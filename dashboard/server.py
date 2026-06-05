@@ -26,7 +26,8 @@ async def _broadcast(payload: dict) -> None:
 
 def setup_event_forwarding() -> None:
     """Call once at startup to wire the event bus to WebSocket clients."""
-    events.subscribe(_broadcast)
+    if _broadcast not in events._subscribers:
+        events.subscribe(_broadcast)
 
 
 @router.get("/", response_class=HTMLResponse)

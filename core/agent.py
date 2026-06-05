@@ -1,3 +1,5 @@
+import asyncio
+import inspect
 import httpx
 from core.config import get_config
 from core.registry import get_tool_schemas, call_tool
@@ -39,6 +41,12 @@ async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
                 fn = tc["function"]
                 try:
                     result = call_tool(fn["name"], fn.get("arguments") or {})
+                    if inspect.isawaitable(result):
+                        result = await result
                 except Exception as exc:
                     result = f"Error calling {fn['name']}: {exc}"
-                history.append({"role": "tool", "content": str(result)})
+                history.append({
+                    "role": "tool",
+                    "tool_call_id": tc.get("id", ""),
+                    "content": str(result),
+                })

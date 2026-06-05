@@ -100,7 +100,7 @@ class VoicePipeline:
 
             while True:
                 try:
-                    chunk = await asyncio.wait_for(audio_q.get(), timeout=2.0)
+                    chunk = await asyncio.wait_for(audio_q.get(), timeout=config.silence_timeout_seconds)
                 except asyncio.TimeoutError:
                     break
                 speech_chunks.append(chunk)
@@ -142,3 +142,4 @@ class VoicePipeline:
                 sd.play(audio_out, samplerate=24000, blocking=True)
             except Exception:
                 logger.exception("TTS playback error")
+                await events.emit("status", {"state": "armed"})
