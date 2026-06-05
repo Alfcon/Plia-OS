@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Plia-OS</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: monospace; background: #0d0d0d; color: #e0e0e0; display: flex; height: 100vh; }
+    aside { width: 300px; padding: 16px; border-right: 1px solid #333; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+    main { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+    h2 { font-size: 0.85rem; text-transform: uppercase; color: #888; margin-bottom: 6px; }
+    #status-badge { padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; background: #1a1a2e; color: #4fc3f7; display: inline-block; }
+    .msg { padding: 8px 10px; border-radius: 6px; max-width: 80%; margin-bottom: 4px; font-size: 0.9rem; }
+    .msg.user { background: #1e3a5f; align-self: flex-end; }
+    .msg.assistant { background: #1a1a1a; border: 1px solid #333; }
+    .msg.tool { background: #1a2e1a; border: 1px solid #2e4d2e; font-size: 0.8rem; color: #a5d6a7; }
+    label { font-size: 0.8rem; color: #aaa; display: block; margin-bottom: 4px; }
+    select, input[type=range], input[type=number] { width: 100%; background: #1a1a1a; color: #e0e0e0; border: 1px solid #333; border-radius: 4px; padding: 4px 6px; }
+    button { background: #1e3a5f; color: #e0e0e0; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 0.8rem; width: 100%; }
+    button:hover { background: #2a4d7a; }
+    #module-list { font-size: 0.8rem; }
+    #module-list li { padding: 3px 0; border-bottom: 1px solid #222; color: #aaa; }
+    #module-list li span { color: #4fc3f7; }
+  </style>
+</head>
+<body>
+
+<aside>
+  <!-- Status -->
+  <section>
+    <h2>Status</h2>
+    <span id="status-badge">armed</span>
+  </section>
+
+  <!-- Voice Controls -->
+  <section>
+    <h2>Voice</h2>
+    <label>Engine
+      <select id="tts-engine">
+        <option value="kokoro">Kokoro</option>
+        <option value="chatterbox">Chatterbox</option>
+      </select>
+    </label>
+    <label>Kokoro Voice
+      <select id="kokoro-voice">
+        <option value="af_heart">af_heart (US Female)</option>
+        <option value="am_michael">am_michael (US Male)</option>
+        <option value="bf_emma">bf_emma (UK Female)</option>
+        <option value="bm_george">bm_george (UK Male)</option>
+      </select>
+    </label>
+    <label>Speed
+      <input type="range" id="kokoro-speed" min="0.5" max="2.0" step="0.1" value="1.0" />
+    </label>
+    <label>Exaggeration (Chatterbox)
+      <input type="range" id="cb-exag" min="0" max="1" step="0.05" value="0.5" />
+    </label>
+    <button onclick="applyVoiceConfig()">Apply</button>
+  </section>
+
+  <!-- Modules -->
+  <section>
+    <h2>Modules</h2>
+    <ul id="module-list">Loading...</ul>
+  </section>
+</aside>
+
+<main id="conversation">
+  <!-- Messages injected here by WebSocket -->
+</main>
+
+<script>
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'status') {
+      document.getElementById('status-badge').textContent = msg.state;
+    }
+    if (msg.type === 'transcript') {
+      const div = document.createElement('div');
+      div.className = `msg ${msg.role}`;
+      div.textContent = msg.text;
+      document.getElementById('conversation').appendChild(div);
+      div.scrollIntoView();
+    }
+    if (msg.type === 'wake') {
+      document.getElementById('status-badge').textContent = 'listening';
+    }
+  };
+
+  // Load tool list
+  fetch('/api/tools')
+    .then(r => r.json())
+    .then(tools => {
+      const ul = document.getElementById('module-list');
+      ul.innerHTML = Object.entries(tools)
+        .map(([name, desc]) => `<li><span>${name}</span> — ${desc}</li>`)
+        .join('');
+    });
+
+  // Load current config into controls
+  fetch('/api/config')
+    .then(r => r.json())
+    .then(cfg => {
+      document.getElementById('tts-engine').value = cfg.tts_engine;
+      document.getElementById('kokoro-voice').value = cfg.kokoro_voice;
+      document.getElementById('kokoro-speed').value = cfg.kokoro_speed;
+      document.getElementById('cb-exag').value = cfg.chatterbox_exaggeration;
+    });
+
+  function applyVoiceConfig() {
+    const payload = {
+      tts_engine: document.getElementById('tts-engine').value,
+      kokoro_voice: document.getElementById('kokoro-voice').value,
+      kokoro_speed: parseFloat(document.getElementById('kokoro-speed').value),
+      chatterbox_exaggeration: parseFloat(document.getElementById('cb-exag').value),
+    };
+    fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+  }
+</script>
+
+</body>
+</html>
