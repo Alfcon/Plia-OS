@@ -95,3 +95,29 @@ async def test_start_recording_while_active_returns_409(app):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post("/api/start-recording")
     assert resp.status_code == 409
+
+
+async def test_stop_recording_saves_wav_and_updates_config(app, tmp_path):
+    chunk = np.zeros((1600, 1), dtype=np.int16)
+    dashboard_server._recorder.active = True
+    dashboard_server._recorder.chunks = [chunk, chunk]
+    dashboard_server._recorder.thread = None
+
+    with patch.object(dashboard_server, "UPLOADS_DIR", tmp_path):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post("/api/stop-recording")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["filename"].startswith("recording_")
+    assert data["filename"].endswith(".wav")
+    assert (tmp_path / data["filename"]).exists()
+    from core.config import get_config
+    assert get_config().chatterbox_reference_audio == data["path"]
+
+
+async def test_stop_recording_when_idle_returns_409(app):
+    dashboard_server._recorder.active = False
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/stop-recording")
+    assert resp.status_code == 409

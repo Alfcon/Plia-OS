@@ -124,6 +124,28 @@ async def start_recording():
     return {"recording": True}
 
 
+@router.post("/api/stop-recording")
+async def stop_recording():
+    if not _recorder.active:
+        raise HTTPException(status_code=409, detail="Not recording")
+    _recorder._stop_event.set()
+    if _recorder.thread:
+        _recorder.thread.join(timeout=2.0)
+        _recorder.thread = None
+    _recorder.active = False
+    _recorder._stop_event.clear()
+
+    if not _recorder.chunks:
+        raise HTTPException(status_code=500, detail="No audio captured")
+
+    audio = np.concatenate(_recorder.chunks, axis=0)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dest = UPLOADS_DIR / f"recording_{ts}.wav"
+    wavfile.write(str(dest), _RECORD_SAMPLE_RATE, audio)
+    update_config(chatterbox_reference_audio=str(dest))
+    return {"path": str(dest), "filename": dest.name}
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
