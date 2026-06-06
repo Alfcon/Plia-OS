@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 _SAMPLE_RATE = 16000
 _BLOCK_SIZE = 1280  # ~80ms per chunk at 16kHz
-_ENERGY_FLOOR = 0.01  # RMS below this = silence
+_ENERGY_FLOOR = 0.03  # RMS below this = silence (normalised to [-1,1])
+_INT16_MAX = 32768.0  # used to normalise int16 → float for RMS and STT
 
 
 class VoicePipeline:
@@ -46,13 +47,14 @@ class VoicePipeline:
         audio_q: asyncio.Queue[np.ndarray] = asyncio.Queue()
 
         def _cb(indata, frames, time, status):
+            # Capture as int16 to avoid PipeWire float32 normalisation issues
             loop.call_soon_threadsafe(audio_q.put_nowait, indata[:, 0].copy())
 
         await events.emit("status", {"state": "armed"})
         with sd.InputStream(
             samplerate=_SAMPLE_RATE,
             channels=1,
-            dtype="float32",
+            dtype="int16",
             blocksize=_BLOCK_SIZE,
             callback=_cb,
         ):
@@ -87,39 +89,51 @@ class VoicePipeline:
                     if max_iterations is not None:
                         return
                     continue
-                chunk_int16 = (chunk * 32768).astype(np.int16)
-                if self._wake.detect(chunk_int16):
+                if self._wake.detect(chunk):  # chunk is already int16
                     self._wake.reset()
+                    logger.info("Wake word detected")
                     await events.emit("wake", {"detected": True})
                     break
 
             # --- Phase 2: collect speech until silence ---
             await events.emit("status", {"state": "listening"})
+            logger.info("Listening for speech...")
             speech_chunks: list[np.ndarray] = []
             silence_count = 0
+            deadline = asyncio.get_event_loop().time() + config.silence_timeout_seconds
 
-            while True:
+            while asyncio.get_event_loop().time() < deadline:
                 try:
-                    chunk = await asyncio.wait_for(audio_q.get(), timeout=config.silence_timeout_seconds)
+                    chunk = await asyncio.wait_for(audio_q.get(), timeout=0.5)
                 except asyncio.TimeoutError:
-                    break
+                    continue
                 speech_chunks.append(chunk)
-                rms = float(np.sqrt(np.mean(chunk ** 2)))
+                rms = float(np.sqrt(np.mean((chunk / _INT16_MAX) ** 2)))
                 if rms < _ENERGY_FLOOR:
                     silence_count += 1
                     if silence_count >= config.silence_chunks_threshold:
+                        logger.info("Silence detected — collected %d chunks", len(speech_chunks))
                         break
                 else:
                     silence_count = 0
+            else:
+                logger.info("Listening timed out after %.0fs", config.silence_timeout_seconds)
 
             if not speech_chunks:
+                logger.info("No speech captured, returning to armed")
                 continue
 
             # --- Phase 3: transcribe ---
             await events.emit("status", {"state": "processing"})
-            audio = np.concatenate(speech_chunks)
+            audio_int16 = np.concatenate(speech_chunks)
+            audio = audio_int16.astype(np.float32) / _INT16_MAX
+            logger.info("Transcribing %.1f seconds of audio (rms=%.3f)...",
+                        len(audio) / _SAMPLE_RATE,
+                        float(np.sqrt(np.mean(audio ** 2))))
             text = self._stt.transcribe(audio)
+            logger.info("Transcript: %r", text)
             if not text:
+                logger.info("Empty transcript, returning to armed")
                 await events.emit("status", {"state": "armed"})
                 continue
 
@@ -127,19 +141,24 @@ class VoicePipeline:
             self._conversation.append({"role": "user", "content": text})
 
             # --- Phase 4: LLM + tool calls ---
+            logger.info("Calling LLM...")
             try:
                 response, self._conversation = await run_turn(self._conversation)
             except Exception as exc:
                 logger.error("Agent error: %s", exc)
                 response = "I encountered an error. Please try again."
+            logger.info("LLM response: %r", response)
 
             await events.emit("transcript", {"role": "assistant", "text": response})
 
             # --- Phase 5: speak ---
             await events.emit("status", {"state": "speaking"})
+            logger.info("Synthesising speech...")
             try:
                 audio_out = self._tts.synthesise(response)
+                logger.info("Playing audio (%d samples)...", len(audio_out))
                 sd.play(audio_out, samplerate=24000, blocking=True)
+                logger.info("Playback complete")
             except Exception:
                 logger.exception("TTS playback error")
                 await events.emit("status", {"state": "armed"})

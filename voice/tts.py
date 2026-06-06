@@ -33,8 +33,6 @@ class TTSService:
 
     def _load_kokoro(self, config) -> None:
         self._kokoro = KPipeline(lang_code="a")
-        self._kokoro_voice = config.kokoro_voice
-        self._kokoro_speed = config.kokoro_speed
 
     def _ensure_kokoro(self) -> None:
         """Lazily initialise Kokoro for use as a fallback during synthesis."""
@@ -46,8 +44,6 @@ class TTSService:
             import torch
             device = "cuda" if torch.cuda.is_available() else "cpu"
             self._chatterbox = ChatterboxTTS.from_pretrained(device=device)
-            self._cb_ref = config.chatterbox_reference_audio
-            self._cb_exag = config.chatterbox_exaggeration
         except Exception:
             logger.warning("Chatterbox failed to load; Kokoro will be used", exc_info=True)
             update_config(tts_engine="kokoro")
@@ -61,10 +57,11 @@ class TTSService:
         return self._synthesise_kokoro(text)
 
     def _synthesise_kokoro(self, text: str) -> np.ndarray:
+        config = get_config()
         chunks = [
             audio
             for _, _, audio in self._kokoro(
-                text, voice=self._kokoro_voice, speed=self._kokoro_speed
+                text, voice=config.kokoro_voice, speed=config.kokoro_speed
             )
             if audio is not None
         ]
@@ -72,10 +69,11 @@ class TTSService:
 
     def _synthesise_chatterbox(self, text: str) -> np.ndarray:
         try:
+            config = get_config()
             wav = self._chatterbox.generate(
                 text,
-                audio_prompt_path=self._cb_ref,
-                exaggeration=self._cb_exag,
+                audio_prompt_path=config.chatterbox_reference_audio,
+                exaggeration=config.chatterbox_exaggeration,
             )
             return wav.squeeze().numpy()
         except Exception:

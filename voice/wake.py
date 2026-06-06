@@ -6,8 +6,22 @@ from core.config import get_config
 
 try:
     from openwakeword.model import Model
+    from openwakeword import get_pretrained_model_paths
 except ImportError:  # pragma: no cover – optional at import time
     Model = None  # type: ignore[assignment,misc]
+    get_pretrained_model_paths = None  # type: ignore[assignment]
+
+
+def _resolve_model_path(name: str) -> str:
+    """Return a file path for a named pretrained model or pass through if already a path."""
+    import os
+    if os.path.exists(name):
+        return name
+    if get_pretrained_model_paths is not None:
+        matches = [p for p in get_pretrained_model_paths() if name in p]
+        if matches:
+            return matches[0]
+    raise ValueError(f"Wake word model {name!r} not found. Available: {get_pretrained_model_paths()}")
 
 
 class WakeWordDetector:
@@ -16,10 +30,8 @@ class WakeWordDetector:
 
     def load(self) -> None:
         config = get_config()
-        self._model = Model(  # type: ignore[misc]
-            wakeword_models=[config.wake_word_model],
-            inference_framework="onnx",
-        )
+        model_path = _resolve_model_path(config.wake_word_model)
+        self._model = Model(wakeword_model_paths=[model_path])  # type: ignore[misc]
 
     def detect(self, chunk: np.ndarray) -> bool:
         if self._model is None:
