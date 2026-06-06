@@ -1,6 +1,7 @@
 import asyncio
 import json
 import dataclasses
+import logging
 import shutil
 import threading
 import numpy as np
@@ -16,6 +17,8 @@ try:
     import sounddevice as sd
 except ImportError:  # pragma: no cover
     sd = None  # type: ignore[assignment]
+
+logger = logging.getLogger(__name__)
 
 _RECORD_SAMPLE_RATE = 16_000
 
@@ -83,7 +86,7 @@ async def post_config(updates: dict):
 
 @router.post("/api/upload-reference-audio")
 async def upload_reference_audio(file: UploadFile = File(...)):
-    dest = UPLOADS_DIR / file.filename
+    dest = UPLOADS_DIR / Path(file.filename).name
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
     update_config(chatterbox_reference_audio=str(dest))
@@ -101,14 +104,20 @@ async def start_recording():
     _recorder.active = True
 
     def _run() -> None:
-        def _callback(indata: np.ndarray, frames: int, time_info, status) -> None:
-            if not _recorder._stop_event.is_set():
-                _recorder.chunks.append(indata.copy())
+        try:
+            def _callback(indata: np.ndarray, frames: int, time_info, status) -> None:
+                if not _recorder._stop_event.is_set():
+                    _recorder.chunks.append(indata.copy())
 
-        with sd.InputStream(
-            samplerate=_RECORD_SAMPLE_RATE, channels=1, dtype="int16", callback=_callback
-        ):
-            _recorder._stop_event.wait()
+            with sd.InputStream(
+                samplerate=_RECORD_SAMPLE_RATE, channels=1, dtype="int16", callback=_callback
+            ):
+                _recorder._stop_event.wait()
+        except Exception:
+            logger.warning("Recording thread error", exc_info=True)
+        finally:
+            _recorder.active = False
+            _recorder.thread = None
 
     _recorder.thread = threading.Thread(target=_run, daemon=True)
     _recorder.thread.start()
