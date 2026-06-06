@@ -100,6 +100,7 @@ class VoicePipeline:
             logger.info("Listening for speech...")
             speech_chunks: list[np.ndarray] = []
             silence_count = 0
+            speech_detected = False
             deadline = asyncio.get_event_loop().time() + config.silence_timeout_seconds
 
             while asyncio.get_event_loop().time() < deadline:
@@ -109,13 +110,14 @@ class VoicePipeline:
                     continue
                 speech_chunks.append(chunk)
                 rms = float(np.sqrt(np.mean((chunk / _INT16_MAX) ** 2)))
-                if rms < _ENERGY_FLOOR:
+                if rms >= _ENERGY_FLOOR:
+                    speech_detected = True
+                    silence_count = 0
+                elif speech_detected:
                     silence_count += 1
                     if silence_count >= config.silence_chunks_threshold:
                         logger.info("Silence detected — collected %d chunks", len(speech_chunks))
                         break
-                else:
-                    silence_count = 0
             else:
                 logger.info("Listening timed out after %.0fs", config.silence_timeout_seconds)
 
