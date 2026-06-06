@@ -131,7 +131,8 @@ async def stop_recording():
     _recorder._stop_event.set()
     if _recorder.thread:
         _recorder.thread.join(timeout=2.0)
-        _recorder.thread = None
+        if not _recorder.thread.is_alive():
+            _recorder.thread = None
     _recorder.active = False
     _recorder._stop_event.clear()
 
@@ -142,6 +143,7 @@ async def stop_recording():
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     dest = UPLOADS_DIR / f"recording_{ts}.wav"
     wavfile.write(str(dest), _RECORD_SAMPLE_RATE, audio)
+    _recorder.chunks = []
     update_config(chatterbox_reference_audio=str(dest))
     return {"path": str(dest), "filename": dest.name}
 
