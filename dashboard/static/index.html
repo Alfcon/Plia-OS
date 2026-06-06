@@ -180,9 +180,11 @@
   }
 
   async function startRecording() {
+    document.getElementById('cb-record-btn').disabled = true;
     const statusEl = document.getElementById('cb-ref-status');
     const res = await fetch('/api/start-recording', { method: 'POST' });
     if (!res.ok) {
+      document.getElementById('cb-record-btn').disabled = false;
       statusEl.textContent = 'Failed to start recording';
       return;
     }
@@ -210,16 +212,15 @@
       canvas.style.display = '';
       const ctx2d = canvas.getContext('2d');
       const dataArr = new Uint8Array(analyser.frequencyBinCount);
-      function drawMeter() {
+      const drawMeter = () => {
         _recMeterRaf = requestAnimationFrame(drawMeter);
         analyser.getByteFrequencyData(dataArr);
         const level = dataArr.reduce((a, b) => a + b, 0) / dataArr.length / 255;
-        ctx2d.clearRect(0, 0, canvas.width, canvas.height);
         ctx2d.fillStyle = '#1a1a1a';
         ctx2d.fillRect(0, 0, canvas.width, canvas.height);
         ctx2d.fillStyle = '#4caf50';
         ctx2d.fillRect(0, 0, canvas.width * level, canvas.height);
-      }
+      };
       drawMeter();
     } catch (_) { /* mic denied — recording still proceeds server-side */ }
 
@@ -236,7 +237,7 @@
     // Tear down level meter
     if (_recMeterRaf) { cancelAnimationFrame(_recMeterRaf); _recMeterRaf = null; }
     if (_recStream) { _recStream.getTracks().forEach(t => t.stop()); _recStream = null; }
-    if (_recAudioCtx) { _recAudioCtx.close(); _recAudioCtx = null; }
+    if (_recAudioCtx) { _recAudioCtx.close().catch(() => {}); _recAudioCtx = null; }
     document.getElementById('cb-meter').style.display = 'none';
 
     // Restore buttons
@@ -254,6 +255,10 @@
       statusEl.textContent = 'Stop failed';
     }
   }
+
+  window.addEventListener('beforeunload', () => {
+    if (_recTimerInterval) fetch('/api/stop-recording', { method: 'POST', keepalive: true });
+  });
 </script>
 
 </body>
