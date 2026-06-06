@@ -29,8 +29,8 @@ class PliaConfig:
     port: int = 8000
 
     # Pipeline
-    silence_timeout_seconds: float = 15.0
-    silence_chunks_threshold: int = 20  # consecutive ~80ms chunks below energy floor
+    silence_timeout_seconds: float = 8.0
+    silence_chunks_threshold: int = 10  # consecutive ~80ms chunks below energy floor
 
 
 _config = PliaConfig()
