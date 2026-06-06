@@ -240,14 +240,19 @@
     if (_recAudioCtx) { _recAudioCtx.close().catch(() => {}); _recAudioCtx = null; }
     document.getElementById('cb-meter').style.display = 'none';
 
-    // Restore buttons
-    document.getElementById('cb-record-btn').style.display = '';
-    document.getElementById('cb-stop-btn').style.display = 'none';
+    // Disable stop button during save (keep it visible until response returns)
+    document.getElementById('cb-stop-btn').disabled = true;
 
     // Call backend
     const statusEl = document.getElementById('cb-ref-status');
     statusEl.textContent = 'Saving…';
     const res = await fetch('/api/stop-recording', { method: 'POST' });
+
+    // Restore buttons after response
+    document.getElementById('cb-record-btn').style.display = '';
+    document.getElementById('cb-stop-btn').style.display = 'none';
+    document.getElementById('cb-stop-btn').disabled = false;
+
     if (res.ok) {
       const data = await res.json();
       statusEl.textContent = `Loaded: ${data.filename}`;

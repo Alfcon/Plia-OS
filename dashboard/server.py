@@ -86,7 +86,8 @@ async def post_config(updates: dict):
 
 @router.post("/api/upload-reference-audio")
 async def upload_reference_audio(file: UploadFile = File(...)):
-    dest = UPLOADS_DIR / Path(file.filename).name
+    safe_name = Path(file.filename or "upload").name or "upload"
+    dest = UPLOADS_DIR / safe_name
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
     update_config(chatterbox_reference_audio=str(dest))
@@ -131,7 +132,9 @@ async def stop_recording():
     _recorder._stop_event.set()
     if _recorder.thread:
         _recorder.thread.join(timeout=2.0)
-        if not _recorder.thread.is_alive():
+        if _recorder.thread.is_alive():
+            logger.warning("Recording thread did not exit within 2 s — sounddevice may be hung")
+        else:
             _recorder.thread = None
     _recorder.active = False
     _recorder._stop_event.clear()
