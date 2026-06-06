@@ -32,7 +32,9 @@ class TTSService:
         self._loaded = True
 
     def _load_kokoro(self, config) -> None:
-        self._kokoro = KPipeline(lang_code="a")
+        lang_code = config.kokoro_voice[0] if config.kokoro_voice else "a"
+        self._kokoro = KPipeline(lang_code=lang_code)
+        self._kokoro_lang = lang_code
 
     def _ensure_kokoro(self) -> None:
         """Lazily initialise Kokoro for use as a fallback during synthesis."""
@@ -62,6 +64,10 @@ class TTSService:
 
     def _synthesise_kokoro(self, text: str) -> np.ndarray:
         config = get_config()
+        lang_code = config.kokoro_voice[0] if config.kokoro_voice else "a"
+        if lang_code != getattr(self, "_kokoro_lang", None):
+            logger.info("Reloading Kokoro for lang_code=%r", lang_code)
+            self._load_kokoro(config)
         chunks = [
             audio
             for _, _, audio in self._kokoro(
