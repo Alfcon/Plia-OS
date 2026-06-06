@@ -130,9 +130,10 @@ async def stop_recording():
     if not _recorder.active:
         raise HTTPException(status_code=409, detail="Not recording")
     _recorder._stop_event.set()
-    if _recorder.thread:
-        _recorder.thread.join(timeout=2.0)
-        if _recorder.thread.is_alive():
+    t = _recorder.thread
+    if t is not None:
+        t.join(timeout=2.0)
+        if t.is_alive():
             logger.warning("Recording thread did not exit within 2 s — sounddevice may be hung")
         else:
             _recorder.thread = None
