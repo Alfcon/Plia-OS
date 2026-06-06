@@ -52,8 +52,12 @@ class TTSService:
         if not self._loaded:
             raise RuntimeError("Call load() before synthesise()")
         config = get_config()
-        if config.tts_engine == "chatterbox" and self._chatterbox is not None:
-            return self._synthesise_chatterbox(text)
+        if config.tts_engine == "chatterbox":
+            if self._chatterbox is None:
+                logger.info("Loading Chatterbox on demand...")
+                self._load_chatterbox(config)
+            if self._chatterbox is not None:
+                return self._synthesise_chatterbox(text)
         return self._synthesise_kokoro(text)
 
     def _synthesise_kokoro(self, text: str) -> np.ndarray:
