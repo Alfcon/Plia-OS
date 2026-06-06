@@ -1,12 +1,16 @@
 import pytest
 import asyncio
 import json
+import threading
+import numpy as np
+from unittest.mock import patch, MagicMock
 from httpx import AsyncClient, ASGITransport
 from fastapi import FastAPI
 from core.registry import tool
 from core import events
 from core.config import reset_config as _reset_config
 from dashboard.server import router
+from dashboard import server as dashboard_server
 
 
 @pytest.fixture
@@ -20,6 +24,28 @@ def app():
 def reset_cfg():
     yield
     _reset_config()
+
+
+@pytest.fixture(autouse=True)
+def reset_recorder():
+    yield
+    dashboard_server._recorder._stop_event.set()
+    if dashboard_server._recorder.thread:
+        dashboard_server._recorder.thread.join(timeout=1.0)
+    dashboard_server._recorder.active = False
+    dashboard_server._recorder.thread = None
+    dashboard_server._recorder.chunks = []
+    dashboard_server._recorder._stop_event.clear()
+
+
+def _make_mock_sd():
+    """Return a mock sounddevice module whose InputStream is a no-op context manager."""
+    mock_sd = MagicMock()
+    cm = MagicMock()
+    cm.__enter__ = MagicMock(return_value=cm)
+    cm.__exit__ = MagicMock(return_value=False)
+    mock_sd.InputStream.return_value = cm
+    return mock_sd
 
 
 async def test_get_tools(app):
@@ -53,3 +79,19 @@ async def test_post_config_unknown_key_returns_422(app):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post("/api/config", json={"nonexistent_key": "value"})
     assert resp.status_code == 422
+
+
+async def test_start_recording_returns_200(app):
+    with patch("dashboard.server.sd", _make_mock_sd()):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post("/api/start-recording")
+    assert resp.status_code == 200
+    assert resp.json() == {"recording": True}
+    assert dashboard_server._recorder.active is True
+
+
+async def test_start_recording_while_active_returns_409(app):
+    dashboard_server._recorder.active = True
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/start-recording")
+    assert resp.status_code == 409
