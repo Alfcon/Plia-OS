@@ -176,3 +176,108 @@ def test_dramabox_synthesis_fallback_to_kokoro_on_error():
         result = svc.synthesise("hello")
 
     assert isinstance(result, np.ndarray)
+
+
+from httpx import AsyncClient, ASGITransport
+from fastapi import FastAPI
+from dashboard.server import router
+from dashboard import server as dashboard_server
+from core.config import reset_config as _reset_config
+import asyncio
+
+
+@pytest.fixture
+def app():
+    a = FastAPI()
+    a.include_router(router)
+    return a
+
+
+@pytest.fixture(autouse=True)
+def reset_cfg_dashboard():
+    yield
+    _reset_config()
+
+
+async def test_generate_dramabox_not_loaded_returns_409(app):
+    with patch("dashboard.server.get_tts_service", return_value=None):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/generate-dramabox", json={"prompt": "hello"}
+            )
+    assert resp.status_code == 409
+
+
+async def test_generate_dramabox_empty_prompt_returns_422(app):
+    mock_svc = MagicMock()
+    mock_svc._dramabox = MagicMock()
+    with patch("dashboard.server.get_tts_service", return_value=mock_svc):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/generate-dramabox", json={"prompt": "   "}
+            )
+    assert resp.status_code == 422
+
+
+async def test_generate_dramabox_returns_filename(app, tmp_path):
+    mock_svc = MagicMock()
+    mock_svc._dramabox = MagicMock()
+    mock_svc._dramabox.generate_to_file.return_value = str(tmp_path / "out.wav")
+
+    async def _fake_to_thread(fn, *args, **kwargs):
+        return fn(*args, **kwargs)
+
+    with patch("dashboard.server.get_tts_service", return_value=mock_svc), \
+         patch("dashboard.server.UPLOADS_DIR", tmp_path), \
+         patch("asyncio.to_thread", side_effect=_fake_to_thread):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/generate-dramabox", json={"prompt": "hello world"}
+            )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "filename" in data
+    assert data["filename"].startswith("dramabox_")
+    assert data["filename"].endswith(".wav")
+
+
+async def test_upload_reference_audio_dramabox_target(app, tmp_path):
+    import io
+    fake_wav = b"RIFF" + b"\x00" * 40
+    with patch.object(dashboard_server, "UPLOADS_DIR", tmp_path):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/upload-reference-audio?target=dramabox",
+                files={"file": ("ref.wav", io.BytesIO(fake_wav), "audio/wav")},
+            )
+    assert resp.status_code == 200
+    from core.config import get_config
+    assert get_config().dramabox_voice_ref is not None
+    assert get_config().chatterbox_reference_audio is None
+
+
+async def test_stop_recording_dramabox_target(app, tmp_path):
+    chunk = np.zeros((1600, 1), dtype=np.int16)
+    dashboard_server._recorder.active = True
+    dashboard_server._recorder.chunks = [chunk]
+    dashboard_server._recorder.thread = None
+
+    with patch.object(dashboard_server, "UPLOADS_DIR", tmp_path):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post("/api/stop-recording?target=dramabox")
+
+    assert resp.status_code == 200
+    from core.config import get_config
+    assert get_config().dramabox_voice_ref is not None
+    assert get_config().chatterbox_reference_audio is None

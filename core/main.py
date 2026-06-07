@@ -38,6 +38,12 @@ def create_app() -> FastAPI:
         StaticFiles(directory=Path(__file__).parent.parent / "dashboard" / "static"),
         name="static",
     )
+    from dashboard.server import UPLOADS_DIR
+    app.mount(
+        "/uploads",
+        StaticFiles(directory=UPLOADS_DIR),
+        name="uploads",
+    )
     return app
 
 

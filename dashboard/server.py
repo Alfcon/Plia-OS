@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse
 from pathlib import Path
 from core import events, registry
 from core.config import get_config, update_config
+from voice.tts import get_tts_service
 
 try:
     import sounddevice as sd
@@ -85,12 +86,15 @@ async def post_config(updates: dict):
 
 
 @router.post("/api/upload-reference-audio")
-async def upload_reference_audio(file: UploadFile = File(...)):
+async def upload_reference_audio(file: UploadFile = File(...), target: str = "chatterbox"):
     safe_name = Path(file.filename or "upload").name or "upload"
     dest = UPLOADS_DIR / safe_name
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
-    update_config(chatterbox_reference_audio=str(dest))
+    if target == "dramabox":
+        update_config(dramabox_voice_ref=str(dest))
+    else:
+        update_config(chatterbox_reference_audio=str(dest))
     return {"path": str(dest), "filename": file.filename}
 
 
@@ -126,7 +130,7 @@ async def start_recording():
 
 
 @router.post("/api/stop-recording")
-async def stop_recording():
+async def stop_recording(target: str = "chatterbox"):
     if not _recorder.active:
         raise HTTPException(status_code=409, detail="Not recording")
     _recorder._stop_event.set()
@@ -148,7 +152,40 @@ async def stop_recording():
     dest = UPLOADS_DIR / f"recording_{ts}.wav"
     wavfile.write(str(dest), _RECORD_SAMPLE_RATE, audio)
     _recorder.chunks = []
-    update_config(chatterbox_reference_audio=str(dest))
+    if target == "dramabox":
+        update_config(dramabox_voice_ref=str(dest))
+    else:
+        update_config(chatterbox_reference_audio=str(dest))
+    return {"path": str(dest), "filename": dest.name}
+
+
+@router.post("/api/generate-dramabox")
+async def generate_dramabox(body: dict):
+    svc = get_tts_service()
+    if svc is None or svc._dramabox is None:
+        raise HTTPException(status_code=409, detail="Dramabox not loaded")
+    prompt = (body.get("prompt") or "").strip()
+    if not prompt:
+        raise HTTPException(status_code=422, detail="prompt required")
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dest = UPLOADS_DIR / f"dramabox_{ts}.wav"
+    loop = asyncio.get_event_loop()
+
+    def _progress(chunk_idx: int, total: int, est_dur: float) -> None:
+        asyncio.run_coroutine_threadsafe(
+            _broadcast({
+                "type": "dramabox_progress",
+                "chunk": chunk_idx + 1,
+                "total": total,
+                "est_duration_s": round(est_dur, 1),
+            }),
+            loop,
+        )
+
+    await asyncio.to_thread(
+        svc._dramabox.generate_to_file, prompt, str(dest), _progress
+    )
     return {"path": str(dest), "filename": dest.name}
 
 
