@@ -1,6 +1,8 @@
 import logging
+import random
 import numpy as np
 from core.config import get_config, update_config
+from voice.vram_broker import get_vram_broker, ModelEntry
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +48,21 @@ class TTSService:
         _service = self
 
     def _load_kokoro(self, config) -> None:
+        broker = get_vram_broker()
         lang_code = config.kokoro_voice[0] if config.kokoro_voice else "a"
-        self._kokoro = KPipeline(lang_code=lang_code)
-        self._kokoro_lang = lang_code
+
+        def _do_load():
+            self._kokoro = KPipeline(lang_code=lang_code)
+            self._kokoro_lang = lang_code
+
+        def _do_unload():
+            self._kokoro = None
+
+        broker.register(ModelEntry(
+            name="kokoro", priority=1, vram_gb=0.4,
+            load_fn=_do_load, unload_fn=_do_unload,
+        ))
+        broker.request("kokoro")
 
     def _ensure_kokoro(self) -> None:
         if self._kokoro is None:
@@ -58,10 +72,25 @@ class TTSService:
         try:
             import torch
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            self._chatterbox = ChatterboxTTS.from_pretrained(device=device)
+            cb_instance = ChatterboxTTS.from_pretrained(device=device)
         except Exception:
             logger.warning("Chatterbox failed to load; Kokoro will be used", exc_info=True)
             update_config(tts_engine="kokoro")
+            return
+
+        broker = get_vram_broker()
+
+        def _do_load():
+            self._chatterbox = cb_instance
+
+        def _do_unload():
+            self._chatterbox = None
+
+        broker.register(ModelEntry(
+            name="chatterbox", priority=3, vram_gb=2.0,
+            load_fn=_do_load, unload_fn=_do_unload,
+        ))
+        broker.request("chatterbox")
 
     def _load_dramabox(self, config) -> None:
         if DramaboxTTS is None:
@@ -69,12 +98,27 @@ class TTSService:
             update_config(tts_engine="kokoro")
             return
         try:
-            self._dramabox = DramaboxTTS()
-            self._dramabox.load()
+            db_instance = DramaboxTTS()
+            db_instance.load()
         except Exception:
             logger.warning("Dramabox failed to load; Kokoro will be used", exc_info=True)
             self._dramabox = None
             update_config(tts_engine="kokoro")
+            return
+
+        broker = get_vram_broker()
+
+        def _do_load():
+            self._dramabox = db_instance
+
+        def _do_unload():
+            self._dramabox = None
+
+        broker.register(ModelEntry(
+            name="dramabox", priority=3, vram_gb=8.52,
+            load_fn=_do_load, unload_fn=_do_unload,
+        ))
+        broker.request("dramabox")
 
     def synthesise(self, text: str) -> np.ndarray:
         if not self._loaded:
@@ -99,7 +143,9 @@ class TTSService:
         lang_code = config.kokoro_voice[0] if config.kokoro_voice else "a"
         if lang_code != getattr(self, "_kokoro_lang", None):
             logger.info("Reloading Kokoro for lang_code=%r", lang_code)
-            self._load_kokoro(config)
+            # Reload in-place: broker already holds the GPU slot
+            self._kokoro = KPipeline(lang_code=lang_code)
+            self._kokoro_lang = lang_code
         chunks = [
             audio
             for _, _, audio in self._kokoro(
@@ -111,11 +157,18 @@ class TTSService:
 
     def _synthesise_chatterbox(self, text: str) -> np.ndarray:
         try:
+            import torch
             config = get_config()
+            seed = config.chatterbox_seed
+            if seed is None:
+                seed = random.randint(0, 2**31 - 1)
+            torch.manual_seed(seed)
             wav = self._chatterbox.generate(
                 text,
                 audio_prompt_path=config.chatterbox_reference_audio,
                 exaggeration=config.chatterbox_exaggeration,
+                cfg_weight=config.chatterbox_cfg_weight,
+                temperature=config.chatterbox_temperature,
             )
             return wav.squeeze().numpy()
         except Exception:
