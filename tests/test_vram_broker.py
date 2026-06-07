@@ -1,8 +1,11 @@
 # tests/test_vram_broker.py
 import pytest
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 from voice.vram_broker import VRAMBroker, ModelEntry, get_vram_broker
 import voice.vram_broker as broker_module
+
+LIGHT = 1
+HEAVY = 3
 
 
 @pytest.fixture(autouse=True)
@@ -62,6 +65,7 @@ def test_request_does_not_evict_equal_priority():
     b.request("kokoro")
     b.request("whisper")
     e1.unload_fn.assert_not_called()
+    assert e2.state == "gpu"
 
 
 def test_second_heavy_releases_first():
@@ -86,7 +90,7 @@ def test_release_unloads_and_restores_evicted():
     b.request("kokoro")
     b.request("dramabox")   # evicts kokoro
     b.release("dramabox")
-    light.load_fn.assert_called()  # restored
+    assert light.load_fn.call_count == 2  # once for initial load, once for restore
     assert light.state == "gpu"
     assert heavy.state == "unloaded"
 
@@ -124,3 +128,22 @@ def test_get_vram_broker_returns_singleton():
     b1 = get_vram_broker()
     b2 = get_vram_broker()
     assert b1 is b2
+
+
+def test_heavy_to_heavy_swap_does_not_restore_lights_from_first_session():
+    """When swapping between two heavy models, lights evicted for the first
+    heavy are abandoned — only lights evicted for the second heavy are restored."""
+    b = VRAMBroker()
+    light = _make_entry("kokoro", 1)
+    h1 = _make_entry("chatterbox", 3)
+    h2 = _make_entry("dramabox", 3)
+    b.register(light)
+    b.register(h1)
+    b.register(h2)
+    b.request("kokoro")         # kokoro on GPU
+    b.request("chatterbox")     # evicts kokoro (_evicted=["kokoro"]), loads chatterbox
+    b.request("dramabox")       # releases chatterbox, resets _evicted=[], loads dramabox
+    # Now release dramabox — _evicted is [] so nothing is restored
+    b.release("dramabox")
+    assert light.state == "unloaded"   # kokoro is gone — this is expected
+    assert light.load_fn.call_count == 1  # called once (initial), never restored
