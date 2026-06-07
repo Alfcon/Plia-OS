@@ -171,8 +171,8 @@ class VoicePipeline:
             try:
                 audio_out = self._tts.synthesise(response)
                 logger.info("Playing audio (%d samples)...", len(audio_out))
-                # Mute before playback: audio duration + 2s tail covers hardware buffer echo
-                self._wake_muted_until = time.monotonic() + len(audio_out) / 24000.0 + 2.0
+                # Mute before playback: audio duration + 4s tail covers hardware buffer echo
+                self._wake_muted_until = time.monotonic() + len(audio_out) / 24000.0 + 4.0
                 while not audio_q.empty():
                     audio_q.get_nowait()
                 sd.play(audio_out, samplerate=24000, blocking=True)
