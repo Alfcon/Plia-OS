@@ -33,6 +33,7 @@ class VoicePipeline:
         self._tts = TTSService()
         self._running = False
         self._conversation: list[dict] = []
+        self._wake_muted_until: float = 0.0  # epoch time; wake ignored before this
 
     def load(self) -> None:
         self._wake.load()
@@ -89,6 +90,8 @@ class VoicePipeline:
                     if max_iterations is not None:
                         return
                     continue
+                if asyncio.get_event_loop().time() < self._wake_muted_until:
+                    continue  # post-playback mute window — discard echo
                 if self._wake.detect(chunk):  # chunk is already int16
                     self._wake.reset()
                     logger.info("Wake word detected")
@@ -161,7 +164,8 @@ class VoicePipeline:
                 logger.info("Playing audio (%d samples)...", len(audio_out))
                 sd.play(audio_out, samplerate=24000, blocking=True)
                 logger.info("Playback complete")
-                # Discard audio captured during playback (echo suppression)
+                # Mute wake detection for 1.5s after playback — hardware buffer tail
+                self._wake_muted_until = asyncio.get_event_loop().time() + 1.5
                 while not audio_q.empty():
                     audio_q.get_nowait()
                 self._wake.reset()
