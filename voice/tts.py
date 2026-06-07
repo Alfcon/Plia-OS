@@ -138,9 +138,10 @@ class TTSService:
         return self._synthesise_kokoro(text)
 
     def _synthesise_kokoro(self, text: str) -> np.ndarray:
+        self._ensure_kokoro()
         config = get_config()
         lang_code = config.kokoro_voice[0] if config.kokoro_voice else "a"
-        if lang_code != getattr(self, "_kokoro_lang", None):
+        if self._kokoro is None or lang_code != getattr(self, "_kokoro_lang", None):
             logger.info("Reloading Kokoro for lang_code=%r", lang_code)
             # Reload in-place: broker already holds the GPU slot
             self._kokoro = KPipeline(lang_code=lang_code)
@@ -162,6 +163,7 @@ class TTSService:
             if seed is None:
                 seed = random.randint(0, 2**31 - 1)
             torch.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
             wav = self._chatterbox.generate(
                 text,
                 audio_prompt_path=config.chatterbox_reference_audio,

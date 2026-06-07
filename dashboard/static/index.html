@@ -465,7 +465,8 @@
       document.getElementById('db-download').textContent = `Download ${data.filename}`;
       resultEl.style.display = '';
     } else {
-      progressEl.textContent = 'Generation failed — check server logs';
+      const errData = await res.json().catch(() => ({}));
+      progressEl.textContent = errData.detail || 'Generation failed — check server logs';
     }
   }
 

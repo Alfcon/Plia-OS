@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 import numpy as np
 from core.agent import run_turn
 from core.config import get_config
@@ -90,7 +91,7 @@ class VoicePipeline:
                     if max_iterations is not None:
                         return
                     continue
-                if asyncio.get_event_loop().time() < self._wake_muted_until:
+                if time.monotonic() < self._wake_muted_until:
                     continue  # post-playback mute window — discard echo
                 if self._wake.detect(chunk):  # chunk is already int16
                     self._wake.reset()
@@ -162,10 +163,12 @@ class VoicePipeline:
             try:
                 audio_out = self._tts.synthesise(response)
                 logger.info("Playing audio (%d samples)...", len(audio_out))
+                # Mute before playback: audio duration + 2s tail covers hardware buffer echo
+                self._wake_muted_until = time.monotonic() + len(audio_out) / 24000.0 + 2.0
+                while not audio_q.empty():
+                    audio_q.get_nowait()
                 sd.play(audio_out, samplerate=24000, blocking=True)
                 logger.info("Playback complete")
-                # Mute wake detection for 1.5s after playback — hardware buffer tail
-                self._wake_muted_until = asyncio.get_event_loop().time() + 1.5
                 while not audio_q.empty():
                     audio_q.get_nowait()
                 self._wake.reset()
