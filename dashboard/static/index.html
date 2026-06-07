@@ -24,11 +24,47 @@
     #module-list li { padding: 3px 0; border-bottom: 1px solid #222; color: #aaa; }
     #module-list li span { color: #4fc3f7; }
     .ref-status { font-size: 0.75rem; color: #4fc3f7; margin: 2px 0 6px; min-height: 1em; }
+    #vram-bar { padding: 8px 10px; border-bottom: 1px solid #333; font-size: 0.75rem; cursor: pointer; }
+    #vram-bar .vram-row { display: flex; align-items: center; gap: 8px; }
+    #vram-bar .vram-track { flex: 1; height: 5px; background: #333; border-radius: 3px; overflow: hidden; }
+    #vram-bar .vram-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+    #vram-bar .vram-fill.normal { background: #4ade80; }
+    #vram-bar .vram-fill.studio { background: #7c3aed; }
+    #vram-bar-detail { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid #222; }
+    #vram-bar.studio-mode { border-color: #7c3aed; }
+    #vram-bar-detail .model-row { display: flex; justify-content: space-between; padding: 2px 0; color: #aaa; }
+    #vram-bar-detail .model-row .model-name { color: #ccc; }
+    #vram-done-btn { width: 100%; margin-top: 8px; background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
+    #vram-done-btn:hover { background: #991b1b; }
+    #vram-pipeline-toggle { display: flex; gap: 4px; margin-top: 6px; font-size: 0.7rem; }
+    #vram-pipeline-toggle button { width: auto; padding: 3px 8px; font-size: 0.7rem; }
+    #vram-pipeline-toggle button.active { background: #1e3a5f; }
   </style>
 </head>
 <body>
 
 <aside>
+  <!-- VRAM Status Bar -->
+  <div id="vram-bar" onclick="toggleVramDetail()">
+    <div class="vram-row">
+      <span id="vram-dot" style="font-size:0.9rem;">●</span>
+      <span id="vram-label" style="color:#888;">VRAM</span>
+      <div class="vram-track">
+        <div id="vram-fill" class="vram-fill normal" style="width:0%"></div>
+      </div>
+      <span id="vram-text" style="color:#555;">— GB</span>
+      <span id="vram-chevron" style="color:#555;">▼</span>
+    </div>
+    <div id="vram-bar-detail">
+      <div id="vram-model-list"></div>
+      <div id="vram-pipeline-toggle" style="display:none">
+        <span style="color:#888;align-self:center;">Pipeline:</span>
+        <button id="vram-pl-active" class="active" onclick="setStudioPipeline('cpu_stt',event)">Active</button>
+        <button id="vram-pl-pause" onclick="setStudioPipeline('pause',event)">Pause</button>
+      </div>
+      <button id="vram-done-btn" style="display:none" onclick="releaseStudioModel(event)">✓ Done</button>
+    </div>
+  </div>
   <!-- Status -->
   <section>
     <h2>Status</h2>
@@ -163,6 +199,9 @@
       const el = document.getElementById('db-progress');
       if (el) el.textContent = `Generating… chunk ${msg.chunk} / ${msg.total} (est. ${msg.est_duration_s}s)`;
     }
+    if (msg.type === 'vram_status') {
+      updateVramBar(msg);
+    }
   };
 
   // Load tool list
@@ -195,6 +234,7 @@
         document.getElementById('db-ref-status').textContent = `Current: ${name}`;
       }
       onEngineChange();
+      startVramPolling();
     });
 
   function onEngineChange() {
@@ -437,6 +477,115 @@
     } else {
       statusEl.textContent = 'Stop failed';
     }
+  }
+
+  // --- VRAM Status Bar ---
+  let _vramDetailOpen = false;
+  let _vramPollInterval = null;
+  let _activeHeavyModel = null;
+
+  function toggleVramDetail() {
+    _vramDetailOpen = !_vramDetailOpen;
+    document.getElementById('vram-bar-detail').style.display = _vramDetailOpen ? 'block' : 'none';
+    document.getElementById('vram-chevron').textContent = _vramDetailOpen ? '▲' : '▼';
+  }
+
+  function updateVramBar(data) {
+    const fill = document.getElementById('vram-fill');
+    const dot = document.getElementById('vram-dot');
+    const label = document.getElementById('vram-label');
+    const text = document.getElementById('vram-text');
+    const bar = document.getElementById('vram-bar');
+    const doneBtn = document.getElementById('vram-done-btn');
+    const pipelineToggle = document.getElementById('vram-pipeline-toggle');
+
+    const total = data.vram_total_gb || 0;
+    const used = data.vram_used_gb || 0;
+    const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+
+    fill.style.width = pct + '%';
+    text.textContent = total > 0 ? `${used.toFixed(1)} / ${total.toFixed(1)} GB` : '— GB';
+
+    _activeHeavyModel = data.active_heavy || null;
+
+    if (data.studio_mode) {
+      fill.className = 'vram-fill studio';
+      dot.style.color = '#f59e0b';
+      label.textContent = 'STUDIO';
+      label.style.color = '#a78bfa';
+      bar.classList.add('studio-mode');
+      doneBtn.style.display = 'block';
+      doneBtn.textContent = `✓ Done — Release ${(_activeHeavyModel || 'engine').charAt(0).toUpperCase() + (_activeHeavyModel || 'engine').slice(1)}`;
+      pipelineToggle.style.display = 'flex';
+      if (!_vramDetailOpen) {
+        _vramDetailOpen = true;
+        document.getElementById('vram-bar-detail').style.display = 'block';
+        document.getElementById('vram-chevron').textContent = '▲';
+      }
+    } else {
+      fill.className = 'vram-fill normal';
+      dot.style.color = '#4ade80';
+      label.textContent = 'VRAM';
+      label.style.color = '#888';
+      bar.classList.remove('studio-mode');
+      doneBtn.style.display = 'none';
+      pipelineToggle.style.display = 'none';
+    }
+
+    const list = document.getElementById('vram-model-list');
+    list.innerHTML = '';
+    for (const [name, info] of Object.entries(data.models || {})) {
+      const row = document.createElement('div');
+      row.className = 'model-row';
+      const stateColor = info.state === 'gpu' ? '#4ade80' : info.state === 'cpu' ? '#f59e0b' : '#555';
+      row.innerHTML = `<span class="model-name" style="color:${stateColor}">● ${name}</span>` +
+                      `<span>${info.state === 'gpu' ? info.vram_gb.toFixed(2) + ' GB GPU' : info.state}</span>`;
+      list.appendChild(row);
+    }
+  }
+
+  async function pollVramStatus() {
+    try {
+      const r = await fetch('/api/vram/status');
+      if (r.ok) updateVramBar(await r.json());
+    } catch (_) {}
+  }
+
+  function startVramPolling() {
+    pollVramStatus();
+    _vramPollInterval = setInterval(pollVramStatus, 5000);
+  }
+
+  async function releaseStudioModel(e) {
+    e.stopPropagation();
+    if (!_activeHeavyModel) return;
+    const btn = document.getElementById('vram-done-btn');
+    btn.disabled = true;
+    btn.textContent = 'Releasing…';
+    try {
+      await fetch('/api/vram/release', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: _activeHeavyModel}),
+      });
+      await pollVramStatus();
+      const cfg = await fetch('/api/config').then(r => r.json());
+      document.getElementById('tts-engine').value = cfg.tts_engine || 'kokoro';
+      onEngineChange();
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function setStudioPipeline(mode, e) {
+    e.stopPropagation();
+    await fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({studio_pipeline_mode: mode}),
+    });
+    document.getElementById('vram-pl-active').classList.toggle('active', mode === 'cpu_stt');
+    document.getElementById('vram-pl-pause').classList.toggle('active', mode === 'pause');
   }
 
   window.addEventListener('beforeunload', () => {
