@@ -49,11 +49,11 @@ class TTSService:
 
     def _load_kokoro(self, config) -> None:
         broker = get_vram_broker()
-        lang_code = config.kokoro_voice[0] if config.kokoro_voice else "a"
 
         def _do_load():
-            self._kokoro = KPipeline(lang_code=lang_code)
-            self._kokoro_lang = lang_code
+            current_lang = get_config().kokoro_voice[0] if get_config().kokoro_voice else "a"
+            self._kokoro = KPipeline(lang_code=current_lang)
+            self._kokoro_lang = current_lang
 
         def _do_unload():
             self._kokoro = None
@@ -102,7 +102,6 @@ class TTSService:
             db_instance.load()
         except Exception:
             logger.warning("Dramabox failed to load; Kokoro will be used", exc_info=True)
-            self._dramabox = None
             update_config(tts_engine="kokoro")
             return
 
