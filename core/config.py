@@ -18,7 +18,7 @@ class PliaConfig:
     stt_language: str = "en"
 
     # TTS
-    tts_engine: Literal["kokoro", "chatterbox", "dramabox"] = "kokoro"
+    tts_engine: Literal["kokoro", "chatterbox", "dramabox"] = "dramabox"
     kokoro_voice: str = "af_heart"
     kokoro_speed: float = 1.0
     chatterbox_reference_audio: str | None = None
@@ -28,6 +28,14 @@ class PliaConfig:
     dramabox_stg_scale: float = 1.5
     dramabox_seed: int = 42
     dramabox_duration_multiplier: float = 1.1
+
+    # Studio mode
+    studio_pipeline_mode: Literal["cpu_stt", "pause"] = "cpu_stt"
+
+    # Chatterbox sampling
+    chatterbox_seed: int | None = None
+    chatterbox_temperature: float = 0.8
+    chatterbox_cfg_weight: float = 0.5
 
     # Server
     host: str = "0.0.0.0"
