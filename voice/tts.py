@@ -171,8 +171,10 @@ class TTSService:
             )
             return wav.squeeze().numpy()
         except Exception:
-            logger.warning("Chatterbox synthesis failed; falling back to Kokoro", exc_info=True)
-            self._ensure_kokoro()
+            logger.warning("Chatterbox synthesis failed; releasing and falling back to Kokoro", exc_info=True)
+            get_vram_broker().release("chatterbox")
+            if self._kokoro is None:
+                self._load_kokoro(get_config())
             return self._synthesise_kokoro(text)
 
     def _synthesise_dramabox(self, text: str) -> np.ndarray:
@@ -184,6 +186,8 @@ class TTSService:
                 resampled = resampled.mean(dim=0)
             return resampled.numpy().astype(np.float32)
         except Exception:
-            logger.warning("Dramabox synthesis failed; falling back to Kokoro", exc_info=True)
-            self._ensure_kokoro()
+            logger.warning("Dramabox synthesis failed; releasing and falling back to Kokoro", exc_info=True)
+            get_vram_broker().release("dramabox")
+            if self._kokoro is None:
+                self._load_kokoro(get_config())
             return self._synthesise_kokoro(text)

@@ -137,3 +137,33 @@ def test_chatterbox_synthesise_randomises_seed_when_none():
     used_seed = mock_seed.call_args[0][0]
     assert isinstance(used_seed, int)
     assert 0 <= used_seed < 2**31
+
+
+def _make_callable_kokoro():
+    """Returns a mock KPipeline class whose instances are callable iterators."""
+    instance_mock = MagicMock()
+    instance_mock.return_value = iter([(None, None, np.zeros(24000, dtype=np.float32))])
+    class_mock = MagicMock()
+    class_mock.return_value = instance_mock
+    return class_mock
+
+
+def test_chatterbox_fallback_releases_heavy_model():
+    """Synthesis failure must release the heavy model before loading Kokoro fallback."""
+    from voice.vram_broker import get_vram_broker
+    mock_cb = MagicMock()
+    mock_cb.generate.side_effect = RuntimeError("synthesis failed")
+    update_config(tts_engine="chatterbox")
+    with patch("voice.tts.ChatterboxTTS") as MockCB, \
+         patch("voice.tts.KPipeline", _make_callable_kokoro()):
+        MockCB.from_pretrained.return_value = mock_cb
+        svc = TTSService()
+        svc.load()
+        # Verify broker state: chatterbox on GPU, kokoro evicted
+        broker = get_vram_broker()
+        assert broker._models["chatterbox"].state == "gpu"
+        # Now synthesise — chatterbox will fail, should release and load kokoro
+        result = svc.synthesise("hello")
+    # After fallback: chatterbox released, kokoro restored
+    assert broker._models["chatterbox"].state == "unloaded"
+    assert isinstance(result, np.ndarray)

@@ -57,12 +57,7 @@
     </div>
     <div id="vram-bar-detail">
       <div id="vram-model-list"></div>
-      <div id="vram-pipeline-toggle" style="display:none">
-        <span style="color:#888;align-self:center;">Pipeline:</span>
-        <button id="vram-pl-active" class="active" onclick="setStudioPipeline('cpu_stt',event)">Active</button>
-        <button id="vram-pl-pause" onclick="setStudioPipeline('pause',event)">Pause</button>
-      </div>
-      <button id="vram-done-btn" style="display:none" onclick="releaseStudioModel(event)">✓ Done</button>
+<button id="vram-done-btn" style="display:none" onclick="releaseStudioModel(event)">✓ Done</button>
     </div>
   </div>
   <!-- Status -->
@@ -517,7 +512,6 @@
     const text = document.getElementById('vram-text');
     const bar = document.getElementById('vram-bar');
     const doneBtn = document.getElementById('vram-done-btn');
-    const pipelineToggle = document.getElementById('vram-pipeline-toggle');
 
     const total = data.vram_total_gb || 0;
     const used = data.vram_used_gb || 0;
@@ -536,7 +530,6 @@
       bar.classList.add('studio-mode');
       doneBtn.style.display = 'block';
       doneBtn.textContent = `✓ Done — Release ${(_activeHeavyModel || 'engine').charAt(0).toUpperCase() + (_activeHeavyModel || 'engine').slice(1)}`;
-      pipelineToggle.style.display = 'flex';
       if (!_vramDetailOpen) {
         _vramDetailOpen = true;
         document.getElementById('vram-bar-detail').style.display = 'block';
@@ -549,7 +542,6 @@
       label.style.color = '#888';
       bar.classList.remove('studio-mode');
       doneBtn.style.display = 'none';
-      pipelineToggle.style.display = 'none';
     }
 
     const list = document.getElementById('vram-model-list');

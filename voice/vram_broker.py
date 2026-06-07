@@ -89,17 +89,19 @@ class VRAMBroker:
         except Exception:
             total = used = 0.0
 
-        active_heavy = next(
-            (m.name for m in self._models.values() if m.priority == 3 and m.state == "gpu"),
-            None,
-        )
+        with self._lock:
+            active_heavy = next(
+                (m.name for m in self._models.values() if m.priority == 3 and m.state == "gpu"),
+                None,
+            )
+            models_snapshot = {
+                m.name: {"state": m.state, "vram_gb": m.vram_gb if m.state == "gpu" else 0.0}
+                for m in self._models.values()
+            }
         return {
             "studio_mode": active_heavy is not None,
             "active_heavy": active_heavy,
-            "models": {
-                m.name: {"state": m.state, "vram_gb": m.vram_gb if m.state == "gpu" else 0.0}
-                for m in self._models.values()
-            },
+            "models": models_snapshot,
             "vram_used_gb": round(used, 2),
             "vram_total_gb": round(total, 2),
         }
