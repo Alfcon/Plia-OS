@@ -136,7 +136,7 @@
         <input type="range" id="db-stg" min="0.0" max="3.0" step="0.1" value="1.5" />
       </label>
       <label>Seed
-        <input type="number" id="db-seed" value="42" min="0" style="width:100%" />
+        <input type="number" id="db-seed" value="42" min="0" style="width:100%" onchange="applyVoiceConfig()" />
       </label>
 
       <hr style="border-color:#333;margin:8px 0;" />
@@ -187,6 +187,17 @@
     const msg = JSON.parse(ev.data);
     if (msg.type === 'status') {
       document.getElementById('status-badge').textContent = msg.state;
+      const dbProg = document.getElementById('db-progress');
+      if (dbProg) {
+        const isDramabox = document.getElementById('tts-engine').value === 'dramabox';
+        if (msg.state === 'speaking' && isDramabox) {
+          dbProg.style.display = '';
+          dbProg.textContent = 'Synthesising…';
+        } else if (msg.state === 'armed') {
+          dbProg.style.display = 'none';
+          dbProg.textContent = '';
+        }
+      }
     }
     if (msg.type === 'transcript') {
       const div = document.createElement('div');
@@ -567,7 +578,7 @@
   }
 
   function randomiseCbSeed() {
-    document.getElementById('cb-seed').value = '';
+    document.getElementById('cb-seed').value = Math.floor(Math.random() * 2147483647);
     applyVoiceConfig();
   }
 
