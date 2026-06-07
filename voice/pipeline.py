@@ -161,6 +161,10 @@ class VoicePipeline:
                 logger.info("Playing audio (%d samples)...", len(audio_out))
                 sd.play(audio_out, samplerate=24000, blocking=True)
                 logger.info("Playback complete")
+                # Discard audio captured during playback (echo suppression)
+                while not audio_q.empty():
+                    audio_q.get_nowait()
+                self._wake.reset()
             except Exception:
                 logger.exception("TTS playback error")
                 await events.emit("status", {"state": "armed"})
