@@ -18,7 +18,7 @@ class PliaConfig:
     stt_language: str = "en"
 
     # TTS
-    tts_engine: Literal["kokoro", "chatterbox", "dramabox"] = "dramabox"
+    tts_engine: Literal["kokoro", "chatterbox", "dramabox"] = "kokoro"
     kokoro_voice: str = "af_heart"
     kokoro_speed: float = 1.0
     chatterbox_reference_audio: str | None = None
