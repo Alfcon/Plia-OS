@@ -147,3 +147,71 @@ def test_heavy_to_heavy_swap_does_not_restore_lights_from_first_session():
     b.release("dramabox")
     assert light.state == "unloaded"   # kokoro is gone — this is expected
     assert light.load_fn.call_count == 1  # called once (initial), never restored
+
+
+# --- Endpoint tests (Task 4) ---
+from httpx import AsyncClient, ASGITransport
+from fastapi import FastAPI
+from unittest.mock import patch as _patch, MagicMock as _MagicMock
+from dashboard.server import router as _router
+from core.config import reset_config as _reset_config, update_config as _update_config, get_config as _get_config
+
+
+@pytest.fixture
+def _app():
+    a = FastAPI()
+    a.include_router(_router)
+    return a
+
+
+@pytest.fixture(autouse=False)
+def _reset_cfg():
+    yield
+    _reset_config()
+
+
+async def test_vram_status_returns_dict(_app, _reset_cfg):
+    mock_broker = _MagicMock()
+    mock_broker.status.return_value = {
+        "studio_mode": False, "active_heavy": None,
+        "models": {}, "vram_used_gb": 0.5, "vram_total_gb": 7.6,
+    }
+    with _patch("dashboard.server.get_vram_broker", return_value=mock_broker):
+        async with AsyncClient(transport=ASGITransport(app=_app), base_url="http://test") as client:
+            resp = await client.get("/api/vram/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "studio_mode" in data
+    assert "vram_total_gb" in data
+
+
+async def test_vram_release_calls_broker(_app, _reset_cfg):
+    mock_broker = _MagicMock()
+    mock_broker.status.return_value = {
+        "studio_mode": False, "active_heavy": None,
+        "models": {}, "vram_used_gb": 0.0, "vram_total_gb": 7.6,
+    }
+    with _patch("dashboard.server.get_vram_broker", return_value=mock_broker):
+        async with AsyncClient(transport=ASGITransport(app=_app), base_url="http://test") as client:
+            resp = await client.post("/api/vram/release", json={"name": "dramabox"})
+    assert resp.status_code == 200
+    mock_broker.release.assert_called_once_with("dramabox")
+
+
+async def test_vram_release_missing_name_returns_422(_app):
+    async with AsyncClient(transport=ASGITransport(app=_app), base_url="http://test") as client:
+        resp = await client.post("/api/vram/release", json={})
+    assert resp.status_code == 422
+
+
+async def test_vram_release_reverts_tts_engine_to_kokoro(_app, _reset_cfg):
+    _update_config(tts_engine="dramabox")
+    mock_broker = _MagicMock()
+    mock_broker.status.return_value = {
+        "studio_mode": False, "active_heavy": None,
+        "models": {}, "vram_used_gb": 0.0, "vram_total_gb": 7.6,
+    }
+    with _patch("dashboard.server.get_vram_broker", return_value=mock_broker):
+        async with AsyncClient(transport=ASGITransport(app=_app), base_url="http://test") as client:
+            await client.post("/api/vram/release", json={"name": "dramabox"})
+    assert _get_config().tts_engine == "kokoro"

@@ -13,6 +13,7 @@ from pathlib import Path
 from core import events, registry
 from core.config import get_config, update_config
 from voice.tts import get_tts_service
+from voice.vram_broker import get_vram_broker
 
 try:
     import sounddevice as sd
@@ -188,6 +189,22 @@ async def generate_dramabox(body: dict):
         svc._dramabox.generate_to_file, prompt, str(dest), _progress
     )
     return {"path": str(dest), "filename": dest.name}
+
+
+@router.get("/api/vram/status")
+async def vram_status():
+    return get_vram_broker().status()
+
+
+@router.post("/api/vram/release")
+async def vram_release(body: dict):
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="name required")
+    get_vram_broker().release(name)
+    update_config(tts_engine="kokoro")
+    await _broadcast({"type": "vram_status", **get_vram_broker().status()})
+    return get_vram_broker().status()
 
 
 @router.websocket("/ws")
