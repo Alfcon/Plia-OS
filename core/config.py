@@ -18,11 +18,16 @@ class PliaConfig:
     stt_language: str = "en"
 
     # TTS
-    tts_engine: Literal["kokoro", "chatterbox"] = "kokoro"
+    tts_engine: Literal["kokoro", "chatterbox", "dramabox"] = "kokoro"
     kokoro_voice: str = "af_heart"
     kokoro_speed: float = 1.0
     chatterbox_reference_audio: str | None = None
     chatterbox_exaggeration: float = 0.5
+    dramabox_voice_ref: str | None = None
+    dramabox_cfg_scale: float = 2.5
+    dramabox_stg_scale: float = 1.5
+    dramabox_seed: int = 42
+    dramabox_duration_multiplier: float = 1.1
 
     # Server
     host: str = "0.0.0.0"
