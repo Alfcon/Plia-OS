@@ -36,9 +36,6 @@
     #vram-bar-detail .model-row .model-name { color: #ccc; }
     #vram-done-btn { width: 100%; margin-top: 8px; background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
     #vram-done-btn:hover { background: #991b1b; }
-    #vram-pipeline-toggle { display: flex; gap: 4px; margin-top: 6px; font-size: 0.7rem; }
-    #vram-pipeline-toggle button { width: auto; padding: 3px 8px; font-size: 0.7rem; }
-    #vram-pipeline-toggle button.active { background: #1e3a5f; }
   </style>
 </head>
 <body>
@@ -601,17 +598,6 @@
     } finally {
       btn.disabled = false;
     }
-  }
-
-  async function setStudioPipeline(mode, e) {
-    e.stopPropagation();
-    await fetch('/api/config', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({studio_pipeline_mode: mode}),
-    });
-    document.getElementById('vram-pl-active').classList.toggle('active', mode === 'cpu_stt');
-    document.getElementById('vram-pl-pause').classList.toggle('active', mode === 'pause');
   }
 
   window.addEventListener('beforeunload', () => {
