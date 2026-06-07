@@ -84,6 +84,16 @@ class VoicePipeline:
 
             # --- Phase 1: wait for wake word ---
             await events.emit("status", {"state": "armed"})
+            # Drain echo queued during synthesis/playback, then sleep out the mute window
+            while not audio_q.empty():
+                audio_q.get_nowait()
+            remaining = self._wake_muted_until - time.monotonic()
+            if remaining > 0:
+                logger.info("Echo mute: sleeping %.2fs to clear hardware echo", remaining)
+                await asyncio.sleep(remaining)
+                while not audio_q.empty():
+                    audio_q.get_nowait()
+                self._wake.reset()
             while True:
                 try:
                     chunk = await asyncio.wait_for(audio_q.get(), timeout=1.0)
@@ -91,8 +101,6 @@ class VoicePipeline:
                     if max_iterations is not None:
                         return
                     continue
-                if time.monotonic() < self._wake_muted_until:
-                    continue  # post-playback mute window — discard echo
                 if self._wake.detect(chunk):  # chunk is already int16
                     self._wake.reset()
                     logger.info("Wake word detected")
