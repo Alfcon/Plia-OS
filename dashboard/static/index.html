@@ -538,8 +538,14 @@
       const row = document.createElement('div');
       row.className = 'model-row';
       const stateColor = info.state === 'gpu' ? '#4ade80' : info.state === 'cpu' ? '#f59e0b' : '#555';
-      row.innerHTML = `<span class="model-name" style="color:${stateColor}">● ${name}</span>` +
-                      `<span>${info.state === 'gpu' ? info.vram_gb.toFixed(2) + ' GB GPU' : info.state}</span>`;
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'model-name';
+      nameSpan.style.color = stateColor;
+      nameSpan.textContent = `● ${name}`;
+      const stateSpan = document.createElement('span');
+      stateSpan.textContent = info.state === 'gpu' ? `${info.vram_gb.toFixed(2)} GB GPU` : info.state;
+      row.appendChild(nameSpan);
+      row.appendChild(stateSpan);
       list.appendChild(row);
     }
   }
@@ -552,6 +558,7 @@
   }
 
   function startVramPolling() {
+    if (_vramPollInterval) return;
     pollVramStatus();
     _vramPollInterval = setInterval(pollVramStatus, 5000);
   }
@@ -572,6 +579,9 @@
       const cfg = await fetch('/api/config').then(r => r.json());
       document.getElementById('tts-engine').value = cfg.tts_engine || 'kokoro';
       onEngineChange();
+    } catch (err) {
+      console.error('Release failed:', err);
+      await pollVramStatus();
     } finally {
       btn.disabled = false;
     }
