@@ -100,3 +100,79 @@ def test_dramabox_wrapper_generate_to_file_calls_server():
         watermark=True,
         progress_callback=None,
     )
+
+
+import voice.tts as tts_module
+from voice.tts import TTSService
+
+
+@pytest.fixture(autouse=True)
+def reset_tts_singleton():
+    original = getattr(tts_module, '_service', None)
+    if hasattr(tts_module, '_service'):
+        tts_module._service = None
+    yield
+    if hasattr(tts_module, '_service'):
+        tts_module._service = original
+
+
+def test_dramabox_synthesise_resamples_to_24k():
+    fake_wav = torch.zeros(1, 48000)  # 48 kHz, 1 channel
+    mock_db = MagicMock()
+    mock_db.synthesise.return_value = (fake_wav, 48000)
+
+    update_config(tts_engine="dramabox")
+    with patch("voice.tts.DramaboxTTS", return_value=mock_db):
+        svc = TTSService()
+        svc.load()
+        result = svc.synthesise("hello dramabox")
+
+    assert isinstance(result, np.ndarray)
+    assert result.dtype == np.float32
+    assert result.shape == (24000,)   # 48000 downsampled to 24000
+
+
+def test_dramabox_load_failure_falls_back_to_kokoro():
+    fake_audio = np.zeros(24000, dtype=np.float32)
+    mock_kokoro = MagicMock()
+    mock_kokoro.return_value = iter([(None, None, fake_audio)])
+
+    update_config(tts_engine="dramabox")
+    with patch("voice.tts.DramaboxTTS") as MockDB, \
+         patch("voice.tts.KPipeline", return_value=mock_kokoro):
+        MockDB.return_value.load.side_effect = RuntimeError("CUDA OOM")
+        svc = TTSService()
+        svc.load()
+
+    assert get_config().tts_engine == "kokoro"
+
+
+def test_get_tts_service_returns_none_before_load():
+    from voice.tts import get_tts_service
+    assert get_tts_service() is None
+
+
+def test_get_tts_service_returns_instance_after_load():
+    from voice.tts import get_tts_service
+    with patch("voice.tts.KPipeline"):
+        svc = TTSService()
+        svc.load()
+    assert get_tts_service() is svc
+
+
+def test_dramabox_synthesis_fallback_to_kokoro_on_error():
+    fake_audio = np.zeros(24000, dtype=np.float32)
+    mock_kokoro = MagicMock()
+    mock_kokoro.return_value = iter([(None, None, fake_audio)])
+
+    mock_db = MagicMock()
+    mock_db.synthesise.side_effect = RuntimeError("inference failed")
+
+    update_config(tts_engine="dramabox")
+    with patch("voice.tts.DramaboxTTS", return_value=mock_db), \
+         patch("voice.tts.KPipeline", return_value=mock_kokoro):
+        svc = TTSService()
+        svc.load()
+        result = svc.synthesise("hello")
+
+    assert isinstance(result, np.ndarray)

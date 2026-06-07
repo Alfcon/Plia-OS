@@ -6,30 +6,44 @@ logger = logging.getLogger(__name__)
 
 try:
     from kokoro import KPipeline
-except ImportError:  # pragma: no cover
+except ImportError:
     KPipeline = None  # type: ignore[assignment,misc]
 
 try:
     from chatterbox.tts import ChatterboxTTS
-except ImportError:  # pragma: no cover
+except ImportError:
     ChatterboxTTS = None  # type: ignore[assignment,misc]
+
+try:
+    from voice.dramabox.wrapper import DramaboxTTS
+except Exception:
+    DramaboxTTS = None  # type: ignore[assignment,misc]
+
+_service: "TTSService | None" = None
+
+
+def get_tts_service() -> "TTSService | None":
+    return _service
 
 
 class TTSService:
     def __init__(self) -> None:
         self._kokoro = None
         self._chatterbox = None
+        self._dramabox = None
         self._loaded = False
 
     def load(self) -> None:
+        global _service
         config = get_config()
+        if config.tts_engine == "dramabox":
+            self._load_dramabox(config)
         if config.tts_engine == "chatterbox":
             self._load_chatterbox(config)
-        # Load kokoro when it is the primary engine (either originally, or after
-        # chatterbox failed to load and the engine was reset to "kokoro").
         if get_config().tts_engine == "kokoro":
             self._load_kokoro(get_config())
         self._loaded = True
+        _service = self
 
     def _load_kokoro(self, config) -> None:
         lang_code = config.kokoro_voice[0] if config.kokoro_voice else "a"
@@ -37,7 +51,6 @@ class TTSService:
         self._kokoro_lang = lang_code
 
     def _ensure_kokoro(self) -> None:
-        """Lazily initialise Kokoro for use as a fallback during synthesis."""
         if self._kokoro is None:
             self._load_kokoro(get_config())
 
@@ -50,10 +63,29 @@ class TTSService:
             logger.warning("Chatterbox failed to load; Kokoro will be used", exc_info=True)
             update_config(tts_engine="kokoro")
 
+    def _load_dramabox(self, config) -> None:
+        if DramaboxTTS is None:
+            logger.warning("Dramabox not available (missing deps); using Kokoro")
+            update_config(tts_engine="kokoro")
+            return
+        try:
+            self._dramabox = DramaboxTTS()
+            self._dramabox.load()
+        except Exception:
+            logger.warning("Dramabox failed to load; Kokoro will be used", exc_info=True)
+            self._dramabox = None
+            update_config(tts_engine="kokoro")
+
     def synthesise(self, text: str) -> np.ndarray:
         if not self._loaded:
             raise RuntimeError("Call load() before synthesise()")
         config = get_config()
+        if config.tts_engine == "dramabox":
+            if self._dramabox is None:
+                logger.info("Loading Dramabox on demand...")
+                self._load_dramabox(config)
+            if self._dramabox is not None:
+                return self._synthesise_dramabox(text)
         if config.tts_engine == "chatterbox":
             if self._chatterbox is None:
                 logger.info("Loading Chatterbox on demand...")
@@ -88,5 +120,18 @@ class TTSService:
             return wav.squeeze().numpy()
         except Exception:
             logger.warning("Chatterbox synthesis failed; falling back to Kokoro", exc_info=True)
+            self._ensure_kokoro()
+            return self._synthesise_kokoro(text)
+
+    def _synthesise_dramabox(self, text: str) -> np.ndarray:
+        try:
+            import torchaudio
+            waveform, sr = self._dramabox.synthesise(text)  # (C, T) tensor, sr=48000
+            resampled = torchaudio.functional.resample(waveform, sr, 24000)
+            if resampled.dim() > 1:
+                resampled = resampled.mean(dim=0)
+            return resampled.numpy().astype(np.float32)
+        except Exception:
+            logger.warning("Dramabox synthesis failed; falling back to Kokoro", exc_info=True)
             self._ensure_kokoro()
             return self._synthesise_kokoro(text)
