@@ -87,7 +87,8 @@ async def post_config(updates: dict):
 
 @router.post("/api/upload-reference-audio")
 async def upload_reference_audio(file: UploadFile = File(...), target: str = "chatterbox"):
-    safe_name = Path(file.filename or "upload").name or "upload"
+    raw = Path(file.filename or "upload").name or "upload"
+    safe_name = raw if raw not in (".", "..") else "upload"
     dest = UPLOADS_DIR / safe_name
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
