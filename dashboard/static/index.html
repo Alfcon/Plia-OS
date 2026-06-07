@@ -567,7 +567,8 @@
   }
 
   function randomiseCbSeed() {
-    document.getElementById('cb-seed').value = Math.floor(Math.random() * 2147483647);
+    document.getElementById('cb-seed').value = '';
+    applyVoiceConfig();
   }
 
   function startVramPolling() {
