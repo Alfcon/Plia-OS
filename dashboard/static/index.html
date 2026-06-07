@@ -42,6 +42,7 @@
       <select id="tts-engine" onchange="onEngineChange()">
         <option value="kokoro">Kokoro</option>
         <option value="chatterbox">Chatterbox</option>
+        <option value="dramabox">Dramabox</option>
       </select>
     </label>
 
@@ -77,6 +78,43 @@
       </label>
     </div>
 
+    <!-- Dramabox-specific -->
+    <div id="dramabox-controls" style="display:none">
+      <label>Reference Voice (5–10 sec WAV/MP3)
+        <input type="file" id="db-ref-file" accept="audio/*" onchange="uploadDbReferenceAudio()" />
+      </label>
+      <div id="db-ref-status" class="ref-status"></div>
+      <div style="display:flex;gap:6px;margin:4px 0;">
+        <button id="db-record-btn" onclick="startDbRecording()" style="width:auto;padding:6px 10px;">Record</button>
+        <button id="db-stop-btn" onclick="stopDbRecording()" style="display:none;width:auto;padding:6px 10px;">Stop</button>
+        <span id="db-timer" style="display:none;font-size:0.75rem;color:#4fc3f7;align-self:center;"></span>
+      </div>
+      <canvas id="db-meter" width="120" height="10" style="display:none;margin-bottom:4px;border-radius:2px;background:#1a1a1a;"></canvas>
+      <label>CFG Scale
+        <input type="range" id="db-cfg" min="1.0" max="5.0" step="0.1" value="2.5" />
+      </label>
+      <label>STG Scale
+        <input type="range" id="db-stg" min="0.0" max="3.0" step="0.1" value="1.5" />
+      </label>
+      <label>Seed
+        <input type="number" id="db-seed" value="42" min="0" style="width:100%" />
+      </label>
+
+      <hr style="border-color:#333;margin:8px 0;" />
+      <h2>Generate Clip</h2>
+      <label>Prompt
+        <textarea id="db-prompt" rows="4"
+          style="width:100%;background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:4px;padding:4px 6px;font-family:monospace;resize:vertical;"
+          placeholder='A woman speaks warmly, "Welcome to Plia."'></textarea>
+      </label>
+      <button id="db-generate-btn" onclick="generateDramaboxClip()">Generate</button>
+      <div id="db-progress" style="display:none;font-size:0.75rem;color:#4fc3f7;margin:4px 0;"></div>
+      <div id="db-result" style="display:none;margin-top:6px;">
+        <audio id="db-audio" controls style="width:100%;margin-bottom:4px;"></audio>
+        <a id="db-download" download style="font-size:0.75rem;color:#4fc3f7;">Download</a>
+      </div>
+    </div>
+
     <button onclick="applyVoiceConfig()">Apply</button>
   </section>
 
@@ -98,6 +136,12 @@
   let _recMeterRaf = null;
   let _recStream = null;
 
+  let _dbRecTimerInterval = null;
+  let _dbRecTimerSeconds = 0;
+  let _dbRecAudioCtx = null;
+  let _dbRecMeterRaf = null;
+  let _dbRecStream = null;
+
   const ws = new WebSocket(`ws://${location.host}/ws`);
 
   ws.onmessage = (ev) => {
@@ -114,6 +158,10 @@
     }
     if (msg.type === 'wake') {
       document.getElementById('status-badge').textContent = 'listening';
+    }
+    if (msg.type === 'dramabox_progress') {
+      const el = document.getElementById('db-progress');
+      if (el) el.textContent = `Generating… chunk ${msg.chunk} / ${msg.total} (est. ${msg.est_duration_s}s)`;
     }
   };
 
@@ -139,6 +187,13 @@
         const name = cfg.chatterbox_reference_audio.split('/').pop();
         document.getElementById('cb-ref-status').textContent = `Current: ${name}`;
       }
+      document.getElementById('db-cfg').value = cfg.dramabox_cfg_scale;
+      document.getElementById('db-stg').value = cfg.dramabox_stg_scale;
+      document.getElementById('db-seed').value = cfg.dramabox_seed;
+      if (cfg.dramabox_voice_ref) {
+        const name = cfg.dramabox_voice_ref.split('/').pop();
+        document.getElementById('db-ref-status').textContent = `Current: ${name}`;
+      }
       onEngineChange();
     });
 
@@ -146,6 +201,24 @@
     const engine = document.getElementById('tts-engine').value;
     document.getElementById('kokoro-controls').style.display = engine === 'kokoro' ? '' : 'none';
     document.getElementById('chatterbox-controls').style.display = engine === 'chatterbox' ? '' : 'none';
+    document.getElementById('dramabox-controls').style.display = engine === 'dramabox' ? '' : 'none';
+  }
+
+  async function uploadDbReferenceAudio() {
+    const fileInput = document.getElementById('db-ref-file');
+    const file = fileInput.files[0];
+    if (!file) return;
+    const status = document.getElementById('db-ref-status');
+    status.textContent = 'Uploading…';
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch('/api/upload-reference-audio?target=dramabox', { method: 'POST', body: form });
+    if (res.ok) {
+      const data = await res.json();
+      status.textContent = `Loaded: ${data.filename}`;
+    } else {
+      status.textContent = 'Upload failed';
+    }
   }
 
   async function uploadReferenceAudio() {
@@ -171,6 +244,9 @@
       kokoro_voice: document.getElementById('kokoro-voice').value,
       kokoro_speed: parseFloat(document.getElementById('kokoro-speed').value),
       chatterbox_exaggeration: parseFloat(document.getElementById('cb-exag').value),
+      dramabox_cfg_scale: parseFloat(document.getElementById('db-cfg').value),
+      dramabox_stg_scale: parseFloat(document.getElementById('db-stg').value),
+      dramabox_seed: parseInt(document.getElementById('db-seed').value, 10),
     };
     fetch('/api/config', {
       method: 'POST',
@@ -228,6 +304,108 @@
     document.getElementById('cb-stop-btn').style.display = '';
   }
 
+  async function startDbRecording() {
+    document.getElementById('db-record-btn').disabled = true;
+    const statusEl = document.getElementById('db-ref-status');
+    const res = await fetch('/api/start-recording', { method: 'POST' });
+    if (!res.ok) {
+      document.getElementById('db-record-btn').disabled = false;
+      statusEl.textContent = 'Failed to start recording';
+      return;
+    }
+    _dbRecTimerSeconds = 0;
+    const timerEl = document.getElementById('db-timer');
+    timerEl.textContent = 'Recording… 0:00';
+    timerEl.style.display = '';
+    _dbRecTimerInterval = setInterval(() => {
+      _dbRecTimerSeconds++;
+      const m = Math.floor(_dbRecTimerSeconds / 60);
+      const s = String(_dbRecTimerSeconds % 60).padStart(2, '0');
+      timerEl.textContent = `Recording… ${m}:${s}`;
+    }, 1000);
+    try {
+      _dbRecStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      _dbRecAudioCtx = new AudioContext();
+      const analyser = _dbRecAudioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      _dbRecAudioCtx.createMediaStreamSource(_dbRecStream).connect(analyser);
+      const canvas = document.getElementById('db-meter');
+      canvas.style.display = '';
+      const ctx2d = canvas.getContext('2d');
+      const dataArr = new Uint8Array(analyser.frequencyBinCount);
+      const drawMeter = () => {
+        _dbRecMeterRaf = requestAnimationFrame(drawMeter);
+        analyser.getByteFrequencyData(dataArr);
+        const level = dataArr.reduce((a, b) => a + b, 0) / dataArr.length / 255;
+        ctx2d.fillStyle = '#1a1a1a';
+        ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+        ctx2d.fillStyle = '#4caf50';
+        ctx2d.fillRect(0, 0, canvas.width * level, canvas.height);
+      };
+      drawMeter();
+    } catch (_) {}
+    document.getElementById('db-record-btn').style.display = 'none';
+    document.getElementById('db-stop-btn').style.display = '';
+  }
+
+  async function stopDbRecording() {
+    clearInterval(_dbRecTimerInterval);
+    _dbRecTimerInterval = null;
+    document.getElementById('db-timer').style.display = 'none';
+    if (_dbRecMeterRaf) { cancelAnimationFrame(_dbRecMeterRaf); _dbRecMeterRaf = null; }
+    if (_dbRecStream) { _dbRecStream.getTracks().forEach(t => t.stop()); _dbRecStream = null; }
+    if (_dbRecAudioCtx) { _dbRecAudioCtx.close().catch(() => {}); _dbRecAudioCtx = null; }
+    document.getElementById('db-meter').style.display = 'none';
+    document.getElementById('db-stop-btn').disabled = true;
+    const statusEl = document.getElementById('db-ref-status');
+    statusEl.textContent = 'Saving…';
+    const res = await fetch('/api/stop-recording?target=dramabox', { method: 'POST' });
+    document.getElementById('db-record-btn').style.display = '';
+    document.getElementById('db-stop-btn').style.display = 'none';
+    document.getElementById('db-stop-btn').disabled = false;
+    if (res.ok) {
+      const data = await res.json();
+      statusEl.textContent = `Loaded: ${data.filename}`;
+    } else {
+      statusEl.textContent = 'Stop failed';
+    }
+  }
+
+  async function generateDramaboxClip() {
+    const prompt = document.getElementById('db-prompt').value.trim();
+    if (!prompt) return;
+    const btn = document.getElementById('db-generate-btn');
+    const progressEl = document.getElementById('db-progress');
+    const resultEl = document.getElementById('db-result');
+    btn.disabled = true;
+    progressEl.textContent = 'Generating…';
+    progressEl.style.display = '';
+    resultEl.style.display = 'none';
+
+    const payload = {
+      prompt,
+      seed: parseInt(document.getElementById('db-seed').value, 10),
+    };
+    const res = await fetch('/api/generate-dramabox', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+
+    btn.disabled = false;
+    if (res.ok) {
+      const data = await res.json();
+      progressEl.style.display = 'none';
+      const audioEl = document.getElementById('db-audio');
+      audioEl.src = `/uploads/${data.filename}`;
+      document.getElementById('db-download').href = `/uploads/${data.filename}`;
+      document.getElementById('db-download').textContent = `Download ${data.filename}`;
+      resultEl.style.display = '';
+    } else {
+      progressEl.textContent = 'Generation failed — check server logs';
+    }
+  }
+
   async function stopRecording() {
     // Tear down timer
     clearInterval(_recTimerInterval);
@@ -262,7 +440,9 @@
   }
 
   window.addEventListener('beforeunload', () => {
-    if (_recTimerInterval) fetch('/api/stop-recording', { method: 'POST', keepalive: true });
+    if (_recTimerInterval || _dbRecTimerInterval) {
+      fetch('/api/stop-recording', { method: 'POST', keepalive: true });
+    }
   });
 </script>
 
