@@ -17,6 +17,7 @@ dependencies = [
     "kokoro>=0.9",
     "chatterbox-tts>=0.1",
     "scipy>=1.13",
+    "langgraph>=0.2",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +35,8 @@ dramabox = [
     "sentencepiece>=0.1.99",
     "resemble-perth @ git+https://github.com/resemble-ai/Perth.git@master",
 ]
+fallback-openai = ["openai>=1.0"]
+fallback-anthropic = ["anthropic>=0.25"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
