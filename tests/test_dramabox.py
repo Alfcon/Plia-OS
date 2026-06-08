@@ -1,4 +1,5 @@
 import pytest
+import voice.vram_broker as broker_module
 from core.config import reset_config, update_config, get_config
 
 
@@ -7,6 +8,13 @@ def clean_config():
     reset_config()
     yield
     reset_config()
+
+
+@pytest.fixture(autouse=True)
+def reset_broker():
+    broker_module._broker = None
+    yield
+    broker_module._broker = None
 
 
 def test_dramabox_config_fields_accepted():
