@@ -191,6 +191,12 @@ async def generate_dramabox(body: dict):
     return {"path": str(dest), "filename": dest.name}
 
 
+@router.get("/api/system/capabilities")
+async def system_capabilities():
+    from core.system_fit import capabilities
+    return capabilities()
+
+
 @router.get("/api/vram/status")
 async def vram_status():
     return get_vram_broker().status()

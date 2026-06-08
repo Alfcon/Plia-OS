@@ -73,6 +73,7 @@
         <option value="dramabox">Dramabox</option>
       </select>
     </label>
+    <div id="engine-fit-warning" style="display:none;font-size:0.75rem;color:#ef9a9a;margin:2px 0 4px;"></div>
 
     <!-- Kokoro-specific -->
     <div id="kokoro-controls">
@@ -257,11 +258,44 @@
       startVramPolling();
     });
 
+  // Load system capabilities and mark engines that won't fit
+  let _engineCaps = {};
+  fetch('/api/system/capabilities')
+    .then(r => r.json())
+    .then(caps => {
+      _engineCaps = caps;
+      const sel = document.getElementById('tts-engine');
+      for (const [engine, info] of Object.entries(caps)) {
+        if (engine.startsWith('_')) continue;
+        const opt = sel.querySelector(`option[value="${engine}"]`);
+        if (opt && !info.fits) {
+          opt.disabled = true;
+          opt.textContent = opt.textContent + ' ✗';
+          opt.title = info.reason || 'Not available on this system';
+        }
+      }
+      _updateEngineFitWarning();
+    }).catch(() => {});
+
+  function _updateEngineFitWarning() {
+    const engine = document.getElementById('tts-engine').value;
+    const warn = document.getElementById('engine-fit-warning');
+    const info = _engineCaps[engine];
+    if (info && !info.fits) {
+      warn.textContent = '⚠ This is too large for your system — ' + info.reason;
+      warn.style.display = '';
+    } else {
+      warn.style.display = 'none';
+      warn.textContent = '';
+    }
+  }
+
   function onEngineChange() {
     const engine = document.getElementById('tts-engine').value;
     document.getElementById('kokoro-controls').style.display = engine === 'kokoro' ? '' : 'none';
     document.getElementById('chatterbox-controls').style.display = engine === 'chatterbox' ? '' : 'none';
     document.getElementById('dramabox-controls').style.display = engine === 'dramabox' ? '' : 'none';
+    _updateEngineFitWarning();
   }
 
   async function uploadDbReferenceAudio() {
