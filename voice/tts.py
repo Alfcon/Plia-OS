@@ -69,19 +69,16 @@ class TTSService:
             self._load_kokoro(get_config())
 
     def _load_chatterbox(self, config) -> None:
-        try:
-            import torch
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            cb_instance = ChatterboxTTS.from_pretrained(device=device)
-        except Exception:
-            logger.warning("Chatterbox failed to load; Kokoro will be used", exc_info=True)
-            update_config(tts_engine="kokoro")
-            return
-
         broker = get_vram_broker()
 
         def _do_load():
-            self._chatterbox = cb_instance
+            try:
+                import torch
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                self._chatterbox = ChatterboxTTS.from_pretrained(device=device)
+            except Exception:
+                logger.warning("Chatterbox failed to load; Kokoro will be used", exc_info=True)
+                update_config(tts_engine="kokoro")
 
         def _do_unload():
             self._chatterbox = None
@@ -97,18 +94,17 @@ class TTSService:
             logger.warning("Dramabox not available (missing deps); using Kokoro")
             update_config(tts_engine="kokoro")
             return
-        try:
-            db_instance = DramaboxTTS()
-            db_instance.load()
-        except Exception:
-            logger.warning("Dramabox failed to load; Kokoro will be used", exc_info=True)
-            update_config(tts_engine="kokoro")
-            return
 
         broker = get_vram_broker()
 
         def _do_load():
-            self._dramabox = db_instance
+            try:
+                db = DramaboxTTS()
+                db.load()
+                self._dramabox = db
+            except Exception:
+                logger.warning("Dramabox failed to load; Kokoro will be used", exc_info=True)
+                update_config(tts_engine="kokoro")
 
         def _do_unload():
             self._dramabox = None
