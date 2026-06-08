@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 from typing import Literal
 
 
@@ -44,6 +45,19 @@ class PliaConfig:
     # Pipeline
     silence_timeout_seconds: float = 8.0
     silence_chunks_threshold: int = 10  # consecutive ~80ms chunks below energy floor
+
+    # Multiagent LLM fallback
+    fallback_provider: str = ""
+    fallback_model: str = ""
+    fallback_api_key: str = ""
+
+    # Web agent
+    web_search_default: str = "ddg"
+    google_search_api_key: str = ""
+    google_search_cx: str = ""
+
+    # Memory agent
+    memory_dir: str = field(default_factory=lambda: os.path.expanduser("~/.plia"))
 
 
 _config = PliaConfig()
