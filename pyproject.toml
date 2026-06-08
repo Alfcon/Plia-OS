@@ -18,6 +18,7 @@ dependencies = [
     "chatterbox-tts>=0.1",
     "scipy>=1.13",
     "langgraph>=0.2",
+    "chromadb>=0.4",
 ]
 
 [project.optional-dependencies]
