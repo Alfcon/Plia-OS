@@ -1,4 +1,5 @@
 from __future__ import annotations
+import inspect
 import logging
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
@@ -50,7 +51,6 @@ async def _supervisor_node(state: AgentState) -> dict:
 
 
 async def _respond_node(state: AgentState) -> dict:
-    import inspect
     tools = get_tool_schemas()
     history = list(state["messages"])
 
