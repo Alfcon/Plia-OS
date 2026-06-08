@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 import numpy as np
-from core.agent import run_turn
+from core.supervisor import run_turn
 from core.config import get_config
 from core import events
 from voice.wake import WakeWordDetector

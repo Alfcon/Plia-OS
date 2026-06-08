@@ -1,16 +1,23 @@
 import pytest
 import respx
 import httpx
-from core.agent import run_turn
+from core.supervisor import run_turn
 from core.registry import tool
 
 
 @respx.mock
 async def test_plain_text_response():
     respx.post("http://localhost:11434/api/chat").mock(
-        return_value=httpx.Response(200, json={
-            "message": {"role": "assistant", "content": "Hello!", "tool_calls": None}
-        })
+        side_effect=[
+            # Supervisor node: route intent
+            httpx.Response(200, json={
+                "message": {"role": "assistant", "content": "respond", "tool_calls": None}
+            }),
+            # Respond node: generate response
+            httpx.Response(200, json={
+                "message": {"role": "assistant", "content": "Hello!", "tool_calls": None}
+            }),
+        ]
     )
     messages = [{"role": "user", "content": "hi"}]
     text, history = await run_turn(messages)
@@ -24,9 +31,14 @@ async def test_tool_call_then_text():
     def get_answer() -> int:
         return 42
 
-    # First response: tool call
+    # Supervisor node: route intent + respond node: tool call + respond node: final response
     respx.post("http://localhost:11434/api/chat").mock(
         side_effect=[
+            # Supervisor node: route to respond
+            httpx.Response(200, json={
+                "message": {"role": "assistant", "content": "respond", "tool_calls": None}
+            }),
+            # Respond node: tool call
             httpx.Response(200, json={
                 "message": {
                     "role": "assistant",
@@ -34,7 +46,7 @@ async def test_tool_call_then_text():
                     "tool_calls": [{"id": "call_abc", "function": {"name": "get_answer", "arguments": {}}}],
                 }
             }),
-            # Second response: plain text after seeing tool result
+            # Respond node: plain text after seeing tool result
             httpx.Response(200, json={
                 "message": {"role": "assistant", "content": "The answer is 42.", "tool_calls": None}
             }),
@@ -58,6 +70,11 @@ async def test_tool_error_returned_as_string():
 
     respx.post("http://localhost:11434/api/chat").mock(
         side_effect=[
+            # Supervisor node: route to respond
+            httpx.Response(200, json={
+                "message": {"role": "assistant", "content": "respond", "tool_calls": None}
+            }),
+            # Respond node: tool call
             httpx.Response(200, json={
                 "message": {
                     "role": "assistant",
@@ -65,6 +82,7 @@ async def test_tool_error_returned_as_string():
                     "tool_calls": [{"function": {"name": "boom", "arguments": {}}}],
                 }
             }),
+            # Respond node: response after error
             httpx.Response(200, json={
                 "message": {"role": "assistant", "content": "Something went wrong.", "tool_calls": None}
             }),
@@ -85,6 +103,11 @@ async def test_async_tool_is_awaited():
 
     respx.post("http://localhost:11434/api/chat").mock(
         side_effect=[
+            # Supervisor node: route to respond
+            httpx.Response(200, json={
+                "message": {"role": "assistant", "content": "respond", "tool_calls": None}
+            }),
+            # Respond node: async tool call
             httpx.Response(200, json={
                 "message": {
                     "role": "assistant",
@@ -92,6 +115,7 @@ async def test_async_tool_is_awaited():
                     "tool_calls": [{"id": "call_x", "function": {"name": "async_answer", "arguments": {}}}],
                 }
             }),
+            # Respond node: response after async tool
             httpx.Response(200, json={
                 "message": {"role": "assistant", "content": "The async answer is 99.", "tool_calls": None}
             }),
