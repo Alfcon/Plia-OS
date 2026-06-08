@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from core.config import reset_config
 
 
@@ -8,6 +8,14 @@ def clean_config():
     reset_config()
     yield
     reset_config()
+
+
+@pytest.fixture(autouse=True)
+def mock_memory(monkeypatch):
+    mock = MagicMock()
+    mock.recall.return_value = []
+    monkeypatch.setattr("core.supervisor.get_memory_store", lambda: mock)
+    return mock
 
 
 async def test_run_turn_returns_string_and_messages():
@@ -63,3 +71,57 @@ async def test_hop_limit_forces_response():
             {"role": "user", "content": "search everything forever"},
         ])
     assert isinstance(text, str)
+
+
+@pytest.mark.asyncio
+async def test_run_turn_auto_saves_turns(mock_memory):
+    """After run_turn, both user and assistant turns are saved to the memory store."""
+    from core.supervisor import run_turn
+    messages = [
+        {"role": "system", "content": "You are Plia."},
+        {"role": "user", "content": "hello"},
+    ]
+    with patch("agents.llm.httpx.AsyncClient") as mock_client:
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.side_effect = [
+            {"message": {"role": "assistant", "content": "respond", "tool_calls": None}},
+            {"message": {"role": "assistant", "content": "Hello there!", "tool_calls": None}},
+        ]
+        mock_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_resp)
+        response, _ = await run_turn(messages)
+
+    add_turn_calls = mock_memory.add_turn.call_args_list
+    roles = [c[0][0] for c in add_turn_calls]
+    contents = [c[0][1] for c in add_turn_calls]
+    assert "user" in roles
+    assert "assistant" in roles
+    assert "hello" in contents
+    assert "Hello there!" in contents
+
+
+@pytest.mark.asyncio
+async def test_run_turn_injects_memory_context(mock_memory):
+    """memory_context passed to AgentState comes from store.recall on the last user message."""
+    from core.supervisor import run_turn
+    mock_memory.recall.return_value = ["user: my name is Alfcon"]
+    messages = [
+        {"role": "system", "content": "You are Plia."},
+        {"role": "user", "content": "what is my name"},
+    ]
+
+    captured_state = {}
+
+    async def fake_invoke(state, *args, **kwargs):
+        captured_state.update(state)
+        return {
+            "messages": state["messages"] + [{"role": "assistant", "content": "Alfcon"}],
+            "tool_results": [],
+        }
+
+    with patch("core.supervisor._graph") as mock_graph:
+        mock_graph.ainvoke = fake_invoke
+        await run_turn(messages)
+
+    assert "my name is Alfcon" in captured_state.get("memory_context", "")
+    mock_memory.recall.assert_called_once_with("what is my name")

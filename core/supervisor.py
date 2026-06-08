@@ -7,6 +7,7 @@ from core.config import get_config
 from core.registry import get_tool_schemas, call_tool
 from agents.llm import call_llm
 from agents.memory import memory_node
+from agents.memory_store import get_memory_store
 from agents.web import web_node
 from agents.code import code_node
 from agents.calendar import calendar_node
@@ -118,9 +119,16 @@ _graph = _build_graph()
 
 async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
     config = get_config()
+    store = get_memory_store()
+
+    last_user = next(
+        (m["content"] for m in reversed(messages) if m["role"] == "user"), ""
+    )
+    memory_context = "\n".join(store.recall(last_user)) if last_user else ""
+
     state = AgentState(
         messages=list(messages),
-        memory_context="",
+        memory_context=memory_context,
         active_agent=None,
         search_provider=config.web_search_default,
         hop_count=0,
@@ -129,4 +137,11 @@ async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
     result = await _graph.ainvoke(state)
     final_messages = result["messages"]
     last = final_messages[-1]
-    return last.get("content", ""), final_messages
+    response = last.get("content", "")
+
+    if last_user:
+        store.add_turn("user", last_user)
+    if response:
+        store.add_turn("assistant", response)
+
+    return response, final_messages
