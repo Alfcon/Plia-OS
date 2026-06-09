@@ -35,7 +35,7 @@ async def test_calendar_node_add_calls_store(isolated_store):
         update = await calendar_node(_state("add a team meeting on July 1 at 10am"))
     isolated_store.add_event.assert_called_once_with("Team meeting", "2026-07-01", "10:00", 60)
     assert update["active_agent"] == "calendar"
-    assert any("Team meeting" in r or "Added" in r for r in update["tool_results"])
+    assert any("Added event 'Team meeting'" in r for r in update["tool_results"])
 
 
 @pytest.mark.asyncio
@@ -55,6 +55,7 @@ async def test_calendar_node_delete_calls_store(isolated_store):
         update = await calendar_node(_state("delete event abc123"))
     isolated_store.delete_event.assert_called_once_with("abc123-uid")
     assert update["active_agent"] == "calendar"
+    assert any("Deleted event" in r for r in update["tool_results"])
 
 
 @pytest.mark.asyncio

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import datetime
 import json
 import logging
 from typing import TYPE_CHECKING
@@ -37,14 +38,15 @@ async def calendar_node(state: "AgentState") -> dict:
         ])
         parsed = json.loads(msg.get("content", "{}"))
         op = parsed.get("op", "list")
-    except Exception:
+    except Exception as exc:
+        logger.warning("Calendar LLM parse failed, falling back to list: %s", exc)
         op, parsed = "list", {}
 
     store = get_calendar_store()
 
     if op == "add":
         title = parsed.get("title", "Untitled")
-        date_str = parsed.get("date", "2026-01-01")
+        date_str = parsed.get("date", datetime.date.today().isoformat())
         time_str = parsed.get("time", "09:00")
         duration = int(parsed.get("duration", 60))
         uid = store.add_event(title, date_str, time_str, duration)
