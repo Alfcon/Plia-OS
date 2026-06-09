@@ -41,6 +41,9 @@
     #agent-log { margin-top: 6px; }
     #agent-log div { padding: 2px 0; font-size: 0.75rem; color: #666; border-bottom: 1px solid #1a1a1a; }
     #agent-log div.recent { color: #aaa; }
+    .config-row { display: flex; gap: 6px; align-items: flex-end; margin-top: 6px; }
+    .config-row button { flex: 0 0 auto; width: auto; padding: 6px 10px; }
+    #google-fields { margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -176,6 +179,49 @@
     <button onclick="applyVoiceConfig()">Apply</button>
   </section>
 
+  <!-- Fallback LLM -->
+  <section>
+    <h2>Fallback LLM</h2>
+    <label>Provider
+      <select id="fallback-provider" onchange="applyFallbackConfig()">
+        <option value="">None (local only)</option>
+        <option value="openai">OpenAI</option>
+        <option value="anthropic">Anthropic</option>
+      </select>
+    </label>
+    <label style="margin-top:6px;">Model
+      <input type="text" id="fallback-model" placeholder="e.g. gpt-4o" />
+    </label>
+    <label style="margin-top:6px;">API Key
+      <input type="password" id="fallback-api-key" placeholder="sk-…" />
+    </label>
+    <div class="config-row">
+      <button onclick="applyFallbackConfig()">Apply</button>
+    </div>
+  </section>
+
+  <!-- Web Search -->
+  <section>
+    <h2>Web Search</h2>
+    <label>Provider
+      <select id="web-provider" onchange="onWebProviderChange()">
+        <option value="ddg">DuckDuckGo</option>
+        <option value="google">Google</option>
+      </select>
+    </label>
+    <div id="google-fields" style="display:none;">
+      <label style="margin-top:6px;">Google API Key
+        <input type="password" id="google-api-key" placeholder="AIza…" />
+      </label>
+      <label style="margin-top:6px;">Search Engine ID (CX)
+        <input type="text" id="google-cx" placeholder="cx…" />
+      </label>
+    </div>
+    <div class="config-row">
+      <button onclick="applyWebConfig()">Apply</button>
+    </div>
+  </section>
+
   <!-- Modules -->
   <section>
     <h2>Modules</h2>
@@ -283,6 +329,16 @@
         const name = cfg.dramabox_voice_ref.split('/').pop();
         document.getElementById('db-ref-status').textContent = `Current: ${name}`;
       }
+      document.getElementById('fallback-provider').value = cfg.fallback_provider || '';
+      document.getElementById('fallback-model').value = cfg.fallback_model || '';
+      if (cfg.fallback_api_key)
+        document.getElementById('fallback-api-key').value = cfg.fallback_api_key;
+      document.getElementById('web-provider').value = cfg.web_search_default || 'ddg';
+      if (cfg.google_search_api_key)
+        document.getElementById('google-api-key').value = cfg.google_search_api_key;
+      if (cfg.google_search_cx)
+        document.getElementById('google-cx').value = cfg.google_search_cx;
+      onWebProviderChange();
       onEngineChange();
       startVramPolling();
     });
@@ -674,6 +730,35 @@
     } finally {
       btn.disabled = false;
     }
+  }
+
+  function applyFallbackConfig() {
+    fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        fallback_provider: document.getElementById('fallback-provider').value,
+        fallback_model: document.getElementById('fallback-model').value,
+        fallback_api_key: document.getElementById('fallback-api-key').value,
+      }),
+    });
+  }
+
+  function onWebProviderChange() {
+    const isGoogle = document.getElementById('web-provider').value === 'google';
+    document.getElementById('google-fields').style.display = isGoogle ? '' : 'none';
+  }
+
+  function applyWebConfig() {
+    fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        web_search_default: document.getElementById('web-provider').value,
+        google_search_api_key: document.getElementById('google-api-key').value,
+        google_search_cx: document.getElementById('google-cx').value,
+      }),
+    });
   }
 
   window.addEventListener('beforeunload', () => {
