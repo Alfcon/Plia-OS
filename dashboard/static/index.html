@@ -36,6 +36,11 @@
     #vram-bar-detail .model-row .model-name { color: #ccc; }
     #vram-done-btn { width: 100%; margin-top: 8px; background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
     #vram-done-btn:hover { background: #991b1b; }
+    .agent-badge { padding: 3px 8px; border-radius: 3px; font-size: 0.75rem; display: inline-block; background: #1a1a1a; color: #555; border: 1px solid #333; }
+    .agent-badge.active { background: #1e3a5f; color: #4fc3f7; border-color: #4fc3f7; }
+    #agent-log { margin-top: 6px; }
+    #agent-log div { padding: 2px 0; font-size: 0.75rem; color: #666; border-bottom: 1px solid #1a1a1a; }
+    #agent-log div.recent { color: #aaa; }
   </style>
 </head>
 <body>
@@ -61,6 +66,19 @@
   <section>
     <h2>Status</h2>
     <span id="status-badge">armed</span>
+  </section>
+
+  <!-- Agents Panel -->
+  <section>
+    <h2>Agents</h2>
+    <div id="agent-badges" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
+      <span class="agent-badge" data-agent="memory">memory</span>
+      <span class="agent-badge" data-agent="web">web</span>
+      <span class="agent-badge" data-agent="code">code</span>
+      <span class="agent-badge" data-agent="calendar">calendar</span>
+      <span class="agent-badge" data-agent="home">home</span>
+    </div>
+    <div id="agent-log"></div>
   </section>
 
   <!-- Voice Controls -->
@@ -209,6 +227,17 @@
     }
     if (msg.type === 'wake') {
       document.getElementById('status-badge').textContent = 'listening';
+    }
+    if (msg.type === 'agent_routing') {
+      document.querySelectorAll('.agent-badge').forEach(b => b.classList.remove('active'));
+      const badge = document.querySelector(`.agent-badge[data-agent="${msg.agent}"]`);
+      if (badge) badge.classList.add('active');
+      const log = document.getElementById('agent-log');
+      const entry = document.createElement('div');
+      entry.className = 'recent';
+      entry.textContent = `→ ${msg.agent}`;
+      log.insertBefore(entry, log.firstChild);
+      while (log.children.length > 5) log.removeChild(log.lastChild);
     }
     if (msg.type === 'dramabox_progress') {
       const el = document.getElementById('db-progress');
