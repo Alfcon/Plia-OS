@@ -16,7 +16,7 @@
     .msg.assistant { background: #1a1a1a; border: 1px solid #333; }
     .msg.tool { background: #1a2e1a; border: 1px solid #2e4d2e; font-size: 0.8rem; color: #a5d6a7; }
     label { font-size: 0.8rem; color: #aaa; display: block; margin-bottom: 4px; }
-    select, input[type=range], input[type=number] { width: 100%; background: #1a1a1a; color: #e0e0e0; border: 1px solid #333; border-radius: 4px; padding: 4px 6px; }
+    select, input[type=range], input[type=number], input[type=text], input[type=password] { width: 100%; background: #1a1a1a; color: #e0e0e0; border: 1px solid #333; border-radius: 4px; padding: 4px 6px; }
     input[type=file] { width: 100%; font-size: 0.75rem; color: #e0e0e0; }
     button { background: #1e3a5f; color: #e0e0e0; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 0.8rem; width: 100%; }
     button:hover { background: #2a4d7a; }
@@ -750,14 +750,16 @@
   }
 
   function applyWebConfig() {
+    const provider = document.getElementById('web-provider').value;
+    const payload = { web_search_default: provider };
+    if (provider === 'google') {
+      payload.google_search_api_key = document.getElementById('google-api-key').value;
+      payload.google_search_cx = document.getElementById('google-cx').value;
+    }
     fetch('/api/config', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        web_search_default: document.getElementById('web-provider').value,
-        google_search_api_key: document.getElementById('google-api-key').value,
-        google_search_cx: document.getElementById('google-cx').value,
-      }),
+      body: JSON.stringify(payload),
     });
   }
 
