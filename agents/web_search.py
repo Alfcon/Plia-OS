@@ -45,10 +45,12 @@ async def scrape_playwright(url: str, max_chars: int = 2000) -> str:
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            text = await page.inner_text("body")
-            await browser.close()
+            try:
+                page = await browser.new_page()
+                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                text = await page.inner_text("body")
+            finally:
+                await browser.close()
         return text[:max_chars]
     except Exception as exc:
         logger.warning("Playwright scrape error: %s", exc)
