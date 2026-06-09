@@ -1,6 +1,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from core.config import reset_config
+from core.supervisor import _supervisor_node
+from core import events
 
 
 @pytest.fixture(autouse=True)
@@ -125,3 +127,69 @@ async def test_run_turn_injects_memory_context(mock_memory):
 
     assert "my name is Alfcon" in captured_state.get("memory_context", "")
     mock_memory.recall.assert_called_once_with("what is my name")
+
+
+@pytest.mark.asyncio
+async def test_supervisor_emits_agent_routing_for_specialist():
+    captured = []
+    async def capture(payload):
+        captured.append(payload)
+
+    events.subscribe(capture)
+    try:
+        state = {
+            "messages": [{"role": "user", "content": "remember my name"}],
+            "memory_context": "", "active_agent": None,
+            "search_provider": "ddg", "hop_count": 0, "tool_results": [],
+        }
+        with patch("core.supervisor.call_llm", new_callable=AsyncMock) as mock_llm:
+            mock_llm.return_value = {"content": "memory"}
+            await _supervisor_node(state)
+    finally:
+        events.unsubscribe(capture)
+
+    routing = [e for e in captured if e["type"] == "agent_routing"]
+    assert len(routing) == 1
+    assert routing[0]["agent"] == "memory"
+
+
+@pytest.mark.asyncio
+async def test_supervisor_does_not_emit_for_respond():
+    captured = []
+    async def capture(payload):
+        captured.append(payload)
+
+    events.subscribe(capture)
+    try:
+        state = {
+            "messages": [{"role": "user", "content": "hello"}],
+            "memory_context": "", "active_agent": None,
+            "search_provider": "ddg", "hop_count": 0, "tool_results": [],
+        }
+        with patch("core.supervisor.call_llm", new_callable=AsyncMock) as mock_llm:
+            mock_llm.return_value = {"content": "respond"}
+            await _supervisor_node(state)
+    finally:
+        events.unsubscribe(capture)
+
+    routing = [e for e in captured if e["type"] == "agent_routing"]
+    assert len(routing) == 0
+
+
+@pytest.mark.asyncio
+async def test_supervisor_does_not_emit_at_hop_limit():
+    captured = []
+    async def capture(payload):
+        captured.append(payload)
+
+    events.subscribe(capture)
+    try:
+        state = {
+            "messages": [], "memory_context": "", "active_agent": None,
+            "search_provider": "ddg", "hop_count": 5, "tool_results": [],
+        }
+        await _supervisor_node(state)
+    finally:
+        events.unsubscribe(capture)
+
+    assert not any(e["type"] == "agent_routing" for e in captured)

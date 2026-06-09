@@ -9,6 +9,7 @@ from agents.llm import call_llm
 from agents.memory import memory_node
 from agents.memory_store import get_memory_store
 from agents.web import web_node
+from core import events
 from agents.code import code_node
 from agents.calendar import calendar_node
 from agents.home import home_node
@@ -48,6 +49,8 @@ async def _supervisor_node(state: AgentState) -> dict:
     if intent not in _KNOWN_INTENTS:
         intent = "respond"
     logger.info("Supervisor routed to: %s", intent)
+    if intent in _KNOWN_INTENTS:
+        await events.emit("agent_routing", {"agent": intent})
     return {"active_agent": intent, "hop_count": state["hop_count"] + 1}
 
 
