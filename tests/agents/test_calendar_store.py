@@ -58,3 +58,8 @@ def test_event_includes_date_in_listing(store):
     store.add_event("Birthday party", "2026-08-15", "18:00", 120)
     events = store.list_events()
     assert any("2026-08-15" in e for e in events)
+
+
+def test_add_event_invalid_date_raises(store):
+    with pytest.raises(ValueError, match="Invalid date/time"):
+        store.add_event("Bad event", "not-a-date", "00:00", 30)

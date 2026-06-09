@@ -42,7 +42,10 @@ class CalendarStore:
         uid = str(uuid.uuid4())
         event.add("uid", uid)
         event.add("summary", title)
-        dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        try:
+            dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        except ValueError as exc:
+            raise ValueError(f"Invalid date/time: '{date_str} {time_str}'") from exc
         event.add("dtstart", dt)
         event.add("dtend", dt + timedelta(minutes=duration_min))
         event.add("dtstamp", datetime.utcnow())
