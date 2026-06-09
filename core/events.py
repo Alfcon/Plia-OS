@@ -15,10 +15,14 @@ def unsubscribe(callback: Callable) -> None:
 async def emit(event_type: str, data: dict) -> None:
     payload = {"type": event_type, **data}
     for callback in list(_subscribers):
-        if asyncio.iscoroutinefunction(callback):
-            await callback(payload)
-        else:
-            callback(payload)
+        try:
+            if asyncio.iscoroutinefunction(callback):
+                await callback(payload)
+            else:
+                callback(payload)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Event subscriber error (event=%s)", event_type)
 
 
 def clear_subscribers() -> None:
