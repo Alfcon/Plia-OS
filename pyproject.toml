@@ -19,6 +19,7 @@ dependencies = [
     "scipy>=1.13",
     "langgraph>=0.2",
     "chromadb>=0.4",
+    "duckduckgo-search>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -38,6 +39,7 @@ dramabox = [
 ]
 fallback-openai = ["openai>=1.0"]
 fallback-anthropic = ["anthropic>=0.25"]
+playwright = ["playwright>=1.40"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
