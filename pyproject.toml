@@ -20,6 +20,7 @@ dependencies = [
     "langgraph>=0.2",
     "chromadb>=0.4",
     "duckduckgo-search>=6.0",
+    "icalendar>=5.0",
 ]
 
 [project.optional-dependencies]
