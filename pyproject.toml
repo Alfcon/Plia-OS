@@ -19,7 +19,7 @@ dependencies = [
     "scipy>=1.13",
     "langgraph>=0.2",
     "chromadb>=0.4",
-    "duckduckgo-search>=6.0",
+    "ddgs>=0.1",
     "icalendar>=5.0",
 ]
 

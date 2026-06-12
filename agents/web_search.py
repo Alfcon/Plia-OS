@@ -3,7 +3,7 @@ import asyncio
 import re
 import logging
 import httpx
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 logger = logging.getLogger(__name__)
 
