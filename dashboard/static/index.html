@@ -91,15 +91,16 @@
         <!-- Voice pane -->
         <div id="m-section-voice" class="m-pane">
           <label>Engine
-            <select id="m-tts-engine" onchange="onMenuEngineChange()">
+            <select id="tts-engine" onchange="onEngineChange()">
               <option value="kokoro">Kokoro</option>
               <option value="chatterbox">Chatterbox</option>
               <option value="dramabox">Dramabox</option>
             </select>
           </label>
-          <div id="m-kokoro-opts">
+          <div id="engine-fit-warning" style="display:none;font-size:0.75rem;color:#ef9a9a;margin:2px 0 4px;"></div>
+          <div id="kokoro-controls">
             <label>Voice
-              <select id="m-kokoro-voice">
+              <select id="kokoro-voice">
                 <option value="af_heart">af_heart (US Female)</option>
                 <option value="am_michael">am_michael (US Male)</option>
                 <option value="bf_emma">bf_emma (UK Female)</option>
@@ -107,10 +108,78 @@
               </select>
             </label>
             <label>Speed
-              <input type="range" id="m-kokoro-speed" min="0.5" max="2.0" step="0.1" value="1.0" />
+              <input type="range" id="kokoro-speed" min="0.5" max="2.0" step="0.1" value="1.0" />
             </label>
           </div>
-          <button class="apply-btn" onclick="applyMenuVoice()">Apply</button>
+          <div id="chatterbox-controls" style="display:none">
+            <label>Reference Voice (5–10 sec WAV/MP3)
+              <input type="file" id="cb-ref-file" accept="audio/*" onchange="uploadReferenceAudio()" />
+            </label>
+            <div id="cb-ref-status" class="ref-status"></div>
+            <div style="display:flex;gap:6px;margin:4px 0;">
+              <button id="cb-record-btn" onclick="startRecording()" style="width:auto;padding:6px 10px;">Record</button>
+              <button id="cb-stop-btn" onclick="stopRecording()" style="display:none;width:auto;padding:6px 10px;">Stop</button>
+              <span id="cb-timer" style="display:none;font-size:0.75rem;color:#4fc3f7;align-self:center;"></span>
+            </div>
+            <canvas id="cb-meter" width="120" height="10" style="display:none;margin-bottom:4px;border-radius:2px;background:#1a1a1a;"></canvas>
+            <label>Exaggeration
+              <input type="range" id="cb-exag" min="0" max="1" step="0.05" value="0.5" />
+            </label>
+            <label>CFG Weight <span style="font-size:0.7rem;color:#555;">— voice ref strength</span>
+              <input type="range" id="cb-cfg" min="0" max="1" step="0.05" value="0.5" />
+            </label>
+            <label>Temperature <span style="font-size:0.7rem;color:#555;">— sampling creativity</span>
+              <input type="range" id="cb-temp" min="0.1" max="2.0" step="0.05" value="0.8" />
+            </label>
+            <label>Seed <span style="font-size:0.7rem;color:#555;">— blank = random each time</span></label>
+            <div style="display:flex;gap:6px;margin-bottom:6px;">
+              <input type="number" id="cb-seed" placeholder="random" style="flex:1;" />
+              <button onclick="randomiseCbSeed()" style="width:auto;padding:6px 8px;">🎲</button>
+            </div>
+            <hr style="border-color:#333;margin:8px 0;" />
+            <h2>Generate Clip</h2>
+            <label>Prompt
+              <textarea id="cb-prompt" rows="3" style="width:100%;background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:4px;padding:4px 6px;font-family:monospace;resize:vertical;" placeholder='Hello, this is a test of Chatterbox voice cloning.'></textarea>
+            </label>
+            <button id="cb-generate-btn" onclick="generateChatterboxClip()">Generate</button>
+            <div id="cb-result" style="display:none;margin-top:6px;">
+              <audio id="cb-audio" controls style="width:100%;margin-bottom:4px;"></audio>
+              <a id="cb-download" download style="font-size:0.75rem;color:#4fc3f7;">Download</a>
+            </div>
+          </div>
+          <div id="dramabox-controls" style="display:none">
+            <label>Reference Voice (5–10 sec WAV/MP3)
+              <input type="file" id="db-ref-file" accept="audio/*" onchange="uploadDbReferenceAudio()" />
+            </label>
+            <div id="db-ref-status" class="ref-status"></div>
+            <div style="display:flex;gap:6px;margin:4px 0;">
+              <button id="db-record-btn" onclick="startDbRecording()" style="width:auto;padding:6px 10px;">Record</button>
+              <button id="db-stop-btn" onclick="stopDbRecording()" style="display:none;width:auto;padding:6px 10px;">Stop</button>
+              <span id="db-timer" style="display:none;font-size:0.75rem;color:#4fc3f7;align-self:center;"></span>
+            </div>
+            <canvas id="db-meter" width="120" height="10" style="display:none;margin-bottom:4px;border-radius:2px;background:#1a1a1a;"></canvas>
+            <label>CFG Scale
+              <input type="range" id="db-cfg" min="1.0" max="5.0" step="0.1" value="2.5" />
+            </label>
+            <label>STG Scale
+              <input type="range" id="db-stg" min="0.0" max="3.0" step="0.1" value="1.5" />
+            </label>
+            <label>Seed
+              <input type="number" id="db-seed" value="42" min="0" style="width:100%" onchange="applyVoiceConfig()" />
+            </label>
+            <hr style="border-color:#333;margin:8px 0;" />
+            <h2>Generate Clip</h2>
+            <label>Prompt
+              <textarea id="db-prompt" rows="3" style="width:100%;background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:4px;padding:4px 6px;font-family:monospace;resize:vertical;" placeholder='A woman speaks warmly, "Welcome to Plia."'></textarea>
+            </label>
+            <button id="db-generate-btn" onclick="generateDramaboxClip()">Generate</button>
+            <div id="db-progress" style="display:none;font-size:0.75rem;color:#4fc3f7;margin:4px 0;"></div>
+            <div id="db-result" style="display:none;margin-top:6px;">
+              <audio id="db-audio" controls style="width:100%;margin-bottom:4px;"></audio>
+              <a id="db-download" download style="font-size:0.75rem;color:#4fc3f7;">Download</a>
+            </div>
+          </div>
+          <button class="apply-btn" onclick="applyVoiceConfig()">Apply</button>
         </div>
         <!-- Web pane -->
         <div id="m-section-web" class="m-pane" style="display:none">
@@ -182,113 +251,6 @@
     <div id="agent-log"></div>
   </section>
 
-  <!-- Voice Controls -->
-  <section>
-    <h2>Voice</h2>
-    <label>Engine
-      <select id="tts-engine" onchange="onEngineChange()">
-        <option value="kokoro">Kokoro</option>
-        <option value="chatterbox">Chatterbox</option>
-        <option value="dramabox">Dramabox</option>
-      </select>
-    </label>
-    <div id="engine-fit-warning" style="display:none;font-size:0.75rem;color:#ef9a9a;margin:2px 0 4px;"></div>
-
-    <!-- Kokoro-specific -->
-    <div id="kokoro-controls">
-      <label>Voice
-        <select id="kokoro-voice">
-          <option value="af_heart">af_heart (US Female)</option>
-          <option value="am_michael">am_michael (US Male)</option>
-          <option value="bf_emma">bf_emma (UK Female)</option>
-          <option value="bm_george">bm_george (UK Male)</option>
-        </select>
-      </label>
-      <label>Speed
-        <input type="range" id="kokoro-speed" min="0.5" max="2.0" step="0.1" value="1.0" />
-      </label>
-    </div>
-
-    <!-- Chatterbox-specific -->
-    <div id="chatterbox-controls" style="display:none">
-      <label>Reference Voice (5–10 sec WAV/MP3)
-        <input type="file" id="cb-ref-file" accept="audio/*" onchange="uploadReferenceAudio()" />
-      </label>
-      <div id="cb-ref-status" class="ref-status"></div>
-      <div style="display:flex;gap:6px;margin:4px 0;">
-        <button id="cb-record-btn" onclick="startRecording()" style="width:auto;padding:6px 10px;">Record</button>
-        <button id="cb-stop-btn" onclick="stopRecording()" style="display:none;width:auto;padding:6px 10px;">Stop</button>
-        <span id="cb-timer" style="display:none;font-size:0.75rem;color:#4fc3f7;align-self:center;"></span>
-      </div>
-      <canvas id="cb-meter" width="120" height="10" style="display:none;margin-bottom:4px;border-radius:2px;background:#1a1a1a;"></canvas>
-      <label>Exaggeration
-        <input type="range" id="cb-exag" min="0" max="1" step="0.05" value="0.5" />
-      </label>
-      <label>CFG Weight <span style="font-size:0.7rem;color:#555;">— voice ref strength</span>
-        <input type="range" id="cb-cfg" min="0" max="1" step="0.05" value="0.5" />
-      </label>
-      <label>Temperature <span style="font-size:0.7rem;color:#555;">— sampling creativity</span>
-        <input type="range" id="cb-temp" min="0.1" max="2.0" step="0.05" value="0.8" />
-      </label>
-      <label>Seed <span style="font-size:0.7rem;color:#555;">— blank = random each time</span></label>
-      <div style="display:flex;gap:6px;margin-bottom:6px;">
-        <input type="number" id="cb-seed" placeholder="random" style="flex:1;" />
-        <button onclick="randomiseCbSeed()" style="width:auto;padding:6px 8px;">🎲</button>
-      </div>
-
-      <hr style="border-color:#333;margin:8px 0;" />
-      <h2>Generate Clip</h2>
-      <label>Prompt
-        <textarea id="cb-prompt" rows="4"
-          style="width:100%;background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:4px;padding:4px 6px;font-family:monospace;resize:vertical;"
-          placeholder='Hello, this is a test of Chatterbox voice cloning.'></textarea>
-      </label>
-      <button id="cb-generate-btn" onclick="generateChatterboxClip()">Generate</button>
-      <div id="cb-result" style="display:none;margin-top:6px;">
-        <audio id="cb-audio" controls style="width:100%;margin-bottom:4px;"></audio>
-        <a id="cb-download" download style="font-size:0.75rem;color:#4fc3f7;">Download</a>
-      </div>
-    </div>
-
-    <!-- Dramabox-specific -->
-    <div id="dramabox-controls" style="display:none">
-      <label>Reference Voice (5–10 sec WAV/MP3)
-        <input type="file" id="db-ref-file" accept="audio/*" onchange="uploadDbReferenceAudio()" />
-      </label>
-      <div id="db-ref-status" class="ref-status"></div>
-      <div style="display:flex;gap:6px;margin:4px 0;">
-        <button id="db-record-btn" onclick="startDbRecording()" style="width:auto;padding:6px 10px;">Record</button>
-        <button id="db-stop-btn" onclick="stopDbRecording()" style="display:none;width:auto;padding:6px 10px;">Stop</button>
-        <span id="db-timer" style="display:none;font-size:0.75rem;color:#4fc3f7;align-self:center;"></span>
-      </div>
-      <canvas id="db-meter" width="120" height="10" style="display:none;margin-bottom:4px;border-radius:2px;background:#1a1a1a;"></canvas>
-      <label>CFG Scale
-        <input type="range" id="db-cfg" min="1.0" max="5.0" step="0.1" value="2.5" />
-      </label>
-      <label>STG Scale
-        <input type="range" id="db-stg" min="0.0" max="3.0" step="0.1" value="1.5" />
-      </label>
-      <label>Seed
-        <input type="number" id="db-seed" value="42" min="0" style="width:100%" onchange="applyVoiceConfig()" />
-      </label>
-
-      <hr style="border-color:#333;margin:8px 0;" />
-      <h2>Generate Clip</h2>
-      <label>Prompt
-        <textarea id="db-prompt" rows="4"
-          style="width:100%;background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:4px;padding:4px 6px;font-family:monospace;resize:vertical;"
-          placeholder='A woman speaks warmly, "Welcome to Plia."'></textarea>
-      </label>
-      <button id="db-generate-btn" onclick="generateDramaboxClip()">Generate</button>
-      <div id="db-progress" style="display:none;font-size:0.75rem;color:#4fc3f7;margin:4px 0;"></div>
-      <div id="db-result" style="display:none;margin-top:6px;">
-        <audio id="db-audio" controls style="width:100%;margin-bottom:4px;"></audio>
-        <a id="db-download" download style="font-size:0.75rem;color:#4fc3f7;">Download</a>
-      </div>
-    </div>
-
-    <button onclick="applyVoiceConfig()">Apply</button>
-  </section>
 
   <!-- Fallback LLM -->
   <section>
@@ -934,34 +896,17 @@
   }
 
   function _syncMenuInputs() {
-    document.getElementById('m-tts-engine').value = document.getElementById('tts-engine').value;
-    document.getElementById('m-kokoro-voice').value = document.getElementById('kokoro-voice').value;
-    document.getElementById('m-kokoro-speed').value = document.getElementById('kokoro-speed').value;
     document.getElementById('m-web-provider').value = document.getElementById('web-provider').value;
     document.getElementById('m-google-api-key').value = document.getElementById('google-api-key').value;
     document.getElementById('m-google-cx').value = document.getElementById('google-cx').value;
-    onMenuEngineChange();
     onMenuWebChange();
     const src = document.getElementById('agent-badges');
     document.getElementById('m-agent-badges').innerHTML = src ? src.innerHTML : '';
   }
 
-  function onMenuEngineChange() {
-    const e = document.getElementById('m-tts-engine').value;
-    document.getElementById('m-kokoro-opts').style.display = e === 'kokoro' ? '' : 'none';
-  }
-
   function onMenuWebChange() {
     const isGoogle = document.getElementById('m-web-provider').value === 'google';
     document.getElementById('m-google-fields').style.display = isGoogle ? '' : 'none';
-  }
-
-  function applyMenuVoice() {
-    document.getElementById('tts-engine').value = document.getElementById('m-tts-engine').value;
-    document.getElementById('kokoro-voice').value = document.getElementById('m-kokoro-voice').value;
-    document.getElementById('kokoro-speed').value = document.getElementById('m-kokoro-speed').value;
-    applyVoiceConfig();
-    onEngineChange();
   }
 
   function applyMenuWeb() {
