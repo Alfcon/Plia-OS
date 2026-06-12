@@ -901,7 +901,7 @@
   }
 
   function openMenu() {
-    document.getElementById('menu-overlay').style.display = '';
+    document.getElementById('menu-overlay').style.display = 'block';
     _syncMenuInputs();
     document.addEventListener('keydown', _menuKeyHandler);
   }
@@ -913,7 +913,7 @@
 
   function toggleMenuSettings() {
     const s = document.getElementById('menu-settings');
-    s.style.display = s.style.display === 'none' ? '' : 'none';
+    s.style.display = s.style.display === 'none' ? 'block' : 'none';
   }
 
   function _syncMenuInputs() {
