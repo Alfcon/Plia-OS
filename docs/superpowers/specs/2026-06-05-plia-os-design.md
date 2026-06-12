@@ -70,7 +70,7 @@ Runs as an asyncio background task inside the FastAPI process.
 | Kokoro | Everyday responses — fast, CPU-only | `voice` (accent/character), `speed` |
 | Chatterbox | Voice cloning, emotional delivery | `reference_audio` (5-sec clip), `exaggeration` (0.0–1.0) |
 
-Engine selection is a config value — no code change required to switch. Kokoro is the default; Chatterbox activates when `reference_audio` is set or emotion control is needed.
+Engine selection is a config value — no code change required to switch. Kokoro is the default. Switch to Chatterbox via the dashboard voice controls or by setting `tts_engine: chatterbox` in `config.py`.
 
 **Voice customisation parameters:**
 
