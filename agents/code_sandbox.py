@@ -54,7 +54,7 @@ def run_python(code: str, timeout: int = 30) -> str:
                 text=True,
                 timeout=timeout,
                 cwd=tmpdir,
-                env={**os.environ, "PYTHONPATH": ""},
+                env={"PATH": _SAFE_PATH, "HOME": "/tmp", "PYTHONPATH": ""},
             )
             output = result.stdout + result.stderr
             return (output or "(no output)")[:_MAX_OUTPUT]

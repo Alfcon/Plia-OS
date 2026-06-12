@@ -68,4 +68,9 @@ async def _call_anthropic(messages: list[dict], tools: list | None, config) -> d
     if system:
         kwargs["system"] = system
     response = await client.messages.create(**kwargs)
-    return {"role": "assistant", "content": response.content[0].text}
+    import anthropic as _anthropic
+    text = next(
+        (block.text for block in response.content if isinstance(block, _anthropic.types.TextBlock)),
+        "",
+    )
+    return {"role": "assistant", "content": text}
