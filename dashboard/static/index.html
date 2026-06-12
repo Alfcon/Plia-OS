@@ -185,21 +185,21 @@
         <!-- Web pane -->
         <div id="m-section-web" class="m-pane" style="display:none">
           <label>Provider
-            <select id="m-web-provider" onchange="onMenuWebChange()">
+            <select id="web-provider" onchange="onWebProviderChange()">
               <option value="ddg">DuckDuckGo</option>
               <option value="google">Google</option>
               <option value="playwright">Playwright</option>
             </select>
           </label>
-          <div id="m-google-fields" style="display:none">
+          <div id="google-fields" style="display:none">
             <label>API Key
-              <input type="password" id="m-google-api-key" placeholder="AIza…" />
+              <input type="password" id="google-api-key" placeholder="AIza…" />
             </label>
             <label>CX
-              <input type="text" id="m-google-cx" placeholder="Search engine ID" />
+              <input type="text" id="google-cx" placeholder="Search engine ID" />
             </label>
           </div>
-          <button class="apply-btn" onclick="applyMenuWeb()">Apply</button>
+          <button class="apply-btn" onclick="applyWebConfig()">Apply</button>
         </div>
         <!-- LLM pane -->
         <div id="m-section-llm" class="m-pane" style="display:none">
@@ -266,27 +266,6 @@
 
 
 
-  <!-- Web Search -->
-  <section>
-    <h2>Web Search</h2>
-    <label>Provider
-      <select id="web-provider" onchange="onWebProviderChange()">
-        <option value="ddg">DuckDuckGo</option>
-        <option value="google">Google</option>
-      </select>
-    </label>
-    <div id="google-fields" style="display:none;">
-      <label style="margin-top:6px;">Google API Key
-        <input type="password" id="google-api-key" placeholder="AIza…" />
-      </label>
-      <label style="margin-top:6px;">Search Engine ID (CX)
-        <input type="text" id="google-cx" placeholder="cx…" />
-      </label>
-    </div>
-    <div class="config-row">
-      <button onclick="applyWebConfig()">Apply</button>
-    </div>
-  </section>
 
   <!-- Modules -->
   <section>
@@ -889,23 +868,6 @@
   }
 
   function _syncMenuInputs() {
-    document.getElementById('m-web-provider').value = document.getElementById('web-provider').value;
-    document.getElementById('m-google-api-key').value = document.getElementById('google-api-key').value;
-    document.getElementById('m-google-cx').value = document.getElementById('google-cx').value;
-    onMenuWebChange();
-  }
-
-  function onMenuWebChange() {
-    const isGoogle = document.getElementById('m-web-provider').value === 'google';
-    document.getElementById('m-google-fields').style.display = isGoogle ? '' : 'none';
-  }
-
-  function applyMenuWeb() {
-    document.getElementById('web-provider').value = document.getElementById('m-web-provider').value;
-    document.getElementById('google-api-key').value = document.getElementById('m-google-api-key').value;
-    document.getElementById('google-cx').value = document.getElementById('m-google-cx').value;
-    applyWebConfig();
-    onWebProviderChange();
   }
 
   async function exitApp() {
