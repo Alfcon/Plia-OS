@@ -373,6 +373,7 @@
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
+    _appendMsg('user', text);
     input.disabled = true;
     document.getElementById('chat-send-btn').disabled = true;
     try {

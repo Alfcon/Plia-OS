@@ -249,7 +249,6 @@ async def chat(body: dict):
     history = [{"role": m["role"], "content": m["content"]} for m in rows]
     history.append({"role": "user", "content": text})
     response, _ = await run_turn(history)
-    await _broadcast({"type": "transcript", "role": "user", "text": text})
     await _broadcast({"type": "transcript", "role": "assistant", "text": response})
     return {"response": response}
 
