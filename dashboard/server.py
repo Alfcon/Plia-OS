@@ -191,6 +191,23 @@ async def generate_dramabox(body: dict):
     return {"path": str(dest), "filename": dest.name}
 
 
+@router.post("/api/generate-chatterbox")
+async def generate_chatterbox(body: dict):
+    svc = get_tts_service()
+    if svc is None or svc._chatterbox is None:
+        raise HTTPException(status_code=409, detail="Chatterbox not loaded")
+    prompt = (body.get("prompt") or "").strip()
+    if not prompt:
+        raise HTTPException(status_code=422, detail="prompt required")
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dest = UPLOADS_DIR / f"chatterbox_{ts}.wav"
+
+    audio = await asyncio.to_thread(svc._synthesise_chatterbox, prompt)
+    wavfile.write(str(dest), 24_000, audio)
+    return {"path": str(dest), "filename": dest.name}
+
+
 @router.get("/api/system/capabilities")
 async def system_capabilities():
     from core.system_fit import capabilities

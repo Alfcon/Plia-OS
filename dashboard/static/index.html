@@ -137,6 +137,19 @@
         <input type="number" id="cb-seed" placeholder="random" style="flex:1;" />
         <button onclick="randomiseCbSeed()" style="width:auto;padding:6px 8px;">🎲</button>
       </div>
+
+      <hr style="border-color:#333;margin:8px 0;" />
+      <h2>Generate Clip</h2>
+      <label>Prompt
+        <textarea id="cb-prompt" rows="4"
+          style="width:100%;background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:4px;padding:4px 6px;font-family:monospace;resize:vertical;"
+          placeholder='Hello, this is a test of Chatterbox voice cloning.'></textarea>
+      </label>
+      <button id="cb-generate-btn" onclick="generateChatterboxClip()">Generate</button>
+      <div id="cb-result" style="display:none;margin-top:6px;">
+        <audio id="cb-audio" controls style="width:100%;margin-bottom:4px;"></audio>
+        <a id="cb-download" download style="font-size:0.75rem;color:#4fc3f7;">Download</a>
+      </div>
     </div>
 
     <!-- Dramabox-specific -->
@@ -586,6 +599,37 @@
     } else {
       const errData = await res.json().catch(() => ({}));
       progressEl.textContent = errData.detail || 'Generation failed — check server logs';
+    }
+  }
+
+  async function generateChatterboxClip() {
+    const prompt = document.getElementById('cb-prompt').value.trim();
+    if (!prompt) return;
+    await applyVoiceConfig();
+    const btn = document.getElementById('cb-generate-btn');
+    const resultEl = document.getElementById('cb-result');
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+    resultEl.style.display = 'none';
+    try {
+      const res = await fetch('/api/generate-chatterbox', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ prompt }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        document.getElementById('cb-audio').src = `/uploads/${data.filename}`;
+        document.getElementById('cb-download').href = `/uploads/${data.filename}`;
+        document.getElementById('cb-download').textContent = `Download ${data.filename}`;
+        resultEl.style.display = '';
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.detail || 'Generation failed — check server logs');
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate';
     }
   }
 
