@@ -86,6 +86,7 @@
         <button class="m-nav-btn active" data-section="voice" onclick="showMenuSection('voice')">Voice</button>
         <button class="m-nav-btn" data-section="web" onclick="showMenuSection('web')">Web</button>
         <button class="m-nav-btn" data-section="agents" onclick="showMenuSection('agents')">Agents</button>
+        <button class="m-nav-btn" data-section="llm" onclick="showMenuSection('llm')">LLM</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -200,6 +201,23 @@
           </div>
           <button class="apply-btn" onclick="applyMenuWeb()">Apply</button>
         </div>
+        <!-- LLM pane -->
+        <div id="m-section-llm" class="m-pane" style="display:none">
+          <label>Provider
+            <select id="fallback-provider" onchange="applyFallbackConfig()">
+              <option value="">None (local only)</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </label>
+          <label>Model
+            <input type="text" id="fallback-model" placeholder="e.g. gpt-4o" />
+          </label>
+          <label>API Key
+            <input type="password" id="fallback-api-key" placeholder="sk-…" />
+          </label>
+          <button class="apply-btn" onclick="applyFallbackConfig()">Apply</button>
+        </div>
         <!-- Agents pane -->
         <div id="m-section-agents" class="m-pane" style="display:none">
           <div id="agent-badges" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
@@ -247,26 +265,6 @@
 
 
 
-  <!-- Fallback LLM -->
-  <section>
-    <h2>Fallback LLM</h2>
-    <label>Provider
-      <select id="fallback-provider" onchange="applyFallbackConfig()">
-        <option value="">None (local only)</option>
-        <option value="openai">OpenAI</option>
-        <option value="anthropic">Anthropic</option>
-      </select>
-    </label>
-    <label style="margin-top:6px;">Model
-      <input type="text" id="fallback-model" placeholder="e.g. gpt-4o" />
-    </label>
-    <label style="margin-top:6px;">API Key
-      <input type="password" id="fallback-api-key" placeholder="sk-…" />
-    </label>
-    <div class="config-row">
-      <button onclick="applyFallbackConfig()">Apply</button>
-    </div>
-  </section>
 
   <!-- Web Search -->
   <section>
