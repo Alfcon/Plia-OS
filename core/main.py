@@ -22,6 +22,11 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        try:
+            import psutil
+            psutil.cpu_percent()  # prime baseline; first call always returns 0.0 otherwise
+        except ImportError:
+            pass
         # Start voice pipeline as background task
         pipeline_task = asyncio.create_task(_start_pipeline())
         yield

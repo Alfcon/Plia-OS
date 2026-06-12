@@ -10,6 +10,7 @@ def _temp_db(monkeypatch, tmp_path):
     import agents.chat_history as ch
     db = tmp_path / "test_chat.db"
     monkeypatch.setattr(ch, "_DB_PATH", db)
+    ch._init_db()
     yield
 
 

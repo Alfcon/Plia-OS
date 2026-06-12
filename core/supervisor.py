@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import inspect
 import logging
 from typing import TypedDict
@@ -153,8 +154,8 @@ async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
 
     from agents.chat_history import add_message
     if last_user:
-        add_message("user", last_user)
+        await asyncio.to_thread(add_message, "user", last_user)
     if response:
-        add_message("assistant", response)
+        await asyncio.to_thread(add_message, "assistant", response)
 
     return response, final_messages

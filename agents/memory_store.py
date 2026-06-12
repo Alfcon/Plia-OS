@@ -109,6 +109,18 @@ class MemoryStore:
             ).fetchall()
         return [f"{r}: {c}" for r, c in reversed(rows)]
 
+    def clear_history(self) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM history")
+        if self._collection is not None:
+            try:
+                import chromadb
+                client = chromadb.PersistentClient(path=self._chroma_path)
+                client.delete_collection("conversations")
+                self._init_chroma()
+            except Exception:
+                pass
+
     def _chroma_add(self, role: str, content: str) -> None:
         if self._collection is None:
             return

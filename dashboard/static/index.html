@@ -351,19 +351,21 @@
     }
   };
 
-  function _appendMsg(role, text) {
+  function _appendMsg(role, text, scroll = true) {
     const div = document.createElement('div');
     div.className = `msg ${role}`;
     div.textContent = text;
     document.getElementById('conversation').appendChild(div);
-    div.scrollIntoView({ behavior: 'smooth' });
+    if (scroll) div.scrollIntoView({ behavior: 'smooth' });
   }
 
   // Load chat history on page load
   fetch('/api/history?n=100')
     .then(r => r.json())
     .then(msgs => {
-      msgs.forEach(m => _appendMsg(m.role, m.content));
+      msgs.forEach(m => _appendMsg(m.role, m.content, false));
+      const conv = document.getElementById('conversation');
+      if (conv.lastElementChild) conv.lastElementChild.scrollIntoView();
     }).catch(() => {});
 
   async function sendChat() {

@@ -15,6 +15,9 @@ from core.config import get_config, update_config
 from voice.tts import get_tts_service
 from voice.vram_broker import get_vram_broker
 
+_chatterbox_load_lock = asyncio.Lock()
+_dramabox_load_lock = asyncio.Lock()
+
 try:
     import sounddevice as sd
 except ImportError:  # pragma: no cover
@@ -166,8 +169,9 @@ async def generate_dramabox(body: dict):
     svc = get_tts_service()
     if svc is None:
         raise HTTPException(status_code=409, detail="TTS service not available")
-    if svc._dramabox is None:
-        await asyncio.to_thread(svc._load_dramabox, get_config())
+    async with _dramabox_load_lock:
+        if svc._dramabox is None:
+            await asyncio.to_thread(svc._load_dramabox, get_config())
     if svc._dramabox is None:
         raise HTTPException(status_code=409, detail="Dramabox failed to load")
     prompt = (body.get("prompt") or "").strip()
@@ -200,8 +204,9 @@ async def generate_chatterbox(body: dict):
     svc = get_tts_service()
     if svc is None:
         raise HTTPException(status_code=409, detail="TTS service not available")
-    if svc._chatterbox is None:
-        await asyncio.to_thread(svc._load_chatterbox, get_config())
+    async with _chatterbox_load_lock:
+        if svc._chatterbox is None:
+            await asyncio.to_thread(svc._load_chatterbox, get_config())
     if svc._chatterbox is None:
         raise HTTPException(status_code=409, detail="Chatterbox failed to load")
     prompt = (body.get("prompt") or "").strip()
@@ -223,13 +228,19 @@ async def generate_chatterbox(body: dict):
 @router.get("/api/history")
 async def get_history(n: int = 100):
     from agents.chat_history import get_recent
-    return get_recent(n)
+    return await asyncio.to_thread(get_recent, n)
 
 
 @router.delete("/api/history")
 async def clear_history():
     from agents.chat_history import clear
-    clear()
+    from agents.memory_store import get_memory_store
+
+    def _clear_all() -> None:
+        clear()
+        get_memory_store().clear_history()
+
+    await asyncio.to_thread(_clear_all)
     return {"status": "cleared"}
 
 
@@ -240,7 +251,8 @@ async def chat(body: dict):
     text = (body.get("text") or "").strip()
     if not text:
         raise HTTPException(status_code=422, detail="text required")
-    history = [{"role": m["role"], "content": m["content"]} for m in get_recent(20)]
+    rows = await asyncio.to_thread(get_recent, 20)
+    history = [{"role": m["role"], "content": m["content"]} for m in rows]
     history.append({"role": "user", "content": text})
     response, _ = await run_turn(history)
     await _broadcast({"type": "transcript", "role": "user", "text": text})

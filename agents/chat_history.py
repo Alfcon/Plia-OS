@@ -7,18 +7,27 @@ _DB_PATH = Path(__file__).parent.parent / "data" / "chat_history.db"
 _DB_PATH.parent.mkdir(exist_ok=True)
 
 
-def _conn() -> sqlite3.Connection:
+def _init_db() -> None:
     con = sqlite3.connect(_DB_PATH)
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS messages (
-            id      INTEGER PRIMARY KEY AUTOINCREMENT,
-            role    TEXT NOT NULL,
-            content TEXT NOT NULL,
-            ts      TEXT NOT NULL
-        )
-    """)
-    con.commit()
-    return con
+    try:
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                role    TEXT NOT NULL,
+                content TEXT NOT NULL,
+                ts      TEXT NOT NULL
+            )
+        """)
+        con.commit()
+    finally:
+        con.close()
+
+
+_init_db()
+
+
+def _conn() -> sqlite3.Connection:
+    return sqlite3.connect(_DB_PATH)
 
 
 def add_message(role: str, content: str) -> None:
