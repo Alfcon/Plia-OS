@@ -6,12 +6,17 @@
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: monospace; background: #0d0d0d; color: #e0e0e0; display: flex; height: 100vh; }
+    body { font-family: monospace; background: #0d0d0d; color: #e0e0e0; display: flex; flex-direction: column; height: 100vh; }
+    #top-bar { flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 6px 14px; background: #111; border-bottom: 1px solid #2a2a2a; font-size: 0.75rem; overflow-x: auto; white-space: nowrap; }
+    #top-bar .tb-label { color: #555; font-size: 0.7rem; text-transform: uppercase; margin-right: 2px; }
+    #top-bar .tb-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px; color: #aaa; }
+    #top-bar .tb-sep { color: #2a2a2a; user-select: none; }
+    #top-bar #status-badge { padding: 2px 8px; border-radius: 3px; font-size: 0.75rem; background: #1a1a2e; color: #4fc3f7; border: 1px solid #1e3a5f; }
+    #app-body { flex: 1; display: flex; min-height: 0; }
     aside { width: 300px; padding: 16px; border-right: 1px solid #333; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
     main { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
     h2 { font-size: 0.85rem; text-transform: uppercase; color: #888; margin-bottom: 6px; }
-    #status-badge { padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; background: #1a1a2e; color: #4fc3f7; display: inline-block; }
-    .msg { padding: 8px 10px; border-radius: 6px; max-width: 80%; margin-bottom: 4px; font-size: 0.9rem; }
+.msg { padding: 8px 10px; border-radius: 6px; max-width: 80%; margin-bottom: 4px; font-size: 0.9rem; }
     .msg.user { background: #1e3a5f; align-self: flex-end; }
     .msg.assistant { background: #1a1a1a; border: 1px solid #333; }
     .msg.tool { background: #1a2e1a; border: 1px solid #2e4d2e; font-size: 0.8rem; color: #a5d6a7; }
@@ -239,6 +244,17 @@
   </div>
 </div>
 
+<header id="top-bar">
+  <span id="status-badge">armed</span>
+  <span class="tb-sep">|</span>
+  <span class="tb-chip"><span class="tb-label">OS</span><span id="tb-os">—</span></span>
+  <span class="tb-chip"><span class="tb-label">CPU</span><span id="tb-cpu">—</span></span>
+  <span class="tb-chip"><span class="tb-label">RAM</span><span id="tb-ram">—</span></span>
+  <span class="tb-chip"><span class="tb-label">VRAM</span><span id="tb-vram">—</span></span>
+  <span class="tb-chip"><span class="tb-label">Disk</span><span id="tb-disk">—</span></span>
+</header>
+
+<div id="app-body">
 <aside>
   <button id="menu-toggle" onclick="openMenu()">☰</button>
   <!-- VRAM Status Bar -->
@@ -257,14 +273,6 @@
 <button id="vram-done-btn" style="display:none" onclick="releaseStudioModel(event)">✓ Done</button>
     </div>
   </div>
-  <!-- Status -->
-  <section>
-    <h2>Status</h2>
-    <span id="status-badge">armed</span>
-  </section>
-
-
-
 
 
   <!-- Modules -->
@@ -277,6 +285,7 @@
 <main id="conversation">
   <!-- Messages injected here by WebSocket -->
 </main>
+</div><!-- #app-body -->
 
 <script>
   let _recTimerInterval = null;
@@ -387,6 +396,22 @@
       onEngineChange();
       startVramPolling();
     });
+
+  function loadSystemInfo() {
+    fetch('/api/system/info').then(r => r.json()).then(info => {
+      document.getElementById('tb-os').textContent = info.os || '—';
+      document.getElementById('tb-cpu').textContent = info.cpu_percent != null
+        ? `${info.cpu_percent}% (${info.cpu_count}c)` : '—';
+      document.getElementById('tb-ram').textContent = info.ram_used_gb != null
+        ? `${info.ram_used_gb}/${info.ram_total_gb} GB` : '—';
+      document.getElementById('tb-vram').textContent = info.vram_gb != null
+        ? `${info.vram_gb} GB${info.gpu_name ? ' · ' + info.gpu_name : ''}` : 'None';
+      document.getElementById('tb-disk').textContent = info.disk_used_gb != null
+        ? `${info.disk_used_gb}/${info.disk_total_gb} GB` : '—';
+    }).catch(() => {});
+  }
+  loadSystemInfo();
+  setInterval(loadSystemInfo, 10000);
 
   // Load system capabilities and mark engines that won't fit
   let _engineCaps = {};

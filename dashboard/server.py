@@ -222,6 +222,35 @@ async def shutdown():
     return {"status": "shutting down"}
 
 
+@router.get("/api/system/info")
+async def system_info():
+    import platform
+    try:
+        import psutil
+        cpu_percent = psutil.cpu_percent(interval=None)
+        cpu_count = psutil.cpu_count(logical=True)
+        vm = psutil.virtual_memory()
+        ram_total_gb = round(vm.total / 1024**3, 1)
+        ram_used_gb = round(vm.used / 1024**3, 1)
+        disk = psutil.disk_usage("/")
+        disk_total_gb = round(disk.total / 1024**3, 1)
+        disk_used_gb = round(disk.used / 1024**3, 1)
+    except ImportError:
+        cpu_percent = cpu_count = ram_total_gb = ram_used_gb = disk_total_gb = disk_used_gb = None
+    from core.system_fit import get_gpu_vram_gb, get_gpu_name
+    return {
+        "os": platform.system(),
+        "cpu_percent": cpu_percent,
+        "cpu_count": cpu_count,
+        "ram_total_gb": ram_total_gb,
+        "ram_used_gb": ram_used_gb,
+        "disk_total_gb": disk_total_gb,
+        "disk_used_gb": disk_used_gb,
+        "vram_gb": get_gpu_vram_gb(),
+        "gpu_name": get_gpu_name(),
+    }
+
+
 @router.get("/api/system/capabilities")
 async def system_capabilities():
     from core.system_fit import capabilities
