@@ -328,6 +328,9 @@
     if (msg.type === 'transcript') {
       _appendMsg(msg.role, msg.text);
     }
+    if (msg.type === 'reminder_fired') {
+      _appendMsg('system', 'Reminder: ' + msg.message);
+    }
     if (msg.type === 'wake') {
       document.getElementById('status-badge').textContent = 'listening';
     }

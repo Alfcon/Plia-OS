@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from core.loader import load_modules
 from core.config import get_config
+from core.reminder_loop import run_reminder_loop
 from dashboard.server import router as dashboard_router, setup_event_forwarding
 
 logger = logging.getLogger(__name__)
@@ -27,14 +28,17 @@ def create_app() -> FastAPI:
             psutil.cpu_percent()  # prime baseline; first call always returns 0.0 otherwise
         except ImportError:
             pass
-        # Start voice pipeline as background task
+        # Start voice pipeline and reminder loop as background tasks
         pipeline_task = asyncio.create_task(_start_pipeline())
+        reminder_task = asyncio.create_task(run_reminder_loop())
         yield
         pipeline_task.cancel()
-        try:
-            await pipeline_task
-        except asyncio.CancelledError:
-            pass
+        reminder_task.cancel()
+        for task in (pipeline_task, reminder_task):
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     app = FastAPI(title="Plia-OS", lifespan=lifespan)
     app.include_router(dashboard_router)
