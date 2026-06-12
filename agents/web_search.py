@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import re
 import logging
 import httpx
@@ -64,5 +65,7 @@ async def web_search(query_or_url: str, provider: str, config) -> list[str]:
         text = await scrape_playwright(target)
         return [text]
     if provider == "google" and config.google_search_api_key and config.google_search_cx:
-        return search_google(query_or_url, config.google_search_api_key, config.google_search_cx)
-    return search_ddg(query_or_url)
+        return await asyncio.to_thread(
+            search_google, query_or_url, config.google_search_api_key, config.google_search_cx
+        )
+    return await asyncio.to_thread(search_ddg, query_or_url)
