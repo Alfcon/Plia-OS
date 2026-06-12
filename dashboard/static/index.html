@@ -202,7 +202,14 @@
         </div>
         <!-- Agents pane -->
         <div id="m-section-agents" class="m-pane" style="display:none">
-          <div id="m-agent-badges"></div>
+          <div id="agent-badges" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
+            <span class="agent-badge" data-agent="memory">memory</span>
+            <span class="agent-badge" data-agent="web">web</span>
+            <span class="agent-badge" data-agent="code">code</span>
+            <span class="agent-badge" data-agent="calendar">calendar</span>
+            <span class="agent-badge" data-agent="home">home</span>
+          </div>
+          <div id="agent-log"></div>
         </div>
       </div>
     </div>
@@ -238,18 +245,6 @@
     <span id="status-badge">armed</span>
   </section>
 
-  <!-- Agents Panel -->
-  <section>
-    <h2>Agents</h2>
-    <div id="agent-badges" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
-      <span class="agent-badge" data-agent="memory">memory</span>
-      <span class="agent-badge" data-agent="web">web</span>
-      <span class="agent-badge" data-agent="code">code</span>
-      <span class="agent-badge" data-agent="calendar">calendar</span>
-      <span class="agent-badge" data-agent="home">home</span>
-    </div>
-    <div id="agent-log"></div>
-  </section>
 
 
   <!-- Fallback LLM -->
@@ -900,8 +895,6 @@
     document.getElementById('m-google-api-key').value = document.getElementById('google-api-key').value;
     document.getElementById('m-google-cx').value = document.getElementById('google-cx').value;
     onMenuWebChange();
-    const src = document.getElementById('agent-badges');
-    document.getElementById('m-agent-badges').innerHTML = src ? src.innerHTML : '';
   }
 
   function onMenuWebChange() {
