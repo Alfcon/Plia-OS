@@ -366,7 +366,10 @@
       msgs.forEach(m => _appendMsg(m.role, m.content, false));
       const conv = document.getElementById('conversation');
       if (conv.lastElementChild) conv.lastElementChild.scrollIntoView();
-    }).catch(() => {});
+    }).catch(err => {
+      console.error('History load failed:', err);
+      _appendMsg('system', '[History unavailable — could not load previous messages]', false);
+    });
 
   async function sendChat() {
     const input = document.getElementById('chat-input');
