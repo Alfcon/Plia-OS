@@ -29,7 +29,7 @@ async def code_node(state: "AgentState") -> dict:
             {"role": "system", "content": _EXTRACT_SYSTEM},
             {"role": "user", "content": last_user},
         ])
-        parsed = json.loads(msg.get("content", "{}"))
+        parsed = json.loads(msg.get("content") or "{}")
         language = parsed.get("language", "python")
         code = parsed.get("code", "")
     except Exception:

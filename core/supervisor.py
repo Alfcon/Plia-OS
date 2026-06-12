@@ -85,6 +85,9 @@ async def _respond_node(state: AgentState) -> dict:
                 "tool_call_id": tc.get("id", ""),
                 "content": str(result),
             })
+    else:
+        logger.warning("Tool-call limit (%d) reached; returning fallback reply", _TOOL_CALL_LIMIT)
+        history.append({"role": "assistant", "content": "I reached the tool call limit and could not complete your request."})
 
     return {"messages": history}
 

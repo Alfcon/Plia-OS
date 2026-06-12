@@ -32,7 +32,7 @@ async def memory_node(state: "AgentState") -> dict:
             {"role": "user", "content": last_user},
         ]
         msg = await call_llm(parse_messages)
-        parsed = json.loads(msg.get("content", "{}"))
+        parsed = json.loads(msg.get("content") or "{}")
         op = parsed.get("op", "recall")
         key = parsed.get("key", last_user[:80])
         value = parsed.get("value", "")

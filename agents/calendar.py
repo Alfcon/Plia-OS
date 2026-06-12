@@ -36,7 +36,7 @@ async def calendar_node(state: "AgentState") -> dict:
             {"role": "system", "content": _PARSE_SYSTEM},
             {"role": "user", "content": last_user},
         ])
-        parsed = json.loads(msg.get("content", "{}"))
+        parsed = json.loads(msg.get("content") or "{}")
         op = parsed.get("op", "list")
     except Exception as exc:
         logger.warning("Calendar LLM parse failed, falling back to list: %s", exc)

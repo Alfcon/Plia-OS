@@ -171,9 +171,13 @@ class TTSService:
         except Exception:
             logger.warning("Chatterbox synthesis failed; releasing and falling back to Kokoro", exc_info=True)
             get_vram_broker().release("chatterbox")
-            if self._kokoro is None:
-                self._load_kokoro(get_config())
-            return self._synthesise_kokoro(text)
+            try:
+                if self._kokoro is None:
+                    self._load_kokoro(get_config())
+                return self._synthesise_kokoro(text)
+            except Exception:
+                logger.warning("Kokoro fallback also failed after Chatterbox failure", exc_info=True)
+                return np.zeros(0, dtype=np.float32)
 
     def _synthesise_dramabox(self, text: str) -> np.ndarray:
         try:

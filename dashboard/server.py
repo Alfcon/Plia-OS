@@ -203,8 +203,12 @@ async def generate_chatterbox(body: dict):
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     dest = UPLOADS_DIR / f"chatterbox_{ts}.wav"
 
-    audio = await asyncio.to_thread(svc._synthesise_chatterbox, prompt)
-    wavfile.write(str(dest), 24_000, audio)
+    def _synth_and_write():
+        audio = svc._synthesise_chatterbox(prompt)
+        pcm = (audio * 32767).clip(-32768, 32767).astype(np.int16)
+        wavfile.write(str(dest), 24_000, pcm)
+
+    await asyncio.to_thread(_synth_and_write)
     return {"path": str(dest), "filename": dest.name}
 
 
