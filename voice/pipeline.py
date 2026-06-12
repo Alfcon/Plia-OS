@@ -20,6 +20,7 @@ _SAMPLE_RATE = 16000
 _BLOCK_SIZE = 1280  # ~80ms per chunk at 16kHz
 _ENERGY_FLOOR = 0.03  # RMS below this = silence (normalised to [-1,1])
 _INT16_MAX = 32768.0  # used to normalise int16 → float for RMS and STT
+_HISTORY_PRELOAD = 20  # number of recent messages to preload on startup
 
 
 class VoicePipeline:
@@ -41,7 +42,13 @@ class VoicePipeline:
         self._stt.load()
         self._tts.load()
         config = get_config()
-        self._conversation = [{"role": "system", "content": config.system_prompt}]
+        from agents.chat_history import get_recent
+        history = get_recent(_HISTORY_PRELOAD)
+        self._conversation = [{"role": "system", "content": config.system_prompt}] + [
+            {"role": m["role"], "content": m["content"]}
+            for m in history
+            if m["role"] != "system"
+        ]
         if self._on_event not in events._subscribers:
             events.subscribe(self._on_event)
 
