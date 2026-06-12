@@ -13,7 +13,6 @@
     #top-bar .tb-sep { color: #2a2a2a; user-select: none; }
     #top-bar #status-badge { padding: 2px 8px; border-radius: 3px; font-size: 0.75rem; background: #1a1a2e; color: #4fc3f7; border: 1px solid #1e3a5f; }
     #app-body { flex: 1; display: flex; min-height: 0; }
-    aside { width: 300px; padding: 16px; border-right: 1px solid #333; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
     main { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
     h2 { font-size: 0.85rem; text-transform: uppercase; color: #888; margin-bottom: 6px; }
 .msg { padding: 8px 10px; border-radius: 6px; max-width: 80%; margin-bottom: 4px; font-size: 0.9rem; }
@@ -29,18 +28,20 @@
     #module-list li { padding: 3px 0; border-bottom: 1px solid #222; color: #aaa; }
     #module-list li span { color: #4fc3f7; }
     .ref-status { font-size: 0.75rem; color: #4fc3f7; margin: 2px 0 6px; min-height: 1em; }
-    #vram-bar { padding: 8px 10px; border-bottom: 1px solid #333; font-size: 0.75rem; cursor: pointer; }
-    #vram-bar .vram-row { display: flex; align-items: center; gap: 8px; }
-    #vram-bar .vram-track { flex: 1; height: 5px; background: #333; border-radius: 3px; overflow: hidden; }
+    #vram-bar { display: inline-flex; flex-direction: column; padding: 2px 8px; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px; font-size: 0.75rem; cursor: pointer; position: relative; flex-shrink: 0; }
+    #vram-bar.studio-mode { border-color: #7c3aed; }
+    #vram-bar .vram-row { display: flex; align-items: center; gap: 6px; }
+    #vram-bar .vram-track { width: 70px; flex: none; height: 5px; background: #333; border-radius: 3px; overflow: hidden; }
     #vram-bar .vram-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
     #vram-bar .vram-fill.normal { background: #4ade80; }
     #vram-bar .vram-fill.studio { background: #7c3aed; }
-    #vram-bar-detail { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid #222; }
-    #vram-bar.studio-mode { border-color: #7c3aed; }
+    #vram-bar-detail { display: none; position: absolute; top: calc(100% + 6px); left: 0; background: #111; border: 1px solid #2a2a2a; border-radius: 4px; padding: 8px 10px; min-width: 200px; z-index: 200; white-space: normal; }
     #vram-bar-detail .model-row { display: flex; justify-content: space-between; padding: 2px 0; color: #aaa; }
     #vram-bar-detail .model-row .model-name { color: #ccc; }
-    #vram-done-btn { width: 100%; margin-top: 8px; background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
+    #vram-done-btn { width: 100%; margin-top: 8px; background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; padding: 4px 8px; }
     #vram-done-btn:hover { background: #991b1b; }
+    #menu-toggle { background: none; border: none; color: #888; font-size: 1rem; cursor: pointer; width: auto; padding: 0 4px; flex-shrink: 0; }
+    #menu-toggle:hover { color: #e0e0e0; }
     .agent-badge { padding: 3px 8px; border-radius: 3px; font-size: 0.75rem; display: inline-block; background: #1a1a1a; color: #555; border: 1px solid #333; }
     .agent-badge.active { background: #1e3a5f; color: #4fc3f7; border-color: #4fc3f7; }
     #agent-log { margin-top: 6px; }
@@ -72,8 +73,6 @@
     #menu-footer .settings-btn:hover { background: #1e3a5f; }
     #menu-footer .exit-btn { background: #1a0808; color: #ef9a9a; border: 1px solid #7f1d1d; }
     #menu-footer .exit-btn:hover { background: #7f1d1d; }
-    #menu-toggle { background: none; border: none; color: #555; font-size: 1rem; cursor: pointer; width: auto; padding: 4px 6px; align-self: flex-start; }
-    #menu-toggle:hover { color: #e0e0e0; background: none; }
   </style>
 </head>
 <body>
@@ -92,6 +91,7 @@
         <button class="m-nav-btn" data-section="web" onclick="showMenuSection('web')">Web</button>
         <button class="m-nav-btn" data-section="agents" onclick="showMenuSection('agents')">Agents</button>
         <button class="m-nav-btn" data-section="llm" onclick="showMenuSection('llm')">LLM</button>
+        <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system')">System</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -234,6 +234,9 @@
           </div>
           <div id="agent-log"></div>
         </div>
+        <div id="m-section-system" class="m-pane" style="display:none">
+          <ul id="module-list" style="font-size:0.78rem;list-style:none;padding:0;">Loading...</ul>
+        </div>
       </div>
     </div>
 
@@ -245,43 +248,32 @@
 </div>
 
 <header id="top-bar">
+  <button id="menu-toggle" onclick="openMenu()">☰</button>
+  <span class="tb-sep">|</span>
   <span id="status-badge">armed</span>
   <span class="tb-sep">|</span>
   <span class="tb-chip"><span class="tb-label">OS</span><span id="tb-os">—</span></span>
   <span class="tb-chip"><span class="tb-label">CPU</span><span id="tb-cpu">—</span></span>
   <span class="tb-chip"><span class="tb-label">RAM</span><span id="tb-ram">—</span></span>
-  <span class="tb-chip"><span class="tb-label">VRAM</span><span id="tb-vram">—</span></span>
-  <span class="tb-chip"><span class="tb-label">Disk</span><span id="tb-disk">—</span></span>
-</header>
-
-<div id="app-body">
-<aside>
-  <button id="menu-toggle" onclick="openMenu()">☰</button>
-  <!-- VRAM Status Bar -->
   <div id="vram-bar" onclick="toggleVramDetail()">
     <div class="vram-row">
       <span id="vram-dot" style="font-size:0.9rem;">●</span>
-      <span id="vram-label" style="color:#888;">VRAM</span>
+      <span id="vram-label" style="color:#888;font-size:0.7rem;text-transform:uppercase;">VRAM</span>
       <div class="vram-track">
         <div id="vram-fill" class="vram-fill normal" style="width:0%"></div>
       </div>
-      <span id="vram-text" style="color:#555;">— GB</span>
+      <span id="vram-text" style="color:#aaa;">— GB</span>
       <span id="vram-chevron" style="color:#555;">▼</span>
     </div>
     <div id="vram-bar-detail">
       <div id="vram-model-list"></div>
-<button id="vram-done-btn" style="display:none" onclick="releaseStudioModel(event)">✓ Done</button>
+      <button id="vram-done-btn" style="display:none" onclick="releaseStudioModel(event)">✓ Done</button>
     </div>
   </div>
+  <span class="tb-chip"><span class="tb-label">Disk</span><span id="tb-disk">—</span></span>
+</header>
 
-
-  <!-- Modules -->
-  <section>
-    <h2>Modules</h2>
-    <ul id="module-list">Loading...</ul>
-  </section>
-</aside>
-
+<div id="app-body">
 <main id="conversation">
   <!-- Messages injected here by WebSocket -->
 </main>
@@ -404,8 +396,6 @@
         ? `${info.cpu_percent}% (${info.cpu_count}c)` : '—';
       document.getElementById('tb-ram').textContent = info.ram_used_gb != null
         ? `${info.ram_used_gb}/${info.ram_total_gb} GB` : '—';
-      document.getElementById('tb-vram').textContent = info.vram_gb != null
-        ? `${info.vram_gb} GB${info.gpu_name ? ' · ' + info.gpu_name : ''}` : 'None';
       document.getElementById('tb-disk').textContent = info.disk_used_gb != null
         ? `${info.disk_used_gb}/${info.disk_total_gb} GB` : '—';
     }).catch(() => {});
