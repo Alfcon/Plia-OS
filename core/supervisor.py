@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 _KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home"}
 _HOP_LIMIT = 5
+_TOOL_CALL_LIMIT = 10
 
 _CLASSIFY_SYSTEM = (
     "You are a router. Given the conversation, output exactly one word — "
@@ -66,7 +67,7 @@ async def _respond_node(state: AgentState) -> dict:
         combined = "\n".join(state["tool_results"])
         history.append({"role": "system", "content": f"Agent results:\n{combined}"})
 
-    while True:
+    for _ in range(_TOOL_CALL_LIMIT):
         payload_msg = await call_llm(history, tools=tools or None)
         history.append(payload_msg)
         if not payload_msg.get("tool_calls"):
