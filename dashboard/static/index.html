@@ -44,11 +44,51 @@
     .config-row { display: flex; gap: 6px; align-items: flex-end; margin-top: 6px; }
     .config-row button { flex: 0 0 auto; width: auto; padding: 6px 10px; }
     #google-fields { margin-top: 4px; }
+    #menu-overlay { position: fixed; inset: 0; z-index: 100; display: none; }
+    #menu-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.75); }
+    #menu-panel { position: absolute; left: 0; top: 0; bottom: 0; width: 260px; background: #111; border-right: 1px solid #2a2a2a; display: flex; flex-direction: column; }
+    #menu-header { padding: 20px 16px 14px; border-bottom: 1px solid #1e1e1e; display: flex; justify-content: space-between; align-items: center; }
+    #menu-header .menu-title { font-size: 1rem; color: #e0e0e0; letter-spacing: 0.08em; text-transform: uppercase; }
+    #menu-header .menu-close { background: none; border: none; color: #555; font-size: 1rem; cursor: pointer; width: auto; padding: 2px 6px; }
+    #menu-header .menu-close:hover { color: #e0e0e0; background: #1a1a1a; }
+    #menu-nav { flex: 1; padding: 8px 0; overflow-y: auto; }
+    #menu-nav a { display: block; padding: 10px 20px; font-size: 0.82rem; color: #888; cursor: pointer; border-left: 2px solid transparent; text-decoration: none; }
+    #menu-nav a:hover { color: #e0e0e0; background: #181818; border-left-color: #4fc3f7; }
+    #menu-footer { padding: 12px 16px; border-top: 1px solid #1e1e1e; display: flex; flex-direction: column; gap: 8px; }
+    #menu-footer .settings-btn { background: #0d1b2a; color: #4fc3f7; border: 1px solid #1e3a5f; }
+    #menu-footer .settings-btn:hover { background: #1e3a5f; }
+    #menu-footer .exit-btn { background: #1a0808; color: #ef9a9a; border: 1px solid #7f1d1d; }
+    #menu-footer .exit-btn:hover { background: #7f1d1d; }
+    #menu-toggle { background: none; border: none; color: #555; font-size: 1rem; cursor: pointer; width: auto; padding: 4px 6px; align-self: flex-start; }
+    #menu-toggle:hover { color: #e0e0e0; background: none; }
   </style>
 </head>
 <body>
 
+<div id="menu-overlay">
+  <div id="menu-backdrop" onclick="closeMenu()"></div>
+  <div id="menu-panel">
+    <div id="menu-header">
+      <span class="menu-title">Plia-OS</span>
+      <button class="menu-close" onclick="closeMenu()">✕</button>
+    </div>
+    <nav id="menu-nav">
+      <a onclick="closeMenu()">Status</a>
+      <a onclick="closeMenu()">Voice</a>
+      <a onclick="closeMenu()">Agents</a>
+      <a onclick="closeMenu()">Web Search</a>
+      <a onclick="closeMenu()">Calendar</a>
+      <a onclick="closeMenu()">Memory</a>
+    </nav>
+    <div id="menu-footer">
+      <button class="settings-btn" onclick="openSettings()">⚙ Settings</button>
+      <button class="exit-btn" onclick="exitApp()">⏻ Exit</button>
+    </div>
+  </div>
+</div>
+
 <aside>
+  <button id="menu-toggle" onclick="openMenu()">☰</button>
   <!-- VRAM Status Bar -->
   <div id="vram-bar" onclick="toggleVramDetail()">
     <div class="vram-row">
@@ -805,6 +845,25 @@
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload),
     });
+  }
+
+  function openMenu() {
+    document.getElementById('menu-overlay').style.display = '';
+    document.addEventListener('keydown', _menuKeyHandler);
+  }
+  function closeMenu() {
+    document.getElementById('menu-overlay').style.display = 'none';
+    document.removeEventListener('keydown', _menuKeyHandler);
+  }
+  function _menuKeyHandler(e) { if (e.key === 'Escape') closeMenu(); }
+  function openSettings() {
+    closeMenu();
+    document.querySelector('aside').scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  async function exitApp() {
+    if (!confirm('Exit Plia-OS?')) return;
+    await fetch('/api/shutdown', { method: 'POST' }).catch(() => {});
+    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#555;font-family:monospace;font-size:0.9rem;">Shutting down…</div>';
   }
 
   window.addEventListener('beforeunload', () => {

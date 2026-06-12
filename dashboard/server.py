@@ -212,6 +212,16 @@ async def generate_chatterbox(body: dict):
     return {"path": str(dest), "filename": dest.name}
 
 
+@router.post("/api/shutdown")
+async def shutdown():
+    import os, signal
+    async def _do() -> None:
+        await asyncio.sleep(0.1)
+        os.kill(os.getpid(), signal.SIGTERM)
+    asyncio.create_task(_do())
+    return {"status": "shutting down"}
+
+
 @router.get("/api/system/capabilities")
 async def system_capabilities():
     from core.system_fit import capabilities
