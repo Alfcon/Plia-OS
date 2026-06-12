@@ -220,6 +220,34 @@ async def generate_chatterbox(body: dict):
     return {"path": str(dest), "filename": dest.name}
 
 
+@router.get("/api/history")
+async def get_history(n: int = 100):
+    from agents.chat_history import get_recent
+    return get_recent(n)
+
+
+@router.delete("/api/history")
+async def clear_history():
+    from agents.chat_history import clear
+    clear()
+    return {"status": "cleared"}
+
+
+@router.post("/api/chat")
+async def chat(body: dict):
+    from core.supervisor import run_turn
+    from agents.chat_history import get_recent
+    text = (body.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="text required")
+    history = [{"role": m["role"], "content": m["content"]} for m in get_recent(20)]
+    history.append({"role": "user", "content": text})
+    response, _ = await run_turn(history)
+    await _broadcast({"type": "transcript", "role": "user", "text": text})
+    await _broadcast({"type": "transcript", "role": "assistant", "text": response})
+    return {"response": response}
+
+
 @router.post("/api/shutdown")
 async def shutdown():
     import os, signal

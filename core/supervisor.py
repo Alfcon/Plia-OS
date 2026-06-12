@@ -151,4 +151,10 @@ async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
     if response:
         store.add_turn("assistant", response)
 
+    from agents.chat_history import add_message
+    if last_user:
+        add_message("user", last_user)
+    if response:
+        add_message("assistant", response)
+
     return response, final_messages
