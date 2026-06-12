@@ -122,6 +122,27 @@ class MemoryStore:
                 logger.warning("ChromaDB clear failed; semantic recall disabled until restart", exc_info=True)
                 self._collection = None
 
+    def add_reminder(self, message: str, fire_at_iso: str) -> int:
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO reminders (message, fire_at, done) VALUES (?, ?, 0)",
+                (message, fire_at_iso),
+            )
+            return cur.lastrowid
+
+    def get_pending(self) -> list[dict]:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT id, message, fire_at FROM reminders WHERE done=0 AND fire_at <= ?",
+                (now_iso,),
+            ).fetchall()
+        return [{"id": r[0], "message": r[1], "fire_at": r[2]} for r in rows]
+
+    def mark_reminder_done(self, reminder_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("UPDATE reminders SET done=1 WHERE id=?", (reminder_id,))
+
     def _chroma_add(self, role: str, content: str) -> None:
         if self._collection is None:
             return
