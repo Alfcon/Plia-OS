@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from icalendar import Calendar, Event
 
@@ -48,7 +48,7 @@ class CalendarStore:
             raise ValueError(f"Invalid date/time: '{date_str} {time_str}'") from exc
         event.add("dtstart", dt)
         event.add("dtend", dt + timedelta(minutes=duration_min))
-        event.add("dtstamp", datetime.utcnow())
+        event.add("dtstamp", datetime.now(timezone.utc))
         cal.add_component(event)
         self._write(cal)
         logger.info("Added event '%s' uid=%s", title, uid[:8])
