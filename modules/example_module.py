@@ -9,6 +9,10 @@ def get_time() -> str:
 
 @tool(description="Set a reminder message to fire in N minutes")
 def set_reminder(message: str, minutes: int) -> str:
+    from datetime import datetime, timezone, timedelta
+    from agents.memory_store import get_memory_store
+    fire_at = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+    get_memory_store().add_reminder(message, fire_at.isoformat())
     return f"Reminder set: '{message}' in {minutes} minute(s)."
 
 
