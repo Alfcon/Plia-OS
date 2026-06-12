@@ -15,8 +15,8 @@ async def _check_reminders() -> None:
     pending = await asyncio.to_thread(store.get_pending)
     for reminder in pending:
         logger.info("Firing reminder id=%d: %s", reminder["id"], reminder["message"])
-        await events.emit("reminder_fired", {"id": reminder["id"], "message": reminder["message"]})
         await asyncio.to_thread(store.mark_reminder_done, reminder["id"])
+        await events.emit("reminder_fired", {"id": reminder["id"], "message": reminder["message"]})
 
 
 async def run_reminder_loop() -> None:
