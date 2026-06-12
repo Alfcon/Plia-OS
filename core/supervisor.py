@@ -60,7 +60,7 @@ async def _respond_node(state: AgentState) -> dict:
     history = list(state["messages"])
 
     context = state.get("memory_context", "")
-    if context:
+    if context and history:
         history = [history[0], {"role": "system", "content": f"Context:\n{context}"}, *history[1:]]
 
     if state["tool_results"]:
