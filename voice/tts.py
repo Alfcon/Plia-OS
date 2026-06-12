@@ -1,6 +1,7 @@
 import logging
 import random
 import threading
+import time
 import numpy as np
 from core.config import get_config, update_config
 from voice.vram_broker import get_vram_broker, ModelEntry
@@ -37,6 +38,8 @@ class TTSService:
         self._loaded = False
         self._chatterbox_load_lock = threading.Lock()
         self._dramabox_load_lock = threading.Lock()
+        self._chatterbox_failed_at: float | None = None
+        self._dramabox_failed_at: float | None = None
 
     def load(self) -> None:
         global _service
@@ -71,15 +74,33 @@ class TTSService:
         if self._kokoro is None:
             self._load_kokoro(get_config())
 
+    _LOAD_COOLDOWN_S = 60.0
+
     def _ensure_chatterbox(self, config=None) -> None:
         with self._chatterbox_load_lock:
+            if self._chatterbox is not None:
+                return
+            if self._chatterbox_failed_at is not None:
+                if time.monotonic() - self._chatterbox_failed_at < self._LOAD_COOLDOWN_S:
+                    return
+            self._load_chatterbox(config or get_config())
             if self._chatterbox is None:
-                self._load_chatterbox(config or get_config())
+                self._chatterbox_failed_at = time.monotonic()
+            else:
+                self._chatterbox_failed_at = None
 
     def _ensure_dramabox(self, config=None) -> None:
         with self._dramabox_load_lock:
+            if self._dramabox is not None:
+                return
+            if self._dramabox_failed_at is not None:
+                if time.monotonic() - self._dramabox_failed_at < self._LOAD_COOLDOWN_S:
+                    return
+            self._load_dramabox(config or get_config())
             if self._dramabox is None:
-                self._load_dramabox(config or get_config())
+                self._dramabox_failed_at = time.monotonic()
+            else:
+                self._dramabox_failed_at = None
 
     def _load_chatterbox(self, config) -> None:
         broker = get_vram_broker()
