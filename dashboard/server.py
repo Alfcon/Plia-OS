@@ -234,6 +234,7 @@ async def clear_history():
         get_memory_store().clear_history()
 
     await asyncio.to_thread(_clear_all)
+    await events.emit("clear_history", {})
     return {"status": "cleared"}
 
 

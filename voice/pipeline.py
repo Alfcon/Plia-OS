@@ -42,6 +42,14 @@ class VoicePipeline:
         self._tts.load()
         config = get_config()
         self._conversation = [{"role": "system", "content": config.system_prompt}]
+        if self._on_event not in events._subscribers:
+            events.subscribe(self._on_event)
+
+    async def _on_event(self, payload: dict) -> None:
+        if payload.get("type") == "clear_history":
+            config = get_config()
+            self._conversation = [{"role": "system", "content": config.system_prompt}]
+            logger.info("Pipeline conversation history cleared")
 
     async def start(self) -> None:
         self._running = True
