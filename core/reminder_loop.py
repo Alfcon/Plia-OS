@@ -22,8 +22,8 @@ async def _check_reminders() -> None:
 async def run_reminder_loop() -> None:
     logger.info("Reminder loop started (poll=%ds)", _POLL_INTERVAL_S)
     while True:
-        await asyncio.sleep(_POLL_INTERVAL_S)
         try:
             await _check_reminders()
         except Exception:
             logger.exception("Reminder check failed")
+        await asyncio.sleep(_POLL_INTERVAL_S)
