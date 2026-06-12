@@ -15,9 +15,6 @@ from core.config import get_config, update_config
 from voice.tts import get_tts_service
 from voice.vram_broker import get_vram_broker
 
-_chatterbox_load_lock = asyncio.Lock()
-_dramabox_load_lock = asyncio.Lock()
-
 try:
     import sounddevice as sd
 except ImportError:  # pragma: no cover
@@ -169,9 +166,7 @@ async def generate_dramabox(body: dict):
     svc = get_tts_service()
     if svc is None:
         raise HTTPException(status_code=409, detail="TTS service not available")
-    async with _dramabox_load_lock:
-        if svc._dramabox is None:
-            await asyncio.to_thread(svc._load_dramabox, get_config())
+    await asyncio.to_thread(svc._ensure_dramabox, get_config())
     if svc._dramabox is None:
         raise HTTPException(status_code=409, detail="Dramabox failed to load")
     prompt = (body.get("prompt") or "").strip()
@@ -204,9 +199,7 @@ async def generate_chatterbox(body: dict):
     svc = get_tts_service()
     if svc is None:
         raise HTTPException(status_code=409, detail="TTS service not available")
-    async with _chatterbox_load_lock:
-        if svc._chatterbox is None:
-            await asyncio.to_thread(svc._load_chatterbox, get_config())
+    await asyncio.to_thread(svc._ensure_chatterbox, get_config())
     if svc._chatterbox is None:
         raise HTTPException(status_code=409, detail="Chatterbox failed to load")
     prompt = (body.get("prompt") or "").strip()

@@ -1,5 +1,6 @@
 import logging
 import random
+import threading
 import numpy as np
 from core.config import get_config, update_config
 from voice.vram_broker import get_vram_broker, ModelEntry
@@ -34,6 +35,8 @@ class TTSService:
         self._chatterbox = None
         self._dramabox = None
         self._loaded = False
+        self._chatterbox_load_lock = threading.Lock()
+        self._dramabox_load_lock = threading.Lock()
 
     def load(self) -> None:
         global _service
@@ -67,6 +70,16 @@ class TTSService:
     def _ensure_kokoro(self) -> None:
         if self._kokoro is None:
             self._load_kokoro(get_config())
+
+    def _ensure_chatterbox(self, config=None) -> None:
+        with self._chatterbox_load_lock:
+            if self._chatterbox is None:
+                self._load_chatterbox(config or get_config())
+
+    def _ensure_dramabox(self, config=None) -> None:
+        with self._dramabox_load_lock:
+            if self._dramabox is None:
+                self._load_dramabox(config or get_config())
 
     def _load_chatterbox(self, config) -> None:
         broker = get_vram_broker()
@@ -122,13 +135,13 @@ class TTSService:
         if config.tts_engine == "dramabox":
             if self._dramabox is None:
                 logger.info("Loading Dramabox on demand...")
-                self._load_dramabox(config)
+                self._ensure_dramabox(config)
             if self._dramabox is not None:
                 return self._synthesise_dramabox(text)
         if config.tts_engine == "chatterbox":
             if self._chatterbox is None:
                 logger.info("Loading Chatterbox on demand...")
-                self._load_chatterbox(config)
+                self._ensure_chatterbox(config)
             if self._chatterbox is not None:
                 return self._synthesise_chatterbox(text)
         return self._synthesise_kokoro(text)
