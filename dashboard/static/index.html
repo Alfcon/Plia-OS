@@ -46,16 +46,21 @@
     #google-fields { margin-top: 4px; }
     #menu-overlay { position: fixed; inset: 0; z-index: 100; display: none; }
     #menu-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.75); }
-    #menu-panel { position: absolute; left: 0; top: 0; bottom: 0; width: 260px; background: #111; border-right: 1px solid #2a2a2a; display: flex; flex-direction: column; }
-    #menu-header { padding: 20px 16px 14px; border-bottom: 1px solid #1e1e1e; display: flex; justify-content: space-between; align-items: center; }
+    #menu-panel { position: absolute; left: 0; top: 0; bottom: 0; width: 280px; background: #111; border-right: 1px solid #2a2a2a; display: flex; flex-direction: column; }
+    #menu-header { padding: 20px 16px 14px; border-bottom: 1px solid #1e1e1e; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
     #menu-header .menu-title { font-size: 1rem; color: #e0e0e0; letter-spacing: 0.08em; text-transform: uppercase; }
     #menu-header .menu-close { background: none; border: none; color: #555; font-size: 1rem; cursor: pointer; width: auto; padding: 2px 6px; }
     #menu-header .menu-close:hover { color: #e0e0e0; background: #1a1a1a; }
-    #menu-nav { flex: 1; padding: 8px 0; overflow-y: auto; }
-    #menu-nav a { display: block; padding: 10px 20px; font-size: 0.82rem; color: #888; cursor: pointer; border-left: 2px solid transparent; text-decoration: none; }
-    #menu-nav a:hover { color: #e0e0e0; background: #181818; border-left-color: #4fc3f7; }
-    #menu-footer { padding: 12px 16px; border-top: 1px solid #1e1e1e; display: flex; flex-direction: column; gap: 8px; }
-    #menu-footer .settings-btn { background: #0d1b2a; color: #4fc3f7; border: 1px solid #1e3a5f; }
+    #menu-settings { flex: 1; overflow-y: auto; padding: 12px 16px; }
+    .m-section { margin-bottom: 20px; }
+    .m-section-title { font-size: 0.7rem; text-transform: uppercase; color: #555; letter-spacing: 0.1em; margin-bottom: 8px; border-bottom: 1px solid #1e1e1e; padding-bottom: 4px; }
+    .m-section label { font-size: 0.78rem; color: #999; display: block; margin-bottom: 6px; }
+    .m-section select, .m-section input[type=range], .m-section input[type=text], .m-section input[type=password] { width: 100%; background: #1a1a1a; color: #e0e0e0; border: 1px solid #2a2a2a; border-radius: 4px; padding: 4px 6px; }
+    .m-section button { margin-top: 6px; background: #1a1a2e; color: #4fc3f7; border: 1px solid #1e3a5f; border-radius: 4px; padding: 5px 10px; font-size: 0.78rem; cursor: pointer; width: 100%; }
+    .m-section button:hover { background: #1e3a5f; }
+    #m-agent-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+    #menu-footer { padding: 14px 16px 20px; border-top: 1px solid #1e1e1e; display: flex; flex-direction: column; gap: 0; flex-shrink: 0; }
+    #menu-footer .settings-btn { background: #0d1b2a; color: #4fc3f7; border: 1px solid #1e3a5f; margin-bottom: 12px; }
     #menu-footer .settings-btn:hover { background: #1e3a5f; }
     #menu-footer .exit-btn { background: #1a0808; color: #ef9a9a; border: 1px solid #7f1d1d; }
     #menu-footer .exit-btn:hover { background: #7f1d1d; }
@@ -72,16 +77,64 @@
       <span class="menu-title">Plia-OS</span>
       <button class="menu-close" onclick="closeMenu()">✕</button>
     </div>
-    <nav id="menu-nav">
-      <a onclick="closeMenu()">Status</a>
-      <a onclick="closeMenu()">Voice</a>
-      <a onclick="closeMenu()">Agents</a>
-      <a onclick="closeMenu()">Web Search</a>
-      <a onclick="closeMenu()">Calendar</a>
-      <a onclick="closeMenu()">Memory</a>
-    </nav>
+
+    <div id="menu-settings" style="display:none">
+      <!-- Voice -->
+      <div class="m-section">
+        <div class="m-section-title">Voice</div>
+        <label>Engine
+          <select id="m-tts-engine" onchange="onMenuEngineChange()">
+            <option value="kokoro">Kokoro</option>
+            <option value="chatterbox">Chatterbox</option>
+            <option value="dramabox">Dramabox</option>
+          </select>
+        </label>
+        <div id="m-kokoro-opts">
+          <label>Voice
+            <select id="m-kokoro-voice">
+              <option value="af_heart">af_heart (US Female)</option>
+              <option value="am_michael">am_michael (US Male)</option>
+              <option value="bf_emma">bf_emma (UK Female)</option>
+              <option value="bm_george">bm_george (UK Male)</option>
+            </select>
+          </label>
+          <label>Speed
+            <input type="range" id="m-kokoro-speed" min="0.5" max="2.0" step="0.1" value="1.0" />
+          </label>
+        </div>
+        <button onclick="applyMenuVoice()">Apply</button>
+      </div>
+
+      <!-- Web Search -->
+      <div class="m-section">
+        <div class="m-section-title">Web Search</div>
+        <label>Provider
+          <select id="m-web-provider" onchange="onMenuWebChange()">
+            <option value="ddg">DuckDuckGo</option>
+            <option value="google">Google</option>
+            <option value="playwright">Playwright</option>
+          </select>
+        </label>
+        <div id="m-google-fields" style="display:none">
+          <label>API Key
+            <input type="password" id="m-google-api-key" placeholder="AIza…" />
+          </label>
+          <label>CX
+            <input type="text" id="m-google-cx" placeholder="Search engine ID" />
+          </label>
+        </div>
+        <button onclick="applyMenuWeb()">Apply</button>
+      </div>
+
+      <!-- Agents -->
+      <div class="m-section">
+        <div class="m-section-title">Agents</div>
+        <div id="m-agent-badges"></div>
+      </div>
+    </div>
+
     <div id="menu-footer">
-      <button class="settings-btn" onclick="openSettings()">⚙ Settings</button>
+      <button class="settings-btn" onclick="toggleMenuSettings()">⚙ Settings</button>
       <button class="exit-btn" onclick="exitApp()">⏻ Exit</button>
     </div>
   </div>
@@ -849,6 +902,7 @@
 
   function openMenu() {
     document.getElementById('menu-overlay').style.display = '';
+    _syncMenuInputs();
     document.addEventListener('keydown', _menuKeyHandler);
   }
   function closeMenu() {
@@ -856,10 +910,51 @@
     document.removeEventListener('keydown', _menuKeyHandler);
   }
   function _menuKeyHandler(e) { if (e.key === 'Escape') closeMenu(); }
-  function openSettings() {
-    closeMenu();
-    document.querySelector('aside').scrollTo({ top: 0, behavior: 'smooth' });
+
+  function toggleMenuSettings() {
+    const s = document.getElementById('menu-settings');
+    s.style.display = s.style.display === 'none' ? '' : 'none';
   }
+
+  function _syncMenuInputs() {
+    document.getElementById('m-tts-engine').value = document.getElementById('tts-engine').value;
+    document.getElementById('m-kokoro-voice').value = document.getElementById('kokoro-voice').value;
+    document.getElementById('m-kokoro-speed').value = document.getElementById('kokoro-speed').value;
+    document.getElementById('m-web-provider').value = document.getElementById('web-provider').value;
+    document.getElementById('m-google-api-key').value = document.getElementById('google-api-key').value;
+    document.getElementById('m-google-cx').value = document.getElementById('google-cx').value;
+    onMenuEngineChange();
+    onMenuWebChange();
+    const src = document.getElementById('agent-badges');
+    document.getElementById('m-agent-badges').innerHTML = src ? src.innerHTML : '';
+  }
+
+  function onMenuEngineChange() {
+    const e = document.getElementById('m-tts-engine').value;
+    document.getElementById('m-kokoro-opts').style.display = e === 'kokoro' ? '' : 'none';
+  }
+
+  function onMenuWebChange() {
+    const isGoogle = document.getElementById('m-web-provider').value === 'google';
+    document.getElementById('m-google-fields').style.display = isGoogle ? '' : 'none';
+  }
+
+  function applyMenuVoice() {
+    document.getElementById('tts-engine').value = document.getElementById('m-tts-engine').value;
+    document.getElementById('kokoro-voice').value = document.getElementById('m-kokoro-voice').value;
+    document.getElementById('kokoro-speed').value = document.getElementById('m-kokoro-speed').value;
+    applyVoiceConfig();
+    onEngineChange();
+  }
+
+  function applyMenuWeb() {
+    document.getElementById('web-provider').value = document.getElementById('m-web-provider').value;
+    document.getElementById('google-api-key').value = document.getElementById('m-google-api-key').value;
+    document.getElementById('google-cx').value = document.getElementById('m-google-cx').value;
+    applyWebConfig();
+    onWebProviderChange();
+  }
+
   async function exitApp() {
     if (!confirm('Exit Plia-OS?')) return;
     await fetch('/api/shutdown', { method: 'POST' }).catch(() => {});
