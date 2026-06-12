@@ -31,11 +31,13 @@ async def code_node(state: "AgentState") -> dict:
         ])
         parsed = json.loads(msg.get("content", "{}"))
         language = parsed.get("language", "python")
-        code = parsed.get("code", last_user)
+        code = parsed.get("code", "")
     except Exception:
-        language, code = "python", last_user
+        language, code = "python", ""
 
-    if language == "shell":
+    if not code:
+        output = "Could not extract code from the request."
+    elif language == "shell":
         output = run_shell(code)
     else:
         output = run_python(code)

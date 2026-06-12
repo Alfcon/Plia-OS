@@ -47,13 +47,14 @@ async def test_code_node_defaults_to_python_on_unknown_language():
 
 
 @pytest.mark.asyncio
-async def test_code_node_llm_parse_error_falls_back_to_python():
+async def test_code_node_llm_parse_error_returns_error_not_raw_input():
     with patch("agents.code.call_llm", new_callable=AsyncMock) as mock_llm, \
-         patch("agents.code.run_python", return_value="result\n") as mock_py:
+         patch("agents.code.run_python") as mock_py:
         mock_llm.return_value = {"content": "not json at all"}
         update = await code_node(_state("print('hello')"))
-    mock_py.assert_called_once()
+    mock_py.assert_not_called()
     assert update["active_agent"] == "code"
+    assert any("Could not extract" in r for r in update["tool_results"])
 
 
 @pytest.mark.asyncio
