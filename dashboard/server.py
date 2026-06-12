@@ -164,8 +164,12 @@ async def stop_recording(target: str = "chatterbox"):
 @router.post("/api/generate-dramabox")
 async def generate_dramabox(body: dict):
     svc = get_tts_service()
-    if svc is None or svc._dramabox is None:
-        raise HTTPException(status_code=409, detail="Dramabox not loaded")
+    if svc is None:
+        raise HTTPException(status_code=409, detail="TTS service not available")
+    if svc._dramabox is None:
+        await asyncio.to_thread(svc._load_dramabox, get_config())
+    if svc._dramabox is None:
+        raise HTTPException(status_code=409, detail="Dramabox failed to load")
     prompt = (body.get("prompt") or "").strip()
     if not prompt:
         raise HTTPException(status_code=422, detail="prompt required")
@@ -194,8 +198,12 @@ async def generate_dramabox(body: dict):
 @router.post("/api/generate-chatterbox")
 async def generate_chatterbox(body: dict):
     svc = get_tts_service()
-    if svc is None or svc._chatterbox is None:
-        raise HTTPException(status_code=409, detail="Chatterbox not loaded")
+    if svc is None:
+        raise HTTPException(status_code=409, detail="TTS service not available")
+    if svc._chatterbox is None:
+        await asyncio.to_thread(svc._load_chatterbox, get_config())
+    if svc._chatterbox is None:
+        raise HTTPException(status_code=409, detail="Chatterbox failed to load")
     prompt = (body.get("prompt") or "").strip()
     if not prompt:
         raise HTTPException(status_code=422, detail="prompt required")
