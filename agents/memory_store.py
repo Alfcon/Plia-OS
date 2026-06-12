@@ -119,7 +119,8 @@ class MemoryStore:
                 client.delete_collection("conversations")
                 self._init_chroma()
             except Exception:
-                pass
+                logger.warning("ChromaDB clear failed; semantic recall disabled until restart", exc_info=True)
+                self._collection = None
 
     def _chroma_add(self, role: str, content: str) -> None:
         if self._collection is None:
