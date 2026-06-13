@@ -127,3 +127,42 @@ async def test_async_tool_is_awaited():
     tool_msgs = [m for m in history if m.get("role") == "tool"]
     assert tool_msgs[0]["content"] == "99"
     assert text == "The async answer is 99."
+
+
+@respx.mock
+async def test_specialist_runs_once_not_repeatedly():
+    """Supervisor must route to respond after tool_results populated, not loop back to specialist.
+    memory_node calls LLM once (parse intent), then respond_node calls LLM once (final reply).
+    Total = 2 LLM calls, not 6+ from re-routing back through memory_node repeatedly."""
+    respx.post("http://localhost:11434/api/chat").mock(
+        side_effect=[
+            # memory_node: parse intent JSON
+            httpx.Response(200, json={
+                "message": {
+                    "role": "assistant",
+                    "content": '{"op": "remember", "key": "fav_food", "value": "pizza"}',
+                    "tool_calls": None,
+                }
+            }),
+            # respond_node: final reply
+            httpx.Response(200, json={
+                "message": {"role": "assistant", "content": "Got it, I'll remember that.", "tool_calls": None}
+            }),
+            # This third entry must NOT be consumed — if it is, memory_node ran twice
+            httpx.Response(200, json={
+                "message": {"role": "assistant", "content": "SHOULD NOT REACH HERE", "tool_calls": None}
+            }),
+        ]
+    )
+
+    from core.supervisor import _keyword_route
+    assert _keyword_route("Remember that my favourite food is pizza") == "memory"
+
+    messages = [
+        {"role": "system", "content": "You are Plia."},
+        {"role": "user", "content": "Remember that my favourite food is pizza"},
+    ]
+    text, _ = await run_turn(messages)
+
+    assert text == "Got it, I'll remember that.", f"Unexpected response: {text!r}"
+    assert "SHOULD NOT REACH HERE" not in text

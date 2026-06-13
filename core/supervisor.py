@@ -57,6 +57,9 @@ async def _supervisor_node(state: AgentState) -> dict:
     if state["hop_count"] >= _HOP_LIMIT:
         return {"active_agent": "respond"}
 
+    if state["tool_results"]:
+        return {"active_agent": "respond"}
+
     last_user = next(
         (m["content"] for m in reversed(state["messages"]) if m["role"] == "user"), ""
     )
