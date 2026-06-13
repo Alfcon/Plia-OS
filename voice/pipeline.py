@@ -21,6 +21,7 @@ _BLOCK_SIZE = 1280  # ~80ms per chunk at 16kHz
 _ENERGY_FLOOR = 0.03  # RMS below this = silence (normalised to [-1,1])
 _INT16_MAX = 32768.0  # used to normalise int16 → float for RMS and STT
 _HISTORY_PRELOAD = 20  # number of recent messages to preload on startup
+_TTS_SAMPLE_RATE = 24000
 
 
 class VoicePipeline:
@@ -36,7 +37,7 @@ class VoicePipeline:
         self._running = False
         self._conversation: list[dict] = []
         self._wake_muted_until: float = 0.0  # epoch time; wake ignored before this
-        self._announcement_queue: asyncio.Queue[str] = asyncio.Queue()
+        self._announcement_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=50)
 
     def load(self) -> None:
         self._wake.load()
@@ -59,16 +60,23 @@ class VoicePipeline:
             self._conversation = [{"role": "system", "content": config.system_prompt}]
             logger.info("Pipeline conversation history cleared")
         elif payload.get("type") == "reminder_fired":
-            message = payload.get("message", "Reminder")
-            self._announcement_queue.put_nowait(f"Reminder: {message}")
-            logger.info("Queued reminder announcement: %s", message)
+            message = payload.get("message") or "Reminder"
+            try:
+                self._announcement_queue.put_nowait(f"Reminder: {message}")
+                logger.info("Queued reminder announcement: %s", message)
+            except asyncio.QueueFull:
+                logger.warning("Announcement queue full; dropping reminder: %s", message)
+
+    def _set_wake_mute(self, audio_out: np.ndarray) -> None:
+        self._wake_muted_until = time.monotonic() + len(audio_out) / _TTS_SAMPLE_RATE + 4.0
 
     async def _speak_announcement(self, message: str) -> None:
         logger.info("Announcing: %s", message)
+        self._wake_muted_until = time.monotonic() + 4.0  # minimum mute even if synthesis fails
         try:
             await events.emit("transcript", {"role": "assistant", "text": message})
             audio_out = self._tts.synthesise(message)
-            self._wake_muted_until = time.monotonic() + len(audio_out) / 24000.0 + 4.0
+            self._set_wake_mute(audio_out)
             sd.play(audio_out, samplerate=24000, blocking=True)
         except Exception:
             logger.exception("Reminder announcement failed")
@@ -137,6 +145,12 @@ class VoicePipeline:
                 except asyncio.TimeoutError:
                     if max_iterations is not None:
                         return
+                    while not self._announcement_queue.empty():
+                        try:
+                            msg = self._announcement_queue.get_nowait()
+                            await self._speak_announcement(msg)
+                        except asyncio.QueueEmpty:
+                            break
                     continue
                 if self._wake.detect(chunk):  # chunk is already int16
                     self._wake.reset()
@@ -209,7 +223,7 @@ class VoicePipeline:
                 audio_out = self._tts.synthesise(response)
                 logger.info("Playing audio (%d samples)...", len(audio_out))
                 # Mute before playback: audio duration + 4s tail covers hardware buffer echo
-                self._wake_muted_until = time.monotonic() + len(audio_out) / 24000.0 + 4.0
+                self._set_wake_mute(audio_out)
                 while not audio_q.empty():
                     audio_q.get_nowait()
                 sd.play(audio_out, samplerate=24000, blocking=True)

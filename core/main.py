@@ -58,8 +58,10 @@ def create_app() -> FastAPI:
 
 async def _start_pipeline() -> None:
     from voice.pipeline import VoicePipeline
+    from core import events
     config = get_config()
     pipeline = VoicePipeline()
+    events.subscribe(pipeline._on_event)  # subscribe before load() so reminders aren't lost during model loading
     try:
         pipeline.load()
         await pipeline.start()
