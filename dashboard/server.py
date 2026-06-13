@@ -40,11 +40,18 @@ UPLOADS_DIR.mkdir(exist_ok=True)
 
 router = APIRouter()
 _ws_clients: list[WebSocket] = []
+_recent_notifications: list[dict] = []  # replay buffer for clients that connect after startup
+_NOTIFICATION_REPLAY_TYPES = {"reminder_fired"}
+_NOTIFICATION_REPLAY_MAX = 20
 
 STATIC_DIR = Path(__file__).parent / "static"
 
 
 async def _broadcast(payload: dict) -> None:
+    if payload.get("type") in _NOTIFICATION_REPLAY_TYPES:
+        _recent_notifications.append(payload)
+        if len(_recent_notifications) > _NOTIFICATION_REPLAY_MAX:
+            _recent_notifications.pop(0)
     dead = []
     for ws in list(_ws_clients):
         try:
@@ -317,6 +324,11 @@ async def vram_release(body: dict):
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
+    for notification in _recent_notifications:
+        try:
+            await ws.send_text(json.dumps(notification))
+        except Exception:
+            pass
     _ws_clients.append(ws)
     try:
         while True:

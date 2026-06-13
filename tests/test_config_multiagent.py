@@ -34,3 +34,21 @@ def test_update_fallback_provider():
 def test_update_web_search_default():
     update_config(web_search_default="google")
     assert get_config().web_search_default == "google"
+
+
+def test_tts_engine_valid_values_accepted():
+    for engine in ("kokoro", "chatterbox", "dramabox"):
+        update_config(tts_engine=engine)
+        assert get_config().tts_engine == engine
+
+
+def test_tts_engine_invalid_value_raises():
+    import pytest
+    with pytest.raises(ValueError, match="tts_engine"):
+        update_config(tts_engine="garbage")
+
+
+def test_studio_pipeline_mode_invalid_raises():
+    import pytest
+    with pytest.raises(ValueError, match="studio_pipeline_mode"):
+        update_config(studio_pipeline_mode="invalid")

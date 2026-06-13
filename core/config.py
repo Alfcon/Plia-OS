@@ -67,10 +67,21 @@ def get_config() -> PliaConfig:
     return _config
 
 
+_LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
+    "tts_engine": ("kokoro", "chatterbox", "dramabox"),
+    "studio_pipeline_mode": ("cpu_stt", "pause"),
+}
+
+
 def update_config(**kwargs) -> PliaConfig:
     for key, value in kwargs.items():
         if not hasattr(_config, key):
             raise ValueError(f"Unknown config key: {key!r}")
+        if key in _LITERAL_CONSTRAINTS and value not in _LITERAL_CONSTRAINTS[key]:
+            raise ValueError(
+                f"Invalid value {value!r} for {key!r}; "
+                f"allowed: {_LITERAL_CONSTRAINTS[key]}"
+            )
         setattr(_config, key, value)
     return _config
 

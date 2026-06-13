@@ -27,6 +27,22 @@ _CLASSIFY_SYSTEM = (
     "If the request needs no specialist, output: respond."
 )
 
+_KEYWORD_ROUTES: dict[str, list[str]] = {
+    "memory": ["remember that", "don't forget", "make a note", "recall what", "what did i tell you", "store this", "memorize"],
+    "web": ["search for", "search the web", "look it up", "look up", "google ", "find online", "look online", "browse to", "visit http"],
+    "code": ["run this code", "execute this", "run python", "run shell", "```python", "```sh", "run the code"],
+    "calendar": ["add to calendar", "schedule a", "create an event", "calendar event", "add an appointment", "add event"],
+    "home": ["turn on the", "turn off the", "lights on", "lights off", "home automation", "smart home"],
+}
+
+
+def _keyword_route(text: str) -> str | None:
+    lower = text.lower()
+    for intent, keywords in _KEYWORD_ROUTES.items():
+        if any(kw in lower for kw in keywords):
+            return intent
+    return None
+
 
 class AgentState(TypedDict):
     messages: list[dict]
@@ -41,15 +57,22 @@ async def _supervisor_node(state: AgentState) -> dict:
     if state["hop_count"] >= _HOP_LIMIT:
         return {"active_agent": "respond"}
 
-    classify_messages = [
-        {"role": "system", "content": _CLASSIFY_SYSTEM},
-        *state["messages"],
-    ]
-    msg = await call_llm(classify_messages)
-    content = msg.get("content", "") or ""
-    intent = content.strip().lower().split()[0] if content.strip() else "respond"
-    if intent not in _KNOWN_INTENTS:
-        intent = "respond"
+    last_user = next(
+        (m["content"] for m in reversed(state["messages"]) if m["role"] == "user"), ""
+    )
+
+    intent = _keyword_route(last_user)
+    if intent is None:
+        classify_messages = [
+            {"role": "system", "content": _CLASSIFY_SYSTEM},
+            *state["messages"],
+        ]
+        msg = await call_llm(classify_messages)
+        content = msg.get("content", "") or ""
+        intent = content.strip().lower().split()[0] if content.strip() else "respond"
+        if intent not in _KNOWN_INTENTS:
+            intent = "respond"
+
     logger.info("Supervisor routed to: %s", intent)
     if intent != "respond":
         await events.emit("agent_routing", {"agent": intent})
