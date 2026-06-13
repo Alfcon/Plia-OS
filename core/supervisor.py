@@ -172,6 +172,10 @@ async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
     final_messages = result["messages"]
     last = final_messages[-1]
     response = last.get("content", "")
+    for _prefix in ("assistant\n\n", "assistant\n", "user\n\n", "user\n", "system\n\n", "system\n"):
+        if response.startswith(_prefix):
+            response = response[len(_prefix):]
+            break
 
     if last_user:
         store.add_turn("user", last_user)
