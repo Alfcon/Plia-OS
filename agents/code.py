@@ -1,9 +1,8 @@
 from __future__ import annotations
-import json
 import logging
 from typing import TYPE_CHECKING
 
-from agents.llm import call_llm
+from agents.llm import call_llm, parse_llm_json
 from agents.code_sandbox import run_python, run_shell
 
 if TYPE_CHECKING:
@@ -29,7 +28,7 @@ async def code_node(state: "AgentState") -> dict:
             {"role": "system", "content": _EXTRACT_SYSTEM},
             {"role": "user", "content": last_user},
         ])
-        parsed = json.loads(msg.get("content") or "{}")
+        parsed = parse_llm_json(msg.get("content"))
         language = parsed.get("language", "python")
         code = parsed.get("code", "")
     except Exception:

@@ -94,6 +94,9 @@ def _load_persisted(config: PliaConfig) -> None:
                 logger.warning("Ignoring invalid persisted value %r for %r; allowed: %s", value, key, allowed)
                 continue
             current = getattr(config, key)
+            if value is None and current is not None:
+                logger.warning("Ignoring null in persisted config for %r; keeping default", key)
+                continue
             if current is not None and value is not None:
                 target = type(current)
                 if not isinstance(value, target):

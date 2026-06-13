@@ -8,9 +8,16 @@ _FENCE_RE = re.compile(r"```[a-zA-Z]*\n?(.*?)```", re.DOTALL)
 
 def parse_llm_json(content: str | None) -> dict:
     text = (content or "").strip()
-    m = _FENCE_RE.search(text)
-    if m:
-        text = m.group(1).strip()
+    for m in _FENCE_RE.finditer(text):
+        inner = m.group(1).strip()
+        if not inner:
+            continue
+        try:
+            result = json.loads(inner)
+            if isinstance(result, dict):
+                return result
+        except json.JSONDecodeError:
+            continue
     result = json.loads(text or "{}")
     if not isinstance(result, dict):
         return {}
