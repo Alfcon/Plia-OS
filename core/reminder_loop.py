@@ -21,6 +21,10 @@ async def _check_reminders() -> None:
 
 async def run_reminder_loop() -> None:
     logger.info("Reminder loop started (poll=%ds)", _POLL_INTERVAL_S)
+    store = get_memory_store()
+    pruned = await asyncio.to_thread(store.prune_done_reminders)
+    if pruned:
+        logger.info("Pruned %d old done reminders on startup", pruned)
     while True:
         try:
             await _check_reminders()

@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 _HISTORY_CAP = 500
 
@@ -142,6 +142,15 @@ class MemoryStore:
     def mark_reminder_done(self, reminder_id: int) -> None:
         with self._conn() as conn:
             conn.execute("UPDATE reminders SET done=1 WHERE id=?", (reminder_id,))
+
+    def prune_done_reminders(self, older_than_days: int = 7) -> int:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=older_than_days)).isoformat()
+        with self._conn() as conn:
+            cur = conn.execute(
+                "DELETE FROM reminders WHERE done=1 AND fire_at < ?",
+                (cutoff,),
+            )
+            return cur.rowcount
 
     def _chroma_add(self, role: str, content: str) -> None:
         if self._collection is None:

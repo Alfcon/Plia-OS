@@ -62,3 +62,47 @@ async def test_check_reminders_fires_multiple():
 
     assert len(fired) == 2
     assert mock_store.mark_reminder_done.call_count == 2
+
+
+def _make_store(tmpdir: str):
+    import os
+    from agents.memory_store import MemoryStore
+    return MemoryStore(
+        db_path=os.path.join(tmpdir, "memory.db"),
+        chroma_path=os.path.join(tmpdir, "chroma"),
+    )
+
+
+def test_prune_done_reminders_removes_old_rows():
+    import tempfile
+    from datetime import datetime, timezone, timedelta
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = _make_store(tmpdir)
+        old = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+        recent = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+        future = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+
+        id_old = store.add_reminder("old done", old)
+        id_recent = store.add_reminder("recent done", recent)
+        store.add_reminder("future pending", future)
+
+        store.mark_reminder_done(id_old)
+        store.mark_reminder_done(id_recent)
+
+        pruned = store.prune_done_reminders(older_than_days=7)
+        assert pruned == 1  # only the 10-day-old row
+
+
+def test_prune_done_reminders_returns_zero_when_nothing_old():
+    import tempfile
+    from datetime import datetime, timezone, timedelta
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = _make_store(tmpdir)
+        recent = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        rid = store.add_reminder("fresh", recent)
+        store.mark_reminder_done(rid)
+
+        pruned = store.prune_done_reminders(older_than_days=7)
+        assert pruned == 0
