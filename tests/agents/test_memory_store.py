@@ -30,6 +30,28 @@ def test_forget_nonexistent_is_safe(store):
     store.forget("does_not_exist")  # must not raise
 
 
+def test_list_all_returns_all_facts(store):
+    store.remember("user.name", "Alfcon")
+    store.remember("user.dog", "Rex")
+    facts = store.list_all()
+    keys = [f["key"] for f in facts]
+    assert "user.name" in keys
+    assert "user.dog" in keys
+    assert all("key" in f and "value" in f for f in facts)
+
+
+def test_list_all_empty(store):
+    assert store.list_all() == []
+
+
+def test_list_all_reflects_overwrite(store):
+    store.remember("k", "first")
+    store.remember("k", "second")
+    facts = store.list_all()
+    assert len(facts) == 1
+    assert facts[0]["value"] == "second"
+
+
 def test_add_turn_and_recall_fallback(store):
     store.add_turn("user", "what is the weather")
     store.add_turn("assistant", "it is sunny")

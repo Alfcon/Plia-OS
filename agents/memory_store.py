@@ -76,6 +76,13 @@ class MemoryStore:
         with self._conn() as conn:
             conn.execute("DELETE FROM facts WHERE key = ?", (key,))
 
+    def list_all(self) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT key, value FROM facts ORDER BY updated_at DESC",
+            ).fetchall()
+        return [{"key": r[0], "value": r[1]} for r in rows]
+
     def add_turn(self, role: str, content: str) -> None:
         now = datetime.now(timezone.utc).isoformat()
         with self._conn() as conn:

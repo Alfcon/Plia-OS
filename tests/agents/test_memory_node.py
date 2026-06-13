@@ -30,7 +30,9 @@ def _state(user_text):
 @pytest.mark.asyncio
 async def test_recall_returns_context(isolated_store):
     isolated_store.recall.return_value = ["user: my dog is Rex"]
-    update = await memory_node(_state("what is my dog's name"))
+    with patch("agents.memory.call_llm", new_callable=AsyncMock) as mock_llm:
+        mock_llm.return_value = {"content": '{"op":"recall","key":"","value":""}'}
+        update = await memory_node(_state("what is my dog's name"))
     assert update["active_agent"] == "memory"
     assert "Rex" in update.get("memory_context", "") or any("Rex" in r for r in update.get("tool_results", []))
 
@@ -60,3 +62,28 @@ async def test_llm_parse_error_falls_back_to_recall(isolated_store):
         update = await memory_node(_state("what do you remember about me"))
     assert update["active_agent"] == "memory"
     assert isinstance(update.get("tool_results"), list)
+
+
+@pytest.mark.asyncio
+async def test_list_returns_all_facts(isolated_store):
+    isolated_store.list_all.return_value = [
+        {"key": "user.name", "value": "Alfcon"},
+        {"key": "user.dog", "value": "Rex"},
+    ]
+    with patch("agents.memory.call_llm", new_callable=AsyncMock) as mock_llm:
+        mock_llm.return_value = {"content": '{"op":"list","key":"","value":""}'}
+        update = await memory_node(_state("what do you know about me"))
+    isolated_store.list_all.assert_called_once()
+    result_text = "\n".join(update["tool_results"])
+    assert "user.name" in result_text
+    assert "Alfcon" in result_text
+
+
+@pytest.mark.asyncio
+async def test_list_empty_store_returns_message(isolated_store):
+    isolated_store.list_all.return_value = []
+    with patch("agents.memory.call_llm", new_callable=AsyncMock) as mock_llm:
+        mock_llm.return_value = {"content": '{"op":"list","key":"","value":""}'}
+        update = await memory_node(_state("what do you know about me"))
+    result_text = "\n".join(update["tool_results"])
+    assert "No stored" in result_text

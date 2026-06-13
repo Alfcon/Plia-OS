@@ -12,9 +12,10 @@ logger = logging.getLogger(__name__)
 
 _PARSE_SYSTEM = (
     "Parse the user memory request. Output JSON with exactly three keys: "
-    '"op" ("remember", "recall", or "forget"), '
+    '"op" ("remember", "recall", "forget", or "list"), '
     '"key" (short identifier string), '
     '"value" (the fact to store, or empty string). '
+    'Use "list" when the user asks what you know about them or wants to see all stored facts. '
     "Output only valid JSON, no explanation."
 )
 
@@ -39,6 +40,18 @@ async def memory_node(state: "AgentState") -> dict:
         op, key, value = "recall", last_user[:80], ""
 
     store = get_memory_store()
+
+    if op == "list":
+        facts = store.list_all()
+        if not facts:
+            result = "No stored memories yet."
+        else:
+            lines = [f"- {f['key']}: {f['value']}" for f in facts]
+            result = "Here is what I know:\n" + "\n".join(lines)
+        return {
+            "tool_results": state["tool_results"] + [f"[memory]\n{result}"],
+            "active_agent": "memory",
+        }
 
     if op == "remember" and key and value:
         store.remember(key, value)
