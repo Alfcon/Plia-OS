@@ -121,3 +121,37 @@ async def test_stop_recording_when_idle_returns_409(app):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post("/api/stop-recording")
     assert resp.status_code == 409
+
+
+async def test_list_reminders_returns_pending(app):
+    mock_store = MagicMock()
+    mock_store.list_pending.return_value = [
+        {"id": 1, "message": "Buy milk", "fire_at": "2026-06-13T12:00:00+00:00"},
+    ]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.get("/api/reminders")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["message"] == "Buy milk"
+
+
+async def test_list_reminders_empty(app):
+    mock_store = MagicMock()
+    mock_store.list_pending.return_value = []
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.get("/api/reminders")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+async def test_cancel_reminder_marks_done(app):
+    mock_store = MagicMock()
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.delete("/api/reminders/42")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == 42
+    mock_store.mark_reminder_done.assert_called_once_with(42)

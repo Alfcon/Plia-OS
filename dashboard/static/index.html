@@ -100,6 +100,7 @@
         <button class="m-nav-btn" data-section="agents" onclick="showMenuSection('agents')">Agents</button>
         <button class="m-nav-btn" data-section="llm" onclick="showMenuSection('llm')">LLM</button>
         <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system')">System</button>
+        <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders()">Reminders</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -245,6 +246,13 @@
         <div id="m-section-system" class="m-pane" style="display:none">
           <ul id="module-list" style="font-size:0.78rem;list-style:none;padding:0;">Loading...</ul>
         </div>
+        <div id="m-section-reminders" class="m-pane" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:0.78rem;color:#aaa;">Pending reminders</span>
+            <button onclick="loadReminders()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
+          </div>
+          <ul id="reminder-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
+        </div>
       </div>
     </div>
 
@@ -330,6 +338,7 @@
     }
     if (msg.type === 'reminder_fired') {
       _appendMsg('system', 'Reminder: ' + msg.message);
+      loadReminders();
     }
     if (msg.type === 'wake') {
       document.getElementById('status-badge').textContent = 'listening';
@@ -453,6 +462,33 @@
       onEngineChange();
       startVramPolling();
     });
+
+  async function loadReminders() {
+    const ul = document.getElementById('reminder-list');
+    if (!ul) return;
+    try {
+      const rows = await fetch('/api/reminders').then(r => r.json());
+      if (!rows.length) {
+        ul.innerHTML = '<li style="color:#555;font-style:italic;">No pending reminders</li>';
+        return;
+      }
+      ul.innerHTML = rows.map(r => {
+        const when = new Date(r.fire_at).toLocaleString();
+        return `<li style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #1e1e1e;">
+          <span style="flex:1;margin-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.message}">${r.message}</span>
+          <span style="color:#888;font-size:0.72rem;white-space:nowrap;margin-right:6px;">${when}</span>
+          <button onclick="cancelReminder(${r.id})" style="background:none;border:1px solid #555;border-radius:3px;color:#ef9a9a;font-size:0.72rem;padding:1px 5px;cursor:pointer;">✕</button>
+        </li>`;
+      }).join('');
+    } catch(e) {
+      ul.innerHTML = '<li style="color:#ef9a9a;">Failed to load</li>';
+    }
+  }
+
+  async function cancelReminder(id) {
+    await fetch(`/api/reminders/${id}`, {method: 'DELETE'});
+    loadReminders();
+  }
 
   function loadSystemInfo() {
     fetch('/api/system/info').then(r => r.json()).then(info => {

@@ -130,6 +130,13 @@ class MemoryStore:
             )
             return cur.lastrowid
 
+    def list_pending(self) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT id, message, fire_at FROM reminders WHERE done=0 ORDER BY fire_at ASC",
+            ).fetchall()
+        return [{"id": r[0], "message": r[1], "fire_at": r[2]} for r in rows]
+
     def get_pending(self) -> list[dict]:
         now_iso = datetime.now(timezone.utc).isoformat()
         with self._conn() as conn:

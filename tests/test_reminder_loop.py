@@ -94,6 +94,40 @@ def test_prune_done_reminders_removes_old_rows():
         assert pruned == 1  # only the 10-day-old row
 
 
+def test_list_pending_returns_all_scheduled_including_future():
+    import tempfile
+    from datetime import datetime, timezone, timedelta
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = _make_store(tmpdir)
+        past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        future = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+
+        store.add_reminder("overdue", past)
+        store.add_reminder("upcoming", future)
+
+        all_pending = store.list_pending()
+        assert len(all_pending) == 2
+        assert all_pending[0]["message"] == "overdue"   # sorted by fire_at asc
+        assert all_pending[1]["message"] == "upcoming"
+
+
+def test_list_pending_excludes_done():
+    import tempfile
+    from datetime import datetime, timezone, timedelta
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = _make_store(tmpdir)
+        past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        rid = store.add_reminder("done one", past)
+        store.mark_reminder_done(rid)
+        store.add_reminder("still pending", past)
+
+        all_pending = store.list_pending()
+        assert len(all_pending) == 1
+        assert all_pending[0]["message"] == "still pending"
+
+
 def test_prune_done_reminders_returns_zero_when_nothing_old():
     import tempfile
     from datetime import datetime, timezone, timedelta

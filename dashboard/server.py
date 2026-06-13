@@ -245,6 +245,19 @@ async def clear_history():
     return {"status": "cleared"}
 
 
+@router.get("/api/reminders")
+async def list_reminders():
+    from agents.memory_store import get_memory_store
+    return await asyncio.to_thread(get_memory_store().list_pending)
+
+
+@router.delete("/api/reminders/{reminder_id}")
+async def cancel_reminder(reminder_id: int):
+    from agents.memory_store import get_memory_store
+    await asyncio.to_thread(get_memory_store().mark_reminder_done, reminder_id)
+    return {"status": "cancelled", "id": reminder_id}
+
+
 @router.post("/api/chat")
 async def chat(body: dict):
     from core.supervisor import run_turn
