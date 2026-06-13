@@ -12,6 +12,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_KNOWN_OPS = {"call_service", "get_state", "list_states"}
+
+
+def _parse_llm_json(content: str | None) -> dict:
+    text = (content or "").strip()
+    if text.startswith("```"):
+        text = text.split("```", 2)[1]
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.rsplit("```", 1)[0].strip()
+    return json.loads(text or "{}")
+
+
 _PARSE_SYSTEM = (
     "Parse the home automation request. Output JSON with these keys: "
     '"op": one of "call_service", "get_state", "list_states". '
@@ -45,8 +58,10 @@ async def home_node(state: "AgentState") -> dict:
             {"role": "system", "content": _PARSE_SYSTEM},
             {"role": "user", "content": last_user},
         ])
-        parsed = json.loads(msg.get("content") or "{}")
-        op = parsed.get("op", "list_states")
+        parsed = _parse_llm_json(msg.get("content"))
+        op = parsed.get("op", "")
+        if op not in _KNOWN_OPS:
+            op = "list_states"
     except Exception as exc:
         logger.warning("Home LLM parse failed: %s", exc)
         return {
@@ -64,7 +79,11 @@ async def home_node(state: "AgentState") -> dict:
                 parsed.get("entity_id"),
             )
         elif op == "get_state":
-            result = await get_state(config.hass_url, config.hass_token, parsed.get("entity_id", ""))
+            entity_id = parsed.get("entity_id", "").strip()
+            if not entity_id:
+                result = "Please specify which entity to query (e.g. 'sensor.temp')."
+            else:
+                result = await get_state(config.hass_url, config.hass_token, entity_id)
         else:
             result = await list_states(config.hass_url, config.hass_token, parsed.get("domain"))
     except Exception as exc:

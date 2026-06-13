@@ -75,14 +75,25 @@ class PliaConfig:
     hass_token: str = ""
 
 
+_LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
+    "tts_engine": ("kokoro", "chatterbox", "dramabox"),
+    "studio_pipeline_mode": ("cpu_stt", "pause"),
+}
+
+
 def _load_persisted(config: PliaConfig) -> None:
     if not _CONFIG_FILE.exists():
         return
     try:
         data = json.loads(_CONFIG_FILE.read_text())
         for key, value in data.items():
-            if hasattr(config, key):
-                setattr(config, key, value)
+            if not hasattr(config, key):
+                continue
+            allowed = _LITERAL_CONSTRAINTS.get(key)
+            if allowed is not None and value not in allowed:
+                logger.warning("Ignoring invalid persisted value %r for %r; allowed: %s", value, key, allowed)
+                continue
+            setattr(config, key, value)
     except Exception as exc:
         logger.warning("Could not load persisted config from %s: %s", _CONFIG_FILE, exc)
 
@@ -101,12 +112,6 @@ _load_persisted(_config)
 
 def get_config() -> PliaConfig:
     return _config
-
-
-_LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
-    "tts_engine": ("kokoro", "chatterbox", "dramabox"),
-    "studio_pipeline_mode": ("cpu_stt", "pause"),
-}
 
 
 def update_config(**kwargs) -> PliaConfig:

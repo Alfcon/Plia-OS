@@ -510,7 +510,7 @@
       await fetch('/api/config', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({hass_url: url, hass_token: token}),
+        body: JSON.stringify(token ? {hass_url: url, hass_token: token} : {hass_url: url}),
       });
       status.style.color = '#81c784';
       status.textContent = 'Saved.';
@@ -1017,7 +1017,7 @@
     fetch('/api/config').then(r => r.json()).then(cfg => {
       const urlEl = document.getElementById('hass-url');
       const tokEl = document.getElementById('hass-token');
-      if (urlEl && cfg.hass_url) urlEl.value = cfg.hass_url;
+      if (urlEl && cfg.hass_url && !urlEl.value) urlEl.value = cfg.hass_url;
       if (tokEl && cfg.hass_token) tokEl.placeholder = '(token saved)';
     }).catch(() => {});
   }
