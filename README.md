@@ -69,6 +69,7 @@ Dashboard at `http://localhost:8000`. Voice pipeline starts automatically; dashb
 | web | Searches via DuckDuckGo, Google Custom Search, or Playwright scrape |
 | code | Runs Python/shell in a sandboxed subprocess |
 | calendar | Add, list, delete events in `~/.plia/calendar.ics` |
+| reminder | Persists reminders to SQLite, fires as dashboard notifications via background polling |
 | home | Smart home stub (not yet implemented) |
 
 ## TTS Engines
@@ -83,7 +84,11 @@ VRAM broker evicts lower-priority models automatically when switching engines.
 
 ## Chat History
 
-All conversations persist to `data/chat_history.db` (SQLite). Loaded on every page refresh. Clear via the ✕ button in the input bar or `DELETE /api/history`.
+All conversations persist to `data/chat_history.db` (SQLite). Loaded on every page refresh. The voice pipeline also reloads the last 20 messages on startup so context survives restarts. Clear via the ✕ button in the input bar or `DELETE /api/history`.
+
+## Reminders
+
+The `set_reminder` tool (available to the LLM) persists reminders to SQLite. A background loop polls every 30 seconds and fires overdue reminders as dashboard notifications via the WebSocket. Reminders survive restarts.
 
 ## Configuration
 
@@ -118,7 +123,7 @@ Settings can be changed live from the dashboard without restarting.
 | POST | `/api/generate-chatterbox` | Synthesise a WAV clip (Chatterbox) |
 | POST | `/api/generate-dramabox` | Synthesise a WAV clip (Dramabox) |
 | POST | `/api/shutdown` | Graceful shutdown |
-| WS | `/ws` | Live events (status, transcript, agent_routing, vram_status) |
+| WS | `/ws` | Live events (status, transcript, agent_routing, vram_status, reminder_fired) |
 
 ## Tests
 
@@ -127,4 +132,4 @@ pip install -e ".[dev]"
 pytest
 ```
 
-172 tests, all passing.
+187 tests, all passing.

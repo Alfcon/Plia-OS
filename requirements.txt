@@ -158,6 +158,7 @@ phonemizer-fork==3.3.2
 pillow==12.2.0
 platformdirs==4.10.0
 playwright==1.60.0
+-e git+https://github.com/Alfcon/Plia-OS.git@6848d959b72b8dc19ffec8c39a211ec6e1be7b85#egg=plia_os
 pluggy==1.6.0
 pooch==1.9.0
 praat-parselmouth==0.4.7
@@ -170,8 +171,8 @@ psutil==7.2.2
 pybase64==1.4.3
 pycparser==3.0
 pydantic==2.13.4
-pydantic_core==2.46.4
 pydantic-settings==2.14.1
+pydantic_core==2.46.4
 pydub==0.25.1
 pyee==13.0.1
 Pygments==2.20.0
@@ -245,8 +246,8 @@ triton==3.2.0
 trove-classifiers==2026.6.1.19
 typer==0.25.1
 typer-slim==0.24.0
-typing_extensions==4.15.0
 typing-inspection==0.4.2
+typing_extensions==4.15.0
 tzdata==2026.2
 uritemplate==4.2.0
 urllib3==2.7.0
