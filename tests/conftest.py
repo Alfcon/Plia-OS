@@ -1,4 +1,12 @@
 import pytest
+import tempfile
+from pathlib import Path
+
+
+@pytest.fixture(autouse=True)
+def isolate_config_file(tmp_path, monkeypatch):
+    import core.config as cfg_mod
+    monkeypatch.setattr(cfg_mod, "_CONFIG_FILE", tmp_path / "config.json")
 
 
 @pytest.fixture(autouse=True)

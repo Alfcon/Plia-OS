@@ -1,6 +1,16 @@
+import dataclasses
+import json
+import logging
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
+
+logger = logging.getLogger(__name__)
+
+_CONFIG_FILE = Path(
+    os.environ.get("PLIA_CONFIG_FILE", str(Path.home() / ".plia" / "config.json"))
+)
 
 
 @dataclass
@@ -65,7 +75,28 @@ class PliaConfig:
     hass_token: str = ""
 
 
+def _load_persisted(config: PliaConfig) -> None:
+    if not _CONFIG_FILE.exists():
+        return
+    try:
+        data = json.loads(_CONFIG_FILE.read_text())
+        for key, value in data.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+    except Exception as exc:
+        logger.warning("Could not load persisted config from %s: %s", _CONFIG_FILE, exc)
+
+
+def _save_persisted(config: PliaConfig) -> None:
+    try:
+        _CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _CONFIG_FILE.write_text(json.dumps(dataclasses.asdict(config), indent=2))
+    except Exception as exc:
+        logger.warning("Could not save config to %s: %s", _CONFIG_FILE, exc)
+
+
 _config = PliaConfig()
+_load_persisted(_config)
 
 
 def get_config() -> PliaConfig:
@@ -88,6 +119,7 @@ def update_config(**kwargs) -> PliaConfig:
                 f"allowed: {_LITERAL_CONSTRAINTS[key]}"
             )
         setattr(_config, key, value)
+    _save_persisted(_config)
     return _config
 
 
