@@ -60,6 +60,10 @@ class PliaConfig:
     # Memory agent
     memory_dir: str = field(default_factory=lambda: os.path.expanduser("~/.plia"))
 
+    # Home automation (Home Assistant)
+    hass_url: str = ""
+    hass_token: str = ""
+
 
 _config = PliaConfig()
 

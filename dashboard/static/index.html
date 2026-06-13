@@ -101,6 +101,7 @@
         <button class="m-nav-btn" data-section="llm" onclick="showMenuSection('llm')">LLM</button>
         <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system')">System</button>
         <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders()">Reminders</button>
+        <button class="m-nav-btn" data-section="home" onclick="showMenuSection('home')">Home</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -252,6 +253,17 @@
             <button onclick="loadReminders()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
           </div>
           <ul id="reminder-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
+        </div>
+        <div id="m-section-home" class="m-pane" style="display:none">
+          <div style="font-size:0.78rem;color:#aaa;margin-bottom:8px;">Home Assistant</div>
+          <label style="font-size:0.75rem;color:#888;display:block;margin-bottom:2px;">URL</label>
+          <input id="hass-url" type="text" placeholder="http://homeassistant.local:8123"
+            style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#eee;padding:4px 6px;border-radius:3px;font-size:0.75rem;margin-bottom:6px;">
+          <label style="font-size:0.75rem;color:#888;display:block;margin-bottom:2px;">Long-lived access token</label>
+          <input id="hass-token" type="password" placeholder="••••••••"
+            style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#eee;padding:4px 6px;border-radius:3px;font-size:0.75rem;margin-bottom:8px;">
+          <button onclick="saveHassConfig()" style="background:#1565c0;border:none;color:#eee;padding:4px 10px;border-radius:3px;font-size:0.75rem;cursor:pointer;width:100%;">Save</button>
+          <div id="hass-status" style="font-size:0.72rem;margin-top:6px;color:#888;"></div>
         </div>
       </div>
     </div>
@@ -488,6 +500,24 @@
   async function cancelReminder(id) {
     await fetch(`/api/reminders/${id}`, {method: 'DELETE'});
     loadReminders();
+  }
+
+  async function saveHassConfig() {
+    const url = document.getElementById('hass-url').value.trim();
+    const token = document.getElementById('hass-token').value.trim();
+    const status = document.getElementById('hass-status');
+    try {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({hass_url: url, hass_token: token}),
+      });
+      status.style.color = '#81c784';
+      status.textContent = 'Saved.';
+    } catch(e) {
+      status.style.color = '#ef9a9a';
+      status.textContent = 'Save failed: ' + e.message;
+    }
   }
 
   function loadSystemInfo() {
@@ -984,6 +1014,12 @@
   }
 
   function _syncMenuInputs() {
+    fetch('/api/config').then(r => r.json()).then(cfg => {
+      const urlEl = document.getElementById('hass-url');
+      const tokEl = document.getElementById('hass-token');
+      if (urlEl && cfg.hass_url) urlEl.value = cfg.hass_url;
+      if (tokEl && cfg.hass_token) tokEl.placeholder = '(token saved)';
+    }).catch(() => {});
   }
 
   async function exitApp() {
