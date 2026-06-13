@@ -36,6 +36,7 @@ class VoicePipeline:
         self._running = False
         self._conversation: list[dict] = []
         self._wake_muted_until: float = 0.0  # epoch time; wake ignored before this
+        self._announcement_queue: asyncio.Queue[str] = asyncio.Queue()
 
     def load(self) -> None:
         self._wake.load()
@@ -57,6 +58,20 @@ class VoicePipeline:
             config = get_config()
             self._conversation = [{"role": "system", "content": config.system_prompt}]
             logger.info("Pipeline conversation history cleared")
+        elif payload.get("type") == "reminder_fired":
+            message = payload.get("message", "Reminder")
+            self._announcement_queue.put_nowait(f"Reminder: {message}")
+            logger.info("Queued reminder announcement: %s", message)
+
+    async def _speak_announcement(self, message: str) -> None:
+        logger.info("Announcing: %s", message)
+        try:
+            await events.emit("transcript", {"role": "assistant", "text": message})
+            audio_out = self._tts.synthesise(message)
+            self._wake_muted_until = time.monotonic() + len(audio_out) / 24000.0 + 4.0
+            sd.play(audio_out, samplerate=24000, blocking=True)
+        except Exception:
+            logger.exception("Reminder announcement failed")
 
     async def start(self) -> None:
         self._running = True
@@ -96,6 +111,14 @@ class VoicePipeline:
 
         while max_iterations is None or iterations < max_iterations:
             iterations += 1
+
+            # --- Phase 0: speak any queued reminder announcements ---
+            while not self._announcement_queue.empty():
+                try:
+                    message = self._announcement_queue.get_nowait()
+                    await self._speak_announcement(message)
+                except asyncio.QueueEmpty:
+                    break
 
             # --- Phase 1: wait for wake word ---
             await events.emit("status", {"state": "armed"})
