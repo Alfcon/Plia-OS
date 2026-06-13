@@ -3,21 +3,25 @@ import re
 import httpx
 from core.config import get_config
 
-_FENCE_RE = re.compile(r"```[a-zA-Z]*\n?(.*?)```", re.DOTALL)
+_FENCE_RE_LANG = re.compile(r"```[a-zA-Z]+\n?(.*?)```", re.DOTALL)
+_FENCE_RE_ANY = re.compile(r"```[a-zA-Z]*\n?(.*?)```", re.DOTALL)
 
 
 def parse_llm_json(content: str | None) -> dict:
     text = (content or "").strip()
-    for m in _FENCE_RE.finditer(text):
-        inner = m.group(1).strip()
-        if not inner:
-            continue
-        try:
-            result = json.loads(inner)
-            if isinstance(result, dict):
-                return result
-        except json.JSONDecodeError:
-            continue
+    # Two-pass: language-tagged fences first (immune to empty bare-fence ambiguity),
+    # then bare fences (``` without a language tag).
+    for pattern in (_FENCE_RE_LANG, _FENCE_RE_ANY):
+        for m in pattern.finditer(text):
+            inner = m.group(1).strip()
+            if not inner:
+                continue
+            try:
+                result = json.loads(inner)
+                if isinstance(result, dict):
+                    return result
+            except json.JSONDecodeError:
+                continue
     result = json.loads(text or "{}")
     if not isinstance(result, dict):
         return {}
