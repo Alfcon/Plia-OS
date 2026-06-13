@@ -33,7 +33,7 @@ async def call_service(
     states = resp.json()
     if not states or not isinstance(states, list):
         return f"Called {domain}.{service}" + (f" on {entity_id}" if entity_id else "")
-    changed = [s.get("entity_id", "") for s in states if isinstance(s, dict)]
+    changed = [s.get("entity_id") for s in states if isinstance(s, dict) and s.get("entity_id")]
     return f"Called {domain}.{service} — affected: {', '.join(changed)}"
 
 

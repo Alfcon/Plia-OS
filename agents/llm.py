@@ -1,5 +1,20 @@
+import json
+import re
 import httpx
 from core.config import get_config
+
+_FENCE_RE = re.compile(r"```[a-zA-Z]*\n?(.*?)```", re.DOTALL)
+
+
+def parse_llm_json(content: str | None) -> dict:
+    text = (content or "").strip()
+    m = _FENCE_RE.search(text)
+    if m:
+        text = m.group(1).strip()
+    result = json.loads(text or "{}")
+    if not isinstance(result, dict):
+        return {}
+    return result
 
 _OLLAMA_TIMEOUT = 30.0
 

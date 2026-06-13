@@ -1,10 +1,9 @@
 from __future__ import annotations
 import datetime
-import json
 import logging
 from typing import TYPE_CHECKING
 
-from agents.llm import call_llm
+from agents.llm import call_llm, parse_llm_json
 from agents.calendar_store import get_calendar_store
 
 if TYPE_CHECKING:
@@ -36,7 +35,7 @@ async def calendar_node(state: "AgentState") -> dict:
             {"role": "system", "content": _PARSE_SYSTEM},
             {"role": "user", "content": last_user},
         ])
-        parsed = json.loads(msg.get("content") or "{}")
+        parsed = parse_llm_json(msg.get("content"))
         op = parsed.get("op", "list")
     except Exception as exc:
         logger.warning("Calendar LLM parse failed, falling back to list: %s", exc)

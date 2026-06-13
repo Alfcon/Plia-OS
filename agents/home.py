@@ -1,9 +1,8 @@
 from __future__ import annotations
-import json
 import logging
 from typing import TYPE_CHECKING
 
-from agents.llm import call_llm
+from agents.llm import call_llm, parse_llm_json
 from agents.home_assistant import call_service, get_state, list_states
 from core.config import get_config
 
@@ -13,16 +12,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _KNOWN_OPS = {"call_service", "get_state", "list_states"}
-
-
-def _parse_llm_json(content: str | None) -> dict:
-    text = (content or "").strip()
-    if text.startswith("```"):
-        text = text.split("```", 2)[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.rsplit("```", 1)[0].strip()
-    return json.loads(text or "{}")
 
 
 _PARSE_SYSTEM = (
@@ -58,7 +47,7 @@ async def home_node(state: "AgentState") -> dict:
             {"role": "system", "content": _PARSE_SYSTEM},
             {"role": "user", "content": last_user},
         ])
-        parsed = _parse_llm_json(msg.get("content"))
+        parsed = parse_llm_json(msg.get("content"))
         op = parsed.get("op", "")
         if op not in _KNOWN_OPS:
             op = "list_states"
@@ -79,7 +68,7 @@ async def home_node(state: "AgentState") -> dict:
                 parsed.get("entity_id"),
             )
         elif op == "get_state":
-            entity_id = parsed.get("entity_id", "").strip()
+            entity_id = str(parsed.get("entity_id") or "").strip()
             if not entity_id:
                 result = "Please specify which entity to query (e.g. 'sensor.temp')."
             else:

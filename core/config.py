@@ -93,6 +93,18 @@ def _load_persisted(config: PliaConfig) -> None:
             if allowed is not None and value not in allowed:
                 logger.warning("Ignoring invalid persisted value %r for %r; allowed: %s", value, key, allowed)
                 continue
+            current = getattr(config, key)
+            if current is not None and value is not None:
+                target = type(current)
+                if not isinstance(value, target):
+                    try:
+                        value = target(value)
+                    except (TypeError, ValueError):
+                        logger.warning(
+                            "Cannot coerce %r for %r to %s; skipping",
+                            value, key, target.__name__,
+                        )
+                        continue
             setattr(config, key, value)
     except Exception as exc:
         logger.warning("Could not load persisted config from %s: %s", _CONFIG_FILE, exc)

@@ -1,9 +1,8 @@
 from __future__ import annotations
-import json
 import logging
 from typing import TYPE_CHECKING
 
-from agents.llm import call_llm
+from agents.llm import call_llm, parse_llm_json
 from agents.memory_store import get_memory_store
 
 if TYPE_CHECKING:
@@ -32,7 +31,7 @@ async def memory_node(state: "AgentState") -> dict:
             {"role": "user", "content": last_user},
         ]
         msg = await call_llm(parse_messages)
-        parsed = json.loads(msg.get("content") or "{}")
+        parsed = parse_llm_json(msg.get("content"))
         op = parsed.get("op", "recall")
         key = parsed.get("key", last_user[:80])
         value = parsed.get("value", "")
