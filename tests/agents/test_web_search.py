@@ -75,7 +75,7 @@ async def test_web_search_dispatches_to_ddg_by_default():
     config = PliaConfig()
     with patch("agents.web_search.search_ddg", return_value=["result1"]) as mock_ddg:
         results = await web_search("python", "ddg", config)
-    mock_ddg.assert_called_once_with("python")
+    mock_ddg.assert_called_once_with("python", 5)
     assert results == ["result1"]
 
 
@@ -87,7 +87,7 @@ async def test_web_search_dispatches_to_google_when_configured():
     config.google_search_cx = "cx"
     with patch("agents.web_search.search_google", return_value=["g_result"]) as mock_g:
         results = await web_search("python", "google", config)
-    mock_g.assert_called_once_with("python", "key", "cx")
+    mock_g.assert_called_once_with("python", "key", "cx", 5)
     assert results == ["g_result"]
 
 
@@ -109,3 +109,40 @@ async def test_web_search_dispatches_to_playwright_for_url():
         results = await web_search("https://example.com/page", "playwright", config)
     mock_pw.assert_called_once_with("https://example.com/page")
     assert results == ["page text"]
+
+
+def test_search_ddg_result_format_is_numbered():
+    mock_result = [
+        {"title": "First", "body": "Body one", "href": "https://one.com"},
+        {"title": "Second", "body": "Body two", "href": "https://two.com"},
+    ]
+    with patch("agents.web_search.DDGS") as mock_cls:
+        mock_ddgs = MagicMock()
+        mock_ddgs.text.return_value = mock_result
+        mock_cls.return_value.__enter__.return_value = mock_ddgs
+        results = search_ddg("query", max_results=2)
+    assert results[0].startswith("[1]")
+    assert results[1].startswith("[2]")
+    assert "https://one.com" in results[0]
+
+
+@pytest.mark.asyncio
+async def test_web_search_respects_max_results_config():
+    from core.config import PliaConfig
+    config = PliaConfig()
+    config.web_search_max_results = 8
+    with patch("agents.web_search.search_ddg", return_value=["r"] * 8) as mock_ddg:
+        await web_search("query", "ddg", config)
+    mock_ddg.assert_called_once_with("query", 8)
+
+
+@pytest.mark.asyncio
+async def test_web_search_google_fallback_logs_and_uses_ddg():
+    from core.config import PliaConfig
+    config = PliaConfig()  # no google keys
+    with patch("agents.web_search.search_ddg", return_value=["ddg"]) as mock_ddg, \
+         patch("agents.web_search.search_google") as mock_g:
+        results = await web_search("query", "google", config)
+    mock_g.assert_not_called()
+    mock_ddg.assert_called_once()
+    assert results == ["ddg"]

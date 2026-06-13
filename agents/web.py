@@ -19,6 +19,12 @@ _EXTRACT_SYSTEM = (
     "Output only the query string or URL, nothing else."
 )
 
+_STRIP_PREFIXES = (
+    "search for ", "search the web for ", "look up ", "look it up ",
+    "google ", "find online ", "look online for ", "browse to ", "visit ",
+    "search ", "find ",
+)
+
 _GOOGLE_KEYWORDS = ("google", "search with google", "use google", "google search")
 _PLAYWRIGHT_KEYWORDS = ("open ", "read this page", "visit ", "browse to", "go to http")
 
@@ -42,14 +48,21 @@ async def web_node(state: "AgentState") -> dict:
     config = get_config()
     provider = _detect_provider(last_user, state.get("search_provider", "ddg"))
 
-    try:
-        msg = await call_llm([
-            {"role": "system", "content": _EXTRACT_SYSTEM},
-            {"role": "user", "content": last_user},
-        ])
-        query = (msg.get("content") or last_user).strip() or last_user
-    except Exception:
-        query = last_user
+    lower = last_user.lower()
+    query = last_user
+    for prefix in _STRIP_PREFIXES:
+        if lower.startswith(prefix):
+            query = last_user[len(prefix):].strip()
+            break
+    else:
+        try:
+            msg = await call_llm([
+                {"role": "system", "content": _EXTRACT_SYSTEM},
+                {"role": "user", "content": last_user},
+            ])
+            query = (msg.get("content") or last_user).strip() or last_user
+        except Exception:
+            query = last_user
 
     results = await web_search(query, provider, config)
     combined = "\n".join(results)

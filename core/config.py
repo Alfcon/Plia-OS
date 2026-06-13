@@ -53,6 +53,7 @@ class PliaConfig:
 
     # Web agent
     web_search_default: str = "ddg"
+    web_search_max_results: int = 5
     google_search_api_key: str = ""
     google_search_cx: str = ""
 

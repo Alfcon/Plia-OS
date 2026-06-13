@@ -83,5 +83,34 @@ async def test_web_node_llm_error_uses_raw_message_as_query():
         mock_ws.return_value = ["result"]
         update = await web_node(_state("find something interesting"))
     args, _ = mock_ws.call_args
-    assert "find something interesting" in args[0]
+    # "find " prefix is stripped before LLM call, so LLM error path still returns stripped query
+    assert "something interesting" in args[0]
     assert update["active_agent"] == "web"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("user_msg,expected_query", [
+    ("search for climate change", "climate change"),
+    ("look up python asyncio", "python asyncio"),
+    ("google best IDE for Rust", "best IDE for Rust"),
+    ("search the web for openai pricing", "openai pricing"),
+])
+async def test_web_node_strips_search_prefixes(user_msg, expected_query):
+    from agents.web import web_node
+
+    with patch("agents.web.web_search", new_callable=AsyncMock) as mock_ws:
+        mock_ws.return_value = ["result"]
+        await web_node(_state(user_msg))
+    args, _ = mock_ws.call_args
+    assert args[0] == expected_query
+
+
+@pytest.mark.asyncio
+async def test_web_node_skips_llm_when_prefix_matched():
+    from agents.web import web_node
+
+    with patch("agents.web.call_llm", new_callable=AsyncMock) as mock_llm, \
+         patch("agents.web.web_search", new_callable=AsyncMock) as mock_ws:
+        mock_ws.return_value = ["result"]
+        await web_node(_state("search for cats"))
+    mock_llm.assert_not_called()
