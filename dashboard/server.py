@@ -248,7 +248,7 @@ async def clear_history():
 @router.get("/api/memory")
 async def list_memory():
     from agents.memory_store import get_memory_store
-    return await asyncio.to_thread(get_memory_store().list_all)
+    return await asyncio.to_thread(lambda: get_memory_store().list_all())
 
 
 @router.delete("/api/memory/{key}")

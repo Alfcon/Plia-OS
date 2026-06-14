@@ -649,6 +649,7 @@
     list.innerHTML = '<li style="color:#555;font-size:0.75rem;">Loading...</li>';
     try {
       const r = await fetch('/api/memory');
+      if (!r.ok) throw new Error(r.status);
       const items = await r.json();
       if (!Array.isArray(items) || items.length === 0) {
         list.innerHTML = '<li style="color:#555;font-size:0.75rem;">No memories stored</li>';
@@ -665,8 +666,8 @@
 
   async function deleteMemory(key) {
     try {
-      await fetch('/api/memory/' + encodeURIComponent(key), {method: 'DELETE'});
-      loadMemory();
+      const r = await fetch('/api/memory/' + encodeURIComponent(key), {method: 'DELETE'});
+      if (r.ok) loadMemory();
     } catch(e) {}
   }
 
