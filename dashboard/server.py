@@ -258,6 +258,18 @@ async def cancel_reminder(reminder_id: int):
     return {"status": "cancelled", "id": reminder_id}
 
 
+@router.post("/api/reminders")
+async def create_reminder(body: dict):
+    from fastapi import HTTPException
+    message = (body.get("message") or "").strip()
+    fire_at = (body.get("fire_at") or "").strip()
+    if not message or not fire_at:
+        raise HTTPException(status_code=422, detail="message and fire_at required")
+    from agents.memory_store import get_memory_store
+    rid = await asyncio.to_thread(get_memory_store().add_reminder, message, fire_at)
+    return {"id": rid, "message": message, "fire_at": fire_at}
+
+
 @router.post("/api/chat")
 async def chat(body: dict):
     from core.supervisor import run_turn
