@@ -258,6 +258,34 @@ async def cancel_reminder(reminder_id: int):
     return {"status": "cancelled", "id": reminder_id}
 
 
+@router.get("/api/calendar")
+async def list_calendar_events():
+    from agents.calendar_store import get_calendar_store
+    return await asyncio.to_thread(get_calendar_store().list_events_json)
+
+
+@router.post("/api/calendar")
+async def create_calendar_event(body: dict):
+    title = (body.get("title") or "").strip()
+    date = (body.get("date") or "").strip()
+    time_str = (body.get("time") or "09:00").strip()
+    duration = int(body.get("duration_min") or 60)
+    if not title or not date:
+        raise HTTPException(status_code=422, detail="title and date required")
+    from agents.calendar_store import get_calendar_store
+    uid = await asyncio.to_thread(lambda: get_calendar_store().add_event(title, date, time_str, duration))
+    return {"uid": uid, "title": title, "date": date, "time": time_str, "duration_min": duration}
+
+
+@router.delete("/api/calendar/{uid}")
+async def delete_calendar_event(uid: str):
+    from agents.calendar_store import get_calendar_store
+    deleted = await asyncio.to_thread(lambda: get_calendar_store().delete_event(uid))
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return {"status": "deleted", "uid": uid}
+
+
 @router.post("/api/reminders")
 async def create_reminder(body: dict):
     message = (body.get("message") or "").strip()
