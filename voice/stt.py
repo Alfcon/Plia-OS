@@ -25,3 +25,15 @@ class STTService:
         config = get_config()
         segments, _ = self._model.transcribe(audio, language=config.stt_language)
         return " ".join(seg.text.strip() for seg in segments).strip()
+
+
+_stt_service: STTService | None = None
+
+
+def get_stt_service() -> STTService:
+    """Lazy singleton — loads the Whisper model on first call."""
+    global _stt_service
+    if _stt_service is None:
+        _stt_service = STTService()
+        _stt_service.load()
+    return _stt_service

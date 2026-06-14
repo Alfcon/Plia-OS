@@ -6,7 +6,7 @@ from core.supervisor import run_turn
 from core.config import get_config
 from core import events
 from voice.wake import WakeWordDetector
-from voice.stt import STTService
+from voice.stt import get_stt_service
 from voice.tts import TTSService
 
 try:
@@ -32,7 +32,6 @@ class VoicePipeline:
 
     def __init__(self) -> None:
         self._wake = WakeWordDetector()
-        self._stt = STTService()
         self._tts = TTSService()
         self._running = False
         self._conversation: list[dict] = []
@@ -41,7 +40,7 @@ class VoicePipeline:
 
     def load(self) -> None:
         self._wake.load()
-        self._stt.load()
+        self._stt = get_stt_service()
         self._tts.load()
         config = get_config()
         from agents.chat_history import get_recent
