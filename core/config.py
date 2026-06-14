@@ -19,6 +19,7 @@ class PliaConfig:
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
     system_prompt: str = "You are Plia, a helpful local AI assistant. Be concise."
+    system_prompt_backup: str = ""
 
     # Wake word
     wake_word_model: str = "hey_jarvis"  # closest built-in; replace with custom trained model
@@ -142,6 +143,8 @@ def update_config(**kwargs) -> PliaConfig:
                 f"Invalid value {value!r} for {key!r}; "
                 f"allowed: {_LITERAL_CONSTRAINTS[key]}"
             )
+        if key == "system_prompt" and value != _config.system_prompt:
+            _config.system_prompt_backup = _config.system_prompt
         setattr(_config, key, value)
     _save_persisted(_config)
     return _config
