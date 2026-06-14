@@ -378,6 +378,7 @@
   </main>
   <div id="chat-input-bar">
     <input type="text" id="chat-input" placeholder="Type a message… (or speak)" autocomplete="off" />
+    <button id="mic-btn" onclick="toggleMicRecording()" title="Voice input" style="background:#1e1e1e;border:1px solid #333;border-radius:4px;color:#aaa;font-size:1rem;padding:6px 10px;cursor:pointer;">🎤</button>
     <button id="chat-send-btn" onclick="sendChat()">Send</button>
     <button id="chat-clear-btn" onclick="clearHistory()" title="Clear history">✕</button>
   </div>
@@ -722,6 +723,83 @@
     } catch(e) {
       list.innerHTML = '<li style="color:#ef9a9a;font-size:0.75rem;">Failed to load</li>';
     }
+  }
+
+  let _micCtx = null;
+  let _micStream = null;
+  let _micProcessor = null;
+  let _micChunks = [];
+  let _micRecording = false;
+
+  async function toggleMicRecording() {
+    if (_micRecording) {
+      stopMicRecording();
+    } else {
+      await startMicRecording();
+    }
+  }
+
+  async function startMicRecording() {
+    const btn = document.getElementById('mic-btn');
+    try {
+      _micStream = await navigator.mediaDevices.getUserMedia({audio: true});
+    } catch(e) {
+      btn.title = 'Microphone permission denied';
+      return;
+    }
+    _micChunks = [];
+    _micCtx = new AudioContext({sampleRate: 16000});
+    const source = _micCtx.createMediaStreamSource(_micStream);
+    _micProcessor = _micCtx.createScriptProcessor(4096, 1, 1);
+    _micProcessor.onaudioprocess = (e) => {
+      _micChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    };
+    source.connect(_micProcessor);
+    _micProcessor.connect(_micCtx.destination);
+    _micRecording = true;
+    btn.textContent = '⏹';
+    btn.style.color = '#ef9a9a';
+    btn.title = 'Stop recording';
+  }
+
+  async function stopMicRecording() {
+    _micRecording = false;
+    const btn = document.getElementById('mic-btn');
+    btn.textContent = '🎤';
+    btn.style.color = '#aaa';
+    btn.title = 'Voice input';
+
+    if (_micProcessor) { _micProcessor.disconnect(); _micProcessor = null; }
+    if (_micCtx) { await _micCtx.close(); _micCtx = null; }
+    if (_micStream) { _micStream.getTracks().forEach(t => t.stop()); _micStream = null; }
+
+    if (_micChunks.length === 0) return;
+
+    const total = _micChunks.reduce((n, c) => n + c.length, 0);
+    const merged = new Float32Array(total);
+    let offset = 0;
+    for (const chunk of _micChunks) { merged.set(chunk, offset); offset += chunk.length; }
+    _micChunks = [];
+
+    btn.textContent = '⏳';
+    btn.title = 'Transcribing…';
+    try {
+      const r = await fetch('/api/voice/transcribe', {
+        method: 'POST',
+        body: merged.buffer,
+        headers: {'Content-Type': 'application/octet-stream'},
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (data.text) {
+          const inp = document.getElementById('chat-input');
+          inp.value = (inp.value ? inp.value + ' ' : '') + data.text;
+          inp.focus();
+        }
+      }
+    } catch(e) { /* silently reset on network error */ }
+    btn.textContent = '🎤';
+    btn.title = 'Voice input';
   }
 
   let _gcalPollId = null;
