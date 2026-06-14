@@ -383,6 +383,10 @@
   let _dbRecMeterRaf = null;
   let _dbRecStream = null;
 
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+
   const ws = new WebSocket(`ws://${location.host}/ws`);
 
   ws.onmessage = (ev) => {
@@ -407,6 +411,9 @@
     if (msg.type === 'reminder_fired') {
       _appendMsg('system', 'Reminder: ' + msg.message);
       loadReminders();
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Plia Reminder', {body: msg.message});
+      }
     }
     if (msg.type === 'wake') {
       document.getElementById('status-badge').textContent = 'listening';
