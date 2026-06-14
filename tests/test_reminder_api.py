@@ -23,6 +23,7 @@ async def test_create_reminder_returns_id(app):
     body = r.json()
     assert body["id"] == 99
     assert body["message"] == "Take vitamins"
+    assert body["fire_at"] == "2026-06-14T09:00:00+00:00"
 
 
 @pytest.mark.asyncio
