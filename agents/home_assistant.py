@@ -80,6 +80,8 @@ async def list_entities(
         resp = await client.get(url, headers=_headers(token))
     resp.raise_for_status()
     entities = resp.json()
+    if not isinstance(entities, list):
+        return []
     if domains:
         entities = [e for e in entities if e.get("entity_id", "").split(".")[0] in domains]
     result = []
