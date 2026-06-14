@@ -74,6 +74,17 @@ async def dashboard():
     return HTMLResponse(index.read_text())
 
 
+@router.post("/api/voice/transcribe")
+async def voice_transcribe(request: Request):
+    body = await request.body()
+    if not body:
+        return {"text": ""}
+    audio = np.frombuffer(body, dtype=np.float32)
+    from voice.stt import get_stt_service
+    text = await asyncio.to_thread(get_stt_service().transcribe, audio)
+    return {"text": text}
+
+
 @router.get("/api/tools")
 async def get_tools():
     return registry.list_tools()
