@@ -135,6 +135,9 @@ def get_config() -> PliaConfig:
 
 
 def update_config(**kwargs) -> PliaConfig:
+    # Auto-backup system_prompt before loop so order of kwargs doesn't matter (V9 fix)
+    if "system_prompt" in kwargs and kwargs["system_prompt"] != _config.system_prompt:
+        _config.system_prompt_backup = _config.system_prompt
     for key, value in kwargs.items():
         if not hasattr(_config, key):
             raise ValueError(f"Unknown config key: {key!r}")
@@ -143,11 +146,31 @@ def update_config(**kwargs) -> PliaConfig:
                 f"Invalid value {value!r} for {key!r}; "
                 f"allowed: {_LITERAL_CONSTRAINTS[key]}"
             )
-        if key == "system_prompt" and value != _config.system_prompt:
-            _config.system_prompt_backup = _config.system_prompt
         setattr(_config, key, value)
     _save_persisted(_config)
     return _config
+
+
+def restore_system_prompt() -> str:
+    """One-shot undo: restore system_prompt from backup and clear the backup slot.
+
+    Returns the restored prompt, or "" if no backup exists.
+    """
+    if not _config.system_prompt_backup:
+        return ""
+    _config.system_prompt = _config.system_prompt_backup
+    _config.system_prompt_backup = ""
+    _save_persisted(_config)
+    return _config.system_prompt
+
+
+def reset_system_prompt_to_default() -> str:
+    """Reset system_prompt to factory default without touching system_prompt_backup."""
+    default: str = PliaConfig.__dataclass_fields__["system_prompt"].default
+    if _config.system_prompt != default:
+        _config.system_prompt = default
+        _save_persisted(_config)
+    return _config.system_prompt
 
 
 def reset_config() -> None:

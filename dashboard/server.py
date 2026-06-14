@@ -11,7 +11,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Up
 from fastapi.responses import HTMLResponse
 from pathlib import Path
 from core import events, registry
-from core.config import get_config, update_config
+from core.config import get_config, update_config, restore_system_prompt, reset_system_prompt_to_default
 from voice.tts import get_tts_service
 from voice.vram_broker import get_vram_broker
 
@@ -86,11 +86,26 @@ async def get_config_route():
 
 @router.post("/api/config")
 async def post_config(updates: dict):
+    updates.pop("system_prompt_backup", None)  # internal field — not settable via public API
     try:
         config = update_config(**updates)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return dataclasses.asdict(config)
+
+
+@router.post("/api/system-prompt/undo")
+async def undo_system_prompt():
+    restored = await asyncio.to_thread(restore_system_prompt)
+    if not restored:
+        raise HTTPException(status_code=422, detail="No previous prompt to restore")
+    return {"system_prompt": restored}
+
+
+@router.post("/api/system-prompt/reset")
+async def reset_system_prompt():
+    default = await asyncio.to_thread(reset_system_prompt_to_default)
+    return {"system_prompt": default}
 
 
 @router.post("/api/upload-reference-audio")
@@ -296,11 +311,13 @@ async def google_calendar_callback(request: Request, code: str = ""):
     redirect_uri = str(request.base_url).rstrip("/") + "/api/calendar/google/callback"
     try:
         await asyncio.to_thread(exchange_code, config.gcal_credentials_file, redirect_uri, code)
-    except Exception as exc:
+    except (AttributeError, TypeError, ImportError, NameError):
+        raise  # programming errors → FastAPI 500, not a user-facing auth failure
+    except Exception:
         logger.exception("Google Calendar OAuth callback failed")
         return HTMLResponse(
             "<html><body style='font-family:sans-serif;padding:2rem;background:#111;color:#eee'>"
-            f"<h2>Authorization failed.</h2><p>{exc}</p><p>Close this tab and try again.</p></body></html>",
+            "<h2>Authorization failed.</h2><p>Close this tab and try again.</p></body></html>",
             status_code=400,
         )
     return HTMLResponse(

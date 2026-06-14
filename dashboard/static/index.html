@@ -100,7 +100,7 @@
         <button class="m-nav-btn" data-section="agents" onclick="showMenuSection('agents')">Agents</button>
         <button class="m-nav-btn" data-section="llm" onclick="showMenuSection('llm')">LLM</button>
         <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system')">System</button>
-        <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders()">Reminders</button>
+        <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders();_requestNotifPermission()">Reminders</button>
         <button class="m-nav-btn" data-section="calendar" onclick="showMenuSection('calendar');loadCalendar();loadGcalStatus()">Calendar</button>
         <button class="m-nav-btn" data-section="memory" onclick="showMenuSection('memory');loadMemory()">Memory</button>
         <button class="m-nav-btn" data-section="modules" onclick="showMenuSection('modules');loadModules()">Modules</button>
@@ -401,8 +401,10 @@
   let _dbRecMeterRaf = null;
   let _dbRecStream = null;
 
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
+  function _requestNotifPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
   }
 
   const ws = new WebSocket(`ws://${location.host}/ws`);
@@ -691,10 +693,14 @@
   }
 
   async function deleteMemory(key) {
+    const list = document.getElementById('memory-list');
     try {
       const r = await fetch('/api/memory/' + encodeURIComponent(key), {method: 'DELETE'});
       if (r.ok) loadMemory();
-    } catch(e) {}
+      else list.innerHTML = '<li style="color:#ef9a9a;font-size:0.75rem;">Delete failed. Try again.</li>';
+    } catch(e) {
+      list.innerHTML = '<li style="color:#ef9a9a;font-size:0.75rem;">Network error.</li>';
+    }
   }
 
   async function loadModules() {
@@ -1248,22 +1254,25 @@
   }
 
   async function resetSystemPrompt() {
-    document.getElementById('system-prompt').value = _DEFAULT_SYSTEM_PROMPT;
-    const r = await fetch('/api/config', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({system_prompt: _DEFAULT_SYSTEM_PROMPT})});
     const st = document.getElementById('system-prompt-status');
-    st.style.color = r.ok ? '#a5d6a7' : '#ef9a9a';
-    st.textContent = r.ok ? 'Reset to default.' : 'Error resetting.';
+    try {
+      const r = await fetch('/api/system-prompt/reset', {method: 'POST'});
+      if (!r.ok) { st.style.color = '#ef9a9a'; st.textContent = 'Error resetting.'; return; }
+      const data = await r.json();
+      document.getElementById('system-prompt').value = data.system_prompt;
+      st.style.color = '#a5d6a7'; st.textContent = 'Reset to default.';
+    } catch(e) { st.style.color = '#ef9a9a'; st.textContent = 'Network error.'; }
   }
 
   async function undoSystemPrompt() {
     const st = document.getElementById('system-prompt-status');
     try {
-      const cfg = await fetch('/api/config').then(r => r.json());
-      if (!cfg.system_prompt_backup) { st.style.color = '#ef9a9a'; st.textContent = 'No previous prompt.'; return; }
-      document.getElementById('system-prompt').value = cfg.system_prompt_backup;
-      const r = await fetch('/api/config', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({system_prompt: cfg.system_prompt_backup})});
-      st.style.color = r.ok ? '#a5d6a7' : '#ef9a9a';
-      st.textContent = r.ok ? 'Reverted.' : 'Error reverting.';
+      const r = await fetch('/api/system-prompt/undo', {method: 'POST'});
+      if (r.status === 422) { st.style.color = '#ef9a9a'; st.textContent = 'No previous prompt.'; return; }
+      if (!r.ok) { st.style.color = '#ef9a9a'; st.textContent = 'Error reverting.'; return; }
+      const data = await r.json();
+      document.getElementById('system-prompt').value = data.system_prompt;
+      st.style.color = '#a5d6a7'; st.textContent = 'Reverted.';
     } catch(e) { st.style.color = '#ef9a9a'; st.textContent = 'Network error.'; }
   }
 
