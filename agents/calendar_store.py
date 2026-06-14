@@ -94,7 +94,7 @@ class CalendarStore:
                 dt = dtend.dt
                 end_str = dt.isoformat() if isinstance(dt, datetime) else str(dt)
             results.append({"uid": uid, "title": summary, "dtstart": start_str, "dtend": end_str})
-        return sorted(results, key=lambda e: e["dtstart"])
+        return sorted(results, key=lambda e: e["dtstart"] or "9999-99-99")
 
     def delete_event(self, uid: str) -> bool:
         cal = self._read()

@@ -77,7 +77,7 @@ def test_list_events_json_returns_structured_dicts(store):
     assert result[0]["uid"] == uid
     assert result[0]["title"] == "Team lunch"
     assert "2026-06-20" in result[0]["dtstart"]
-    assert "dtend" in result[0]
+    assert result[0]["dtend"]  # dtend has a non-empty value
 
 
 def test_list_events_json_sorted_by_dtstart(store):
