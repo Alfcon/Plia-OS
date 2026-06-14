@@ -70,3 +70,26 @@ async def list_states(base_url: str, token: str, domain: str | None = None) -> s
         lines.append(f"  {name} ({eid}): {state}")
     suffix = f"\n  ... and {len(entities) - 30} more" if len(entities) > 30 else ""
     return "\n".join(lines) + suffix
+
+
+async def list_entities(
+    base_url: str, token: str, domains: list[str] | None = None
+) -> list[dict]:
+    url = f"{base_url.rstrip('/')}/api/states"
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.get(url, headers=_headers(token))
+    resp.raise_for_status()
+    entities = resp.json()
+    if domains:
+        entities = [e for e in entities if e.get("entity_id", "").split(".")[0] in domains]
+    result = []
+    for e in entities:
+        eid = e.get("entity_id", "")
+        domain = eid.split(".")[0] if "." in eid else ""
+        result.append({
+            "entity_id": eid,
+            "friendly_name": e.get("attributes", {}).get("friendly_name", eid),
+            "state": e.get("state", "unknown"),
+            "domain": domain,
+        })
+    return result

@@ -85,6 +85,26 @@ async def voice_transcribe(request: Request):
     return {"text": text}
 
 
+@router.get("/api/hass/entities")
+async def hass_entities():
+    config = get_config()
+    if not config.hass_url or not config.hass_token:
+        return []
+    from agents.home_assistant import list_entities
+    return await list_entities(config.hass_url, config.hass_token, domains=["light", "switch"])
+
+
+@router.post("/api/hass/toggle/{entity_id}")
+async def hass_toggle(entity_id: str):
+    config = get_config()
+    if not config.hass_url or not config.hass_token:
+        raise HTTPException(status_code=503, detail="Home Assistant not configured")
+    domain = entity_id.split(".")[0]
+    from agents.home_assistant import call_service
+    result = await call_service(config.hass_url, config.hass_token, domain, "toggle", entity_id)
+    return {"result": result}
+
+
 @router.get("/api/tools")
 async def get_tools():
     return registry.list_tools()
