@@ -871,6 +871,7 @@
 
   async function loadHassEntities() {
     const list = document.getElementById('hass-entities-list');
+    list.querySelectorAll('button').forEach(b => { b.disabled = true; });
     list.innerHTML = '<li style="color:#555;font-size:0.75rem;">Loading…</li>';
     try {
       const r = await fetch('/api/hass/entities');
@@ -901,6 +902,7 @@
       const r = await fetch('/api/hass/toggle/' + encodeURIComponent(entityId), {method: 'POST'});
       if (!r.ok) throw new Error(r.status);
     } catch(e) {
+      btn.disabled = false;
       btn.textContent = '✕';
       return;
     }
