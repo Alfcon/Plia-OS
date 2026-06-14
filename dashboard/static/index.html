@@ -674,7 +674,15 @@
     window.open(data.auth_url, '_blank', 'width=600,height=700');
     statusEl.textContent = 'Waiting for authorization...';
     clearInterval(_gcalPollId);
+    let _gcalPollCount = 0;
     _gcalPollId = setInterval(async () => {
+      _gcalPollCount++;
+      if (_gcalPollCount > 150) {
+        clearInterval(_gcalPollId);
+        statusEl.textContent = 'Timed out. Try connecting again.';
+        statusEl.style.color = '#ef9a9a';
+        return;
+      }
       try {
         const s = await fetch('/api/calendar/google/status');
         const sd = await s.json();

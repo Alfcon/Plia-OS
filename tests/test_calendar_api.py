@@ -150,3 +150,12 @@ async def test_create_calendar_event_uses_google_when_connected(app):
             })
     assert r.status_code == 200
     assert r.json()["uid"] == "gcal-new-id"
+
+
+@pytest.mark.asyncio
+async def test_google_callback_error_returns_400(app):
+    with patch("agents.google_calendar.exchange_code", side_effect=Exception("bad code")):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            r = await ac.get("/api/calendar/google/callback?code=invalid")
+    assert r.status_code == 400
+    assert "failed" in r.text.lower()

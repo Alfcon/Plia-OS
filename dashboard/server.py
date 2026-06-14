@@ -281,7 +281,15 @@ async def google_calendar_callback(request: Request, code: str = ""):
     from agents.google_calendar import exchange_code
     config = get_config()
     redirect_uri = str(request.base_url).rstrip("/") + "/api/calendar/google/callback"
-    await asyncio.to_thread(exchange_code, config.gcal_credentials_file, redirect_uri, code)
+    try:
+        await asyncio.to_thread(exchange_code, config.gcal_credentials_file, redirect_uri, code)
+    except Exception as exc:
+        logger.exception("Google Calendar OAuth callback failed")
+        return HTMLResponse(
+            "<html><body style='font-family:sans-serif;padding:2rem;background:#111;color:#eee'>"
+            f"<h2>Authorization failed.</h2><p>{exc}</p><p>Close this tab and try again.</p></body></html>",
+            status_code=400,
+        )
     return HTMLResponse(
         "<html><body style='font-family:sans-serif;padding:2rem;background:#111;color:#eee'>"
         "<h2>Google Calendar connected.</h2><p>You can close this tab.</p></body></html>"
