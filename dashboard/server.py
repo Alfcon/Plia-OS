@@ -269,11 +269,17 @@ async def create_calendar_event(body: dict):
     title = (body.get("title") or "").strip()
     date = (body.get("date") or "").strip()
     time_str = (body.get("time") or "09:00").strip()
-    duration = int(body.get("duration_min") or 60)
+    try:
+        duration = int(body.get("duration_min") or 60)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="duration_min must be an integer")
     if not title or not date:
         raise HTTPException(status_code=422, detail="title and date required")
     from agents.calendar_store import get_calendar_store
-    uid = await asyncio.to_thread(lambda: get_calendar_store().add_event(title, date, time_str, duration))
+    try:
+        uid = await asyncio.to_thread(lambda: get_calendar_store().add_event(title, date, time_str, duration))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     return {"uid": uid, "title": title, "date": date, "time": time_str, "duration_min": duration}
 
 

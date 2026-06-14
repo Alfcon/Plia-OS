@@ -76,3 +76,13 @@ async def test_delete_calendar_event_not_found(app):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             r = await ac.delete("/api/calendar/no-such-uid")
     assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_calendar_event_rejects_invalid_date(app):
+    mock_store = MagicMock()
+    mock_store.add_event.side_effect = ValueError("Invalid date/time: '2026-13-45 09:00'")
+    with patch("agents.calendar_store.get_calendar_store", return_value=mock_store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            r = await ac.post("/api/calendar", json={"title": "Bad", "date": "2026-13-45"})
+    assert r.status_code == 422
