@@ -74,6 +74,10 @@ class PliaConfig:
     hass_url: str = ""
     hass_token: str = ""
 
+    # Google Calendar
+    gcal_credentials_file: str = ""  # path to OAuth 2.0 client_secret.json from Google Cloud Console
+    gcal_calendar_id: str = "primary"
+
 
 _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
     "tts_engine": ("kokoro", "chatterbox", "dramabox"),

@@ -52,3 +52,13 @@ def test_studio_pipeline_mode_invalid_raises():
     import pytest
     with pytest.raises(ValueError, match="studio_pipeline_mode"):
         update_config(studio_pipeline_mode="invalid")
+
+
+def test_gcal_credentials_file_default_empty():
+    from core.config import PliaConfig
+    assert PliaConfig().gcal_credentials_file == ""
+
+
+def test_gcal_calendar_id_default_primary():
+    from core.config import PliaConfig
+    assert PliaConfig().gcal_calendar_id == "primary"
