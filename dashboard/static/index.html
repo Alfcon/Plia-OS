@@ -101,7 +101,7 @@
         <button class="m-nav-btn" data-section="llm" onclick="showMenuSection('llm')">LLM</button>
         <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system')">System</button>
         <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders()">Reminders</button>
-        <button class="m-nav-btn" data-section="calendar" onclick="showMenuSection('calendar');loadCalendar()">Calendar</button>
+        <button class="m-nav-btn" data-section="calendar" onclick="showMenuSection('calendar');loadCalendar();loadGcalStatus()">Calendar</button>
         <button class="m-nav-btn" data-section="home" onclick="showMenuSection('home')">Home</button>
       </div>
       <div id="m-content">
@@ -283,6 +283,19 @@
             <button onclick="loadCalendar()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
           </div>
           <ul id="calendar-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
+          <div style="margin-top:12px;border-top:1px solid #222;padding-top:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:0.78rem;color:#aaa;">Google Calendar</span>
+              <span id="gcal-status-badge" style="font-size:0.72rem;color:#888;">Checking...</span>
+            </div>
+            <div id="gcal-connect-section" style="display:none">
+              <label style="font-size:0.72rem;color:#888;display:block;margin-bottom:2px;">Path to credentials.json (from Google Cloud Console)</label>
+              <input id="gcal-creds-file" type="text" placeholder="/home/user/client_secret.json"
+                style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#eee;padding:4px 6px;border-radius:3px;font-size:0.75rem;margin-bottom:5px;">
+              <button onclick="connectGoogleCalendar()" style="background:#1565c0;border:none;color:#eee;padding:4px 10px;border-radius:3px;font-size:0.75rem;cursor:pointer;width:100%;">Connect Google Calendar</button>
+              <div id="gcal-connect-status" style="font-size:0.72rem;margin-top:4px;color:#888;min-height:1em;"></div>
+            </div>
+          </div>
         </div>
         <div id="m-section-home" class="m-pane" style="display:none">
           <div style="font-size:0.78rem;color:#aaa;margin-bottom:8px;">Home Assistant</div>
@@ -620,6 +633,56 @@
       await fetch('/api/calendar/' + encodeURIComponent(uid), {method: 'DELETE'});
       loadCalendar();
     } catch(e) {}
+  }
+
+  async function loadGcalStatus() {
+    try {
+      const r = await fetch('/api/calendar/google/status');
+      const data = await r.json();
+      const badge = document.getElementById('gcal-status-badge');
+      const section = document.getElementById('gcal-connect-section');
+      if (data.connected) {
+        badge.textContent = '● Connected';
+        badge.style.color = '#a5d6a7';
+        section.style.display = 'none';
+      } else {
+        badge.textContent = '○ Not connected';
+        badge.style.color = '#ef9a9a';
+        section.style.display = '';
+      }
+    } catch(e) {}
+  }
+
+  async function connectGoogleCalendar() {
+    const credsFile = document.getElementById('gcal-creds-file').value.trim();
+    const statusEl = document.getElementById('gcal-connect-status');
+    if (!credsFile) { statusEl.textContent = 'Enter path to credentials.json first.'; return; }
+    statusEl.textContent = 'Saving credentials path...';
+    await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({gcal_credentials_file: credsFile})});
+    statusEl.textContent = 'Opening Google authorization...';
+    const r = await fetch('/api/calendar/google/auth', {method:'POST'});
+    if (!r.ok) {
+      const e = await r.json();
+      statusEl.textContent = e.detail || 'Error';
+      statusEl.style.color = '#ef9a9a';
+      return;
+    }
+    const data = await r.json();
+    window.open(data.auth_url, '_blank', 'width=600,height=700');
+    statusEl.textContent = 'Waiting for authorization...';
+    const poll = setInterval(async () => {
+      try {
+        const s = await fetch('/api/calendar/google/status');
+        const sd = await s.json();
+        if (sd.connected) {
+          clearInterval(poll);
+          statusEl.textContent = 'Connected!';
+          statusEl.style.color = '#a5d6a7';
+          loadGcalStatus();
+          loadCalendar();
+        }
+      } catch(e) {}
+    }, 2000);
   }
 
   async function saveHassConfig() {
