@@ -635,6 +635,8 @@
     } catch(e) {}
   }
 
+  let _gcalPollId = null;
+
   async function loadGcalStatus() {
     try {
       const r = await fetch('/api/calendar/google/status');
@@ -642,6 +644,7 @@
       const badge = document.getElementById('gcal-status-badge');
       const section = document.getElementById('gcal-connect-section');
       if (data.connected) {
+        clearInterval(_gcalPollId);
         badge.textContent = '● Connected';
         badge.style.color = '#a5d6a7';
         section.style.display = 'none';
@@ -670,12 +673,13 @@
     const data = await r.json();
     window.open(data.auth_url, '_blank', 'width=600,height=700');
     statusEl.textContent = 'Waiting for authorization...';
-    const poll = setInterval(async () => {
+    clearInterval(_gcalPollId);
+    _gcalPollId = setInterval(async () => {
       try {
         const s = await fetch('/api/calendar/google/status');
         const sd = await s.json();
         if (sd.connected) {
-          clearInterval(poll);
+          clearInterval(_gcalPollId);
           statusEl.textContent = 'Connected!';
           statusEl.style.color = '#a5d6a7';
           loadGcalStatus();
