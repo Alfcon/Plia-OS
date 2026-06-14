@@ -102,6 +102,7 @@
         <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system')">System</button>
         <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders()">Reminders</button>
         <button class="m-nav-btn" data-section="calendar" onclick="showMenuSection('calendar');loadCalendar();loadGcalStatus()">Calendar</button>
+        <button class="m-nav-btn" data-section="memory" onclick="showMenuSection('memory');loadMemory()">Memory</button>
         <button class="m-nav-btn" data-section="home" onclick="showMenuSection('home')">Home</button>
       </div>
       <div id="m-content">
@@ -296,6 +297,14 @@
               <div id="gcal-connect-status" style="font-size:0.72rem;margin-top:4px;color:#888;min-height:1em;"></div>
             </div>
           </div>
+        </div>
+        <div id="m-section-memory" class="m-pane" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:0.78rem;color:#aaa;">Stored memories</span>
+            <button onclick="loadMemory()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
+          </div>
+          <p style="font-size:0.72rem;color:#555;margin:0 0 8px;">Facts Plia learned from conversation. Say "remember that…" to add.</p>
+          <ul id="memory-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
         </div>
         <div id="m-section-home" class="m-pane" style="display:none">
           <div style="font-size:0.78rem;color:#aaa;margin-bottom:8px;">Home Assistant</div>
@@ -632,6 +641,32 @@
     try {
       await fetch('/api/calendar/' + encodeURIComponent(uid), {method: 'DELETE'});
       loadCalendar();
+    } catch(e) {}
+  }
+
+  async function loadMemory() {
+    const list = document.getElementById('memory-list');
+    list.innerHTML = '<li style="color:#555;font-size:0.75rem;">Loading...</li>';
+    try {
+      const r = await fetch('/api/memory');
+      const items = await r.json();
+      if (!Array.isArray(items) || items.length === 0) {
+        list.innerHTML = '<li style="color:#555;font-size:0.75rem;">No memories stored</li>';
+        return;
+      }
+      list.innerHTML = items.map(m => `<li style="padding:4px 0;border-bottom:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+        <span style="word-break:break-word;"><strong style="color:#e0e0e0;">${_esc(m.key)}</strong><br><span style="color:#888;">${_esc(m.value)}</span></span>
+        <button onclick="deleteMemory(this.dataset.key)" data-key="${_esc(m.key)}" style="background:none;border:none;color:#ef9a9a;font-size:0.9rem;cursor:pointer;padding:2px 6px;flex-shrink:0;" title="Forget">✕</button>
+      </li>`).join('');
+    } catch(e) {
+      list.innerHTML = '<li style="color:#ef9a9a;font-size:0.75rem;">Failed to load</li>';
+    }
+  }
+
+  async function deleteMemory(key) {
+    try {
+      await fetch('/api/memory/' + encodeURIComponent(key), {method: 'DELETE'});
+      loadMemory();
     } catch(e) {}
   }
 
