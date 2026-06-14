@@ -265,11 +265,13 @@ async def create_reminder(body: dict):
     if not message or not fire_at:
         raise HTTPException(status_code=422, detail="message and fire_at required")
     try:
-        datetime.fromisoformat(fire_at)
+        parsed_dt = datetime.fromisoformat(fire_at)
+        if parsed_dt.tzinfo is None:
+            raise ValueError("naive datetime")
     except ValueError:
-        raise HTTPException(status_code=422, detail="fire_at must be ISO-8601")
+        raise HTTPException(status_code=422, detail="fire_at must be ISO-8601 with timezone offset")
     from agents.memory_store import get_memory_store
-    rid = await asyncio.to_thread(get_memory_store().add_reminder, message, fire_at)
+    rid = await asyncio.to_thread(lambda: get_memory_store().add_reminder(message, fire_at))
     return {"id": rid, "message": message, "fire_at": fire_at}
 
 

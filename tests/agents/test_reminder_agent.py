@@ -66,6 +66,31 @@ async def test_missing_fields_returns_helpful_message():
 
 
 @pytest.mark.asyncio
+async def test_naive_datetime_rejected():
+    mock_store = MagicMock()
+    with patch("agents.reminder.call_llm", new_callable=AsyncMock) as mock_llm, \
+         patch("agents.reminder.get_memory_store", return_value=mock_store):
+        mock_llm.return_value = {"content": '{"message":"Take meds","fire_at":"2026-06-14T15:00:00"}'}
+        update = await reminder_node(_state("remind me to take meds at 3pm"))
+    mock_store.add_reminder.assert_not_called()
+    result = "\n".join(update["tool_results"])
+    assert "couldn't" in result.lower() or "parse" in result.lower()
+
+
+@pytest.mark.asyncio
+async def test_store_error_returns_distinct_message():
+    mock_store = MagicMock()
+    mock_store.add_reminder.side_effect = RuntimeError("DB locked")
+    with patch("agents.reminder.call_llm", new_callable=AsyncMock) as mock_llm, \
+         patch("agents.reminder.get_memory_store", return_value=mock_store):
+        mock_llm.return_value = {"content": '{"message":"Take meds","fire_at":"2026-06-14T15:00:00+00:00"}'}
+        update = await reminder_node(_state("remind me to take meds at 3pm"))
+    result = "\n".join(update["tool_results"])
+    assert "failed to save" in result.lower() or "please try again" in result.lower()
+    assert update["active_agent"] == "reminder"
+
+
+@pytest.mark.asyncio
 async def test_preserves_existing_tool_results():
     mock_store = MagicMock()
     mock_store.add_reminder.return_value = 1

@@ -38,3 +38,10 @@ async def test_create_reminder_rejects_blank_fire_at(app):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         r = await ac.post("/api/reminders", json={"message": "Test", "fire_at": ""})
     assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_reminder_rejects_naive_datetime(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        r = await ac.post("/api/reminders", json={"message": "Test", "fire_at": "2026-06-14T09:00:00"})
+    assert r.status_code == 422

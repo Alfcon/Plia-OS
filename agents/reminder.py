@@ -43,18 +43,29 @@ async def reminder_node(state: "AgentState") -> dict:
         fire_at = str(parsed.get("fire_at") or "").strip()
         if not message or not fire_at:
             raise ValueError("missing fields")
-        datetime.fromisoformat(fire_at)  # validates format before storing
-        store = get_memory_store()
-        reminder_id = store.add_reminder(message, fire_at)
-        logger.info("Reminder created: id=%d message=%r fire_at=%s", reminder_id, message, fire_at)
-        result = f"Reminder set: '{message}' at {fire_at}"
-        return {
-            "tool_results": state["tool_results"] + [f"[reminder]\n{result}"],
-            "active_agent": "reminder",
-        }
+        parsed_dt = datetime.fromisoformat(fire_at)
+        if parsed_dt.tzinfo is None:
+            raise ValueError("fire_at must include timezone offset")
     except Exception:
         logger.exception("Reminder parse failed for: %r", last_user)
         return {
             "tool_results": state["tool_results"] + [_FALLBACK_MSG],
             "active_agent": "reminder",
         }
+
+    try:
+        store = get_memory_store()
+        reminder_id = store.add_reminder(message, fire_at)
+        logger.info("Reminder created: id=%d message=%r fire_at=%s", reminder_id, message, fire_at)
+    except Exception:
+        logger.exception("Failed to store reminder: %r at %s", message, fire_at)
+        return {
+            "tool_results": state["tool_results"] + ["[reminder]\nFailed to save the reminder. Please try again."],
+            "active_agent": "reminder",
+        }
+
+    result = f"Reminder set: '{message}' at {fire_at}"
+    return {
+        "tool_results": state["tool_results"] + [f"[reminder]\n{result}"],
+        "active_agent": "reminder",
+    }

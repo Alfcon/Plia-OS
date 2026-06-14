@@ -35,7 +35,7 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
     "code": ["run this code", "execute this", "run python", "run shell", "```python", "```sh", "run the code"],
     "calendar": ["add to calendar", "schedule a", "create an event", "calendar event", "add an appointment", "add event"],
     "home": ["turn on the", "turn off the", "lights on", "lights off", "home automation", "smart home"],
-    "reminder": ["remind me", "set a reminder", "set reminder", "alert me", "don't let me forget", "notify me when", "remind me to"],
+    "reminder": ["set a reminder", "set reminder", "don't let me forget", "notify me when", "remind me to"],
 }
 
 
