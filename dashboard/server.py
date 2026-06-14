@@ -7,7 +7,7 @@ import threading
 import numpy as np
 from datetime import datetime
 from scipy.io import wavfile
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Request
 from fastapi.responses import HTMLResponse
 from pathlib import Path
 from core import events, registry
@@ -258,8 +258,42 @@ async def cancel_reminder(reminder_id: int):
     return {"status": "cancelled", "id": reminder_id}
 
 
+@router.get("/api/calendar/google/status")
+async def google_calendar_status():
+    from agents.google_calendar import is_connected
+    connected = await asyncio.to_thread(is_connected)
+    return {"connected": connected}
+
+
+@router.post("/api/calendar/google/auth")
+async def google_calendar_auth(request: Request):
+    from agents.google_calendar import build_auth_url
+    config = get_config()
+    if not config.gcal_credentials_file:
+        raise HTTPException(status_code=422, detail="gcal_credentials_file not configured")
+    redirect_uri = str(request.base_url).rstrip("/") + "/api/calendar/google/callback"
+    auth_url = await asyncio.to_thread(build_auth_url, config.gcal_credentials_file, redirect_uri)
+    return {"auth_url": auth_url}
+
+
+@router.get("/api/calendar/google/callback")
+async def google_calendar_callback(request: Request, code: str = ""):
+    from agents.google_calendar import exchange_code
+    config = get_config()
+    redirect_uri = str(request.base_url).rstrip("/") + "/api/calendar/google/callback"
+    await asyncio.to_thread(exchange_code, config.gcal_credentials_file, redirect_uri, code)
+    return HTMLResponse(
+        "<html><body style='font-family:sans-serif;padding:2rem;background:#111;color:#eee'>"
+        "<h2>Google Calendar connected.</h2><p>You can close this tab.</p></body></html>"
+    )
+
+
 @router.get("/api/calendar")
 async def list_calendar_events():
+    from agents.google_calendar import is_connected, list_events as gcal_list
+    if await asyncio.to_thread(is_connected):
+        config = get_config()
+        return await asyncio.to_thread(gcal_list, config.gcal_calendar_id)
     from agents.calendar_store import get_calendar_store
     return await asyncio.to_thread(get_calendar_store().list_events_json)
 
@@ -275,6 +309,17 @@ async def create_calendar_event(body: dict):
         raise HTTPException(status_code=422, detail="duration_min must be an integer")
     if not title or not date:
         raise HTTPException(status_code=422, detail="title and date required")
+    from agents.google_calendar import is_connected, create_event as gcal_create
+    if await asyncio.to_thread(is_connected):
+        from datetime import timedelta, timezone
+        config = get_config()
+        dt = datetime.strptime(f"{date} {time_str}", "%Y-%m-%d %H:%M").replace(tzinfo=timezone.utc)
+        dtend = dt + timedelta(minutes=duration)
+        try:
+            uid = await asyncio.to_thread(gcal_create, title, dt.isoformat(), dtend.isoformat(), config.gcal_calendar_id)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"uid": uid, "title": title, "date": date, "time": time_str, "duration_min": duration}
     from agents.calendar_store import get_calendar_store
     try:
         uid = await asyncio.to_thread(lambda: get_calendar_store().add_event(title, date, time_str, duration))
@@ -285,6 +330,14 @@ async def create_calendar_event(body: dict):
 
 @router.delete("/api/calendar/{uid}")
 async def delete_calendar_event(uid: str):
+    from agents.google_calendar import is_connected, delete_event as gcal_delete
+    if await asyncio.to_thread(is_connected):
+        config = get_config()
+        try:
+            await asyncio.to_thread(gcal_delete, uid, config.gcal_calendar_id)
+        except Exception:
+            raise HTTPException(status_code=404, detail="Event not found in Google Calendar")
+        return {"status": "deleted", "uid": uid}
     from agents.calendar_store import get_calendar_store
     deleted = await asyncio.to_thread(lambda: get_calendar_store().delete_event(uid))
     if not deleted:
