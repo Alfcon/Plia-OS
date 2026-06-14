@@ -324,6 +324,10 @@
 </div><!-- #app-body -->
 
 <script>
+  function _esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   let _recTimerInterval = null;
   let _recTimerSeconds = 0;
   let _recAudioCtx = null;
@@ -496,7 +500,7 @@
       ul.innerHTML = rows.map(r => {
         const when = new Date(r.fire_at).toLocaleString();
         return `<li style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #1e1e1e;">
-          <span style="flex:1;margin-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.message}">${r.message}</span>
+          <span style="flex:1;margin-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.message)}">${_esc(r.message)}</span>
           <span style="color:#888;font-size:0.72rem;white-space:nowrap;margin-right:6px;">${when}</span>
           <button onclick="cancelReminder(${r.id})" style="background:none;border:1px solid #555;border-radius:3px;color:#ef9a9a;font-size:0.72rem;padding:1px 5px;cursor:pointer;">✕</button>
         </li>`;
@@ -510,6 +514,7 @@
     const msg = document.getElementById('reminder-msg').value.trim();
     const timeVal = document.getElementById('reminder-time').value;
     const statusEl = document.getElementById('reminder-status');
+    statusEl.style.color = '#888';
     if (!msg || !timeVal) {
       statusEl.textContent = 'Enter message and time.';
       statusEl.style.color = '#ef9a9a';
