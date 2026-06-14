@@ -37,6 +37,7 @@ async def test_confirmation_in_tool_results():
     result = "\n".join(update["tool_results"])
     assert "Walk the dog" in result
     assert "2026-06-14" in result
+    assert any(r.startswith("[reminder]") for r in update["tool_results"])
 
 
 @pytest.mark.asyncio
@@ -48,7 +49,8 @@ async def test_llm_parse_error_returns_helpful_message():
         update = await reminder_node(_state("remind me somehow"))
     mock_store.add_reminder.assert_not_called()
     result = "\n".join(update["tool_results"])
-    assert "remind me to" in result.lower() or "couldn't" in result.lower()
+    assert "couldn't" in result.lower()
+    assert "remind me to" in result.lower()
     assert update["active_agent"] == "reminder"
 
 

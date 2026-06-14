@@ -43,18 +43,18 @@ async def reminder_node(state: "AgentState") -> dict:
         fire_at = str(parsed.get("fire_at") or "").strip()
         if not message or not fire_at:
             raise ValueError("missing fields")
+        datetime.fromisoformat(fire_at)  # validates format before storing
+        store = get_memory_store()
+        reminder_id = store.add_reminder(message, fire_at)
+        logger.info("Reminder created: id=%d message=%r fire_at=%s", reminder_id, message, fire_at)
+        result = f"Reminder set: '{message}' at {fire_at}"
+        return {
+            "tool_results": state["tool_results"] + [f"[reminder]\n{result}"],
+            "active_agent": "reminder",
+        }
     except Exception:
         logger.exception("Reminder parse failed for: %r", last_user)
         return {
             "tool_results": state["tool_results"] + [_FALLBACK_MSG],
             "active_agent": "reminder",
         }
-
-    store = get_memory_store()
-    reminder_id = store.add_reminder(message, fire_at)
-    logger.info("Reminder created: id=%d message=%r fire_at=%s", reminder_id, message, fire_at)
-    result = f"Reminder set: '{message}' at {fire_at}"
-    return {
-        "tool_results": state["tool_results"] + [f"[reminder]\n{result}"],
-        "active_agent": "reminder",
-    }
