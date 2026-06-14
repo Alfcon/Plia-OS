@@ -83,6 +83,7 @@ class PliaConfig:
 _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
     "tts_engine": ("kokoro", "chatterbox", "dramabox"),
     "studio_pipeline_mode": ("cpu_stt", "pause"),
+    "stt_model_size": ("tiny", "base", "small", "medium", "large"),
 }
 
 

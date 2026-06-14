@@ -48,6 +48,18 @@ def test_tts_engine_invalid_value_raises():
         update_config(tts_engine="garbage")
 
 
+def test_stt_model_size_valid_values_accepted():
+    for size in ("tiny", "base", "small", "medium", "large"):
+        update_config(stt_model_size=size)
+        assert get_config().stt_model_size == size
+
+
+def test_stt_model_size_invalid_value_raises():
+    import pytest
+    with pytest.raises(ValueError, match="stt_model_size"):
+        update_config(stt_model_size="huge")
+
+
 def test_studio_pipeline_mode_invalid_raises():
     import pytest
     with pytest.raises(ValueError, match="studio_pipeline_mode"):
