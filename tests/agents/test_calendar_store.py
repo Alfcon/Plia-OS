@@ -63,3 +63,26 @@ def test_event_includes_date_in_listing(store):
 def test_add_event_invalid_date_raises(store):
     with pytest.raises(ValueError, match="Invalid date/time"):
         store.add_event("Bad event", "not-a-date", "00:00", 30)
+
+
+def test_list_events_json_empty_returns_empty_list(store):
+    result = store.list_events_json()
+    assert result == []
+
+
+def test_list_events_json_returns_structured_dicts(store):
+    uid = store.add_event("Team lunch", "2026-06-20", "12:00", 60)
+    result = store.list_events_json()
+    assert len(result) == 1
+    assert result[0]["uid"] == uid
+    assert result[0]["title"] == "Team lunch"
+    assert "2026-06-20" in result[0]["dtstart"]
+    assert "dtend" in result[0]
+
+
+def test_list_events_json_sorted_by_dtstart(store):
+    store.add_event("Later", "2026-06-25", "09:00", 60)
+    store.add_event("Earlier", "2026-06-20", "09:00", 60)
+    result = store.list_events_json()
+    assert result[0]["title"] == "Earlier"
+    assert result[1]["title"] == "Later"

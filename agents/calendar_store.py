@@ -75,6 +75,27 @@ class CalendarStore:
             results.append(f"{dt_str}: {summary} (uid: {uid[:8]})")
         return sorted(results) if results else ["No events found"]
 
+    def list_events_json(self) -> list[dict]:
+        cal = self._read()
+        results = []
+        for component in cal.walk():
+            if component.name != "VEVENT":
+                continue
+            summary = str(component.get("summary", ""))
+            uid = str(component.get("uid", ""))
+            dtstart = component.get("dtstart")
+            dtend = component.get("dtend")
+            start_str = ""
+            end_str = ""
+            if dtstart:
+                dt = dtstart.dt
+                start_str = dt.isoformat() if isinstance(dt, datetime) else str(dt)
+            if dtend:
+                dt = dtend.dt
+                end_str = dt.isoformat() if isinstance(dt, datetime) else str(dt)
+            results.append({"uid": uid, "title": summary, "dtstart": start_str, "dtend": end_str})
+        return sorted(results, key=lambda e: e["dtstart"])
+
     def delete_event(self, uid: str) -> bool:
         cal = self._read()
         new_cal = self._blank_calendar()
