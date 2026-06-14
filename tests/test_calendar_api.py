@@ -86,3 +86,14 @@ async def test_create_calendar_event_rejects_invalid_date(app):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             r = await ac.post("/api/calendar", json={"title": "Bad", "date": "2026-13-45"})
     assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_calendar_event_rejects_non_integer_duration(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        r = await ac.post("/api/calendar", json={
+            "title": "Test",
+            "date": "2026-06-20",
+            "duration_min": "not_an_int",
+        })
+    assert r.status_code == 422
