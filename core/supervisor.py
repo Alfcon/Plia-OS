@@ -14,16 +14,18 @@ from core import events
 from agents.code import code_node
 from agents.calendar import calendar_node
 from agents.home import home_node
+from agents.reminder import reminder_node
 
 logger = logging.getLogger(__name__)
 
-_KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home"}
+_KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder"}
 _HOP_LIMIT = 5
 _TOOL_CALL_LIMIT = 10
 
 _CLASSIFY_SYSTEM = (
     "You are a router. Given the conversation, output exactly one word — "
-    "the specialist to handle the request: memory, web, code, calendar, home. "
+    "the specialist to handle the request: memory, web, code, calendar, home, reminder. "
+    "Use 'reminder' when the user wants to be reminded of something at a future time. "
     "If the request needs no specialist, output: respond."
 )
 
@@ -33,6 +35,7 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
     "code": ["run this code", "execute this", "run python", "run shell", "```python", "```sh", "run the code"],
     "calendar": ["add to calendar", "schedule a", "create an event", "calendar event", "add an appointment", "add event"],
     "home": ["turn on the", "turn off the", "lights on", "lights off", "home automation", "smart home"],
+    "reminder": ["remind me", "set a reminder", "set reminder", "alert me", "don't let me forget", "notify me when", "remind me to"],
 }
 
 
@@ -131,6 +134,7 @@ def _build_graph():
     g.add_node("code", code_node)
     g.add_node("calendar", calendar_node)
     g.add_node("home", home_node)
+    g.add_node("reminder", reminder_node)
     g.add_node("respond", _respond_node)
 
     g.set_entry_point("supervisor")
@@ -140,9 +144,10 @@ def _build_graph():
         "code": "code",
         "calendar": "calendar",
         "home": "home",
+        "reminder": "reminder",
         "respond": "respond",
     })
-    for agent in ("memory", "web", "code", "calendar", "home"):
+    for agent in ("memory", "web", "code", "calendar", "home", "reminder"):
         g.add_edge(agent, "supervisor")
     g.add_edge("respond", END)
     return g.compile()
