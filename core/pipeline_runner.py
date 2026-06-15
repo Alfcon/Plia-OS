@@ -15,7 +15,7 @@ async def start_pipeline() -> None:
     from voice.pipeline import VoicePipeline
     pipeline = VoicePipeline()
     events.subscribe(pipeline._on_event)
-    if _on_pipeline_status not in events._subscribers:
+    if not events.is_subscribed(_on_pipeline_status):
         events.subscribe(_on_pipeline_status)
     try:
         pipeline.load()

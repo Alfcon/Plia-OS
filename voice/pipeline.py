@@ -52,7 +52,7 @@ class VoicePipeline:
             for m in history
             if m["role"] != "system"
         ]
-        if self._on_event not in events._subscribers:
+        if not events.is_subscribed(self._on_event):
             events.subscribe(self._on_event)
 
     async def _on_event(self, payload: dict) -> None:

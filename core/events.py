@@ -12,6 +12,10 @@ def unsubscribe(callback: Callable) -> None:
     _subscribers.remove(callback)
 
 
+def is_subscribed(callback: Callable) -> bool:
+    return callback in _subscribers
+
+
 async def emit(event_type: str, data: dict) -> None:
     payload = {"type": event_type, **data}
     for callback in list(_subscribers):

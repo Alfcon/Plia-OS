@@ -64,7 +64,7 @@ async def _broadcast(payload: dict) -> None:
 
 def setup_event_forwarding() -> None:
     """Call once at startup to wire the event bus to WebSocket clients."""
-    if _broadcast not in events._subscribers:
+    if not events.is_subscribed(_broadcast):
         events.subscribe(_broadcast)
 
 
