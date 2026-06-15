@@ -25,6 +25,7 @@ async def start_pipeline() -> None:
             "Voice pipeline failed to start. "
             "Dashboard and API remain available."
         )
+        await events.emit("status", {"state": "error"})
     finally:
         events.unsubscribe(pipeline._on_event)
         pipeline_registry.set_state("stopped")

@@ -583,7 +583,7 @@
     const label = document.getElementById('pipeline-state-label');
     const btn = document.getElementById('pipeline-toggle-btn');
     if (!dot) return;
-    const colors = {armed:'#81c784', listening:'#4fc3f7', processing:'#ffb74d', speaking:'#ce93d8', stopped:'#555', starting:'#888'};
+    const colors = {armed:'#81c784', listening:'#4fc3f7', processing:'#ffb74d', speaking:'#ce93d8', stopped:'#555', starting:'#888', error:'#ef5350'};
     dot.style.background = colors[state] || '#555';
     label.textContent = state;
     btn.textContent = (state === 'stopped') ? 'Start' : 'Stop';

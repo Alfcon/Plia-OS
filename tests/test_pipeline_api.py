@@ -118,3 +118,24 @@ async def test_pipeline_finally_does_not_clobber_replaced_task():
 
     # finally saw get_task() is replacement ≠ current_task (task), so did not clear
     assert pipeline_registry.get_task() is replacement
+
+
+@pytest.mark.asyncio
+async def test_pipeline_emits_error_status_on_failure():
+    """start_pipeline() emits status/error when pipeline.load() raises."""
+    from core.pipeline_runner import start_pipeline
+
+    mock_pipeline = MagicMock()
+    mock_pipeline.load.side_effect = RuntimeError("no device")
+    mock_pipeline._on_event = AsyncMock()
+
+    emitted = []
+    events.subscribe(lambda p: emitted.append(p))
+
+    with patch("voice.pipeline.VoicePipeline", return_value=mock_pipeline):
+        task = asyncio.create_task(start_pipeline())
+        pipeline_registry.set_task(task)
+        await task
+
+    error_events = [e for e in emitted if e.get("type") == "status" and e.get("state") == "error"]
+    assert error_events, "Expected a status/error event on pipeline failure"
