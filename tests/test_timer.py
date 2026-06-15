@@ -73,3 +73,43 @@ def test_set_timer_singular_second():
         result = set_timer(seconds=1)
     assert "1 second" in result
     assert "seconds" not in result
+
+
+def test_list_timers_empty():
+    mock_store = MagicMock()
+    mock_store.list_pending.return_value = []
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.example_module import list_timers
+        result = list_timers()
+    assert "No active" in result
+
+
+def test_list_timers_shows_remaining_time():
+    from datetime import datetime, timezone, timedelta
+    future = (datetime.now(timezone.utc) + timedelta(minutes=3, seconds=30)).isoformat()
+    mock_store = MagicMock()
+    mock_store.list_pending.return_value = [
+        {"id": 7, "message": "Timer done: pasta!", "fire_at": future},
+    ]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.example_module import list_timers
+        result = list_timers()
+    assert "pasta" in result
+    assert "[7]" in result
+    assert "remaining" in result
+    assert "3m" in result
+
+
+def test_list_timers_excludes_non_timer_reminders():
+    from datetime import datetime, timezone, timedelta
+    future = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+    mock_store = MagicMock()
+    mock_store.list_pending.return_value = [
+        {"id": 1, "message": "Call John", "fire_at": future},
+        {"id": 2, "message": "Timer done!", "fire_at": future},
+    ]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.example_module import list_timers
+        result = list_timers()
+    assert "Call John" not in result
+    assert "[2]" in result

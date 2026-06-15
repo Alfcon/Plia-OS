@@ -84,6 +84,25 @@ def set_timer(minutes: int = 0, seconds: int = 0, label: str = "") -> str:
     return f"Timer set for {duration}{': ' + label if label else ''}."
 
 
+@tool(description="List all active countdown timers with time remaining.")
+def list_timers() -> str:
+    from datetime import datetime, timezone
+    from agents.memory_store import get_memory_store
+    reminders = get_memory_store().list_pending()
+    timers = [r for r in reminders if r["message"].startswith("Timer")]
+    if not timers:
+        return "No active timers."
+    now = datetime.now(timezone.utc)
+    lines = []
+    for t in timers:
+        fire_at = datetime.fromisoformat(t["fire_at"])
+        remaining = max(0, int((fire_at - now).total_seconds()))
+        mins, secs = divmod(remaining, 60)
+        time_str = f"{mins}m {secs}s" if mins else f"{secs}s"
+        lines.append(f"- [{t['id']}] {t['message']} — {time_str} remaining")
+    return "\n".join(lines)
+
+
 @tool(description="Set a reminder message to fire in N minutes")
 def set_reminder(message: str, minutes: int) -> str:
     from datetime import datetime, timezone, timedelta
