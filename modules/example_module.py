@@ -54,6 +54,16 @@ def forget_memory(key: str) -> str:
     return f"Forgotten: '{key}'."
 
 
+@tool(description="Clear the conversation history and start fresh. Use when asked to 'forget this conversation', 'start over', or 'clear context'.")
+def clear_conversation() -> str:
+    import asyncio
+    from agents.memory_store import get_memory_store
+    from core import events
+    get_memory_store().clear_history()
+    asyncio.get_event_loop().create_task(events.emit("clear_history", {}))
+    return "Conversation cleared. Starting fresh."
+
+
 @tool(description="Set a reminder message to fire in N minutes")
 def set_reminder(message: str, minutes: int) -> str:
     from datetime import datetime, timezone, timedelta
