@@ -9,6 +9,8 @@ from pathlib import Path
 from core.loader import load_modules
 from core.config import get_config
 from core.reminder_loop import run_reminder_loop
+from core import pipeline_registry
+from core.pipeline_runner import start_pipeline
 from dashboard.server import router as dashboard_router, setup_event_forwarding
 
 logger = logging.getLogger(__name__)
@@ -29,7 +31,8 @@ def create_app() -> FastAPI:
         except ImportError:
             pass
         # Start voice pipeline and reminder loop as background tasks
-        pipeline_task = asyncio.create_task(_start_pipeline())
+        pipeline_task = asyncio.create_task(start_pipeline())
+        pipeline_registry.set_task(pipeline_task)
         reminder_task = asyncio.create_task(run_reminder_loop())
         yield
         pipeline_task.cancel()
@@ -54,22 +57,6 @@ def create_app() -> FastAPI:
         name="uploads",
     )
     return app
-
-
-async def _start_pipeline() -> None:
-    from voice.pipeline import VoicePipeline
-    from core import events
-    config = get_config()
-    pipeline = VoicePipeline()
-    events.subscribe(pipeline._on_event)  # subscribe before load() so reminders aren't lost during model loading
-    try:
-        pipeline.load()
-        await pipeline.start()
-    except Exception:
-        logger.exception(
-            "Voice pipeline failed to start. "
-            "Dashboard and API remain available."
-        )
 
 
 if __name__ == "__main__":
