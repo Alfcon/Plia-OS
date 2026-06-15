@@ -103,6 +103,24 @@ def list_timers() -> str:
     return "\n".join(lines)
 
 
+@tool(description="Cancel an active timer by label. If no label given, cancels the most recently set timer.")
+def cancel_timer(label: str = "") -> str:
+    from agents.memory_store import get_memory_store
+    store = get_memory_store()
+    timers = [r for r in store.list_pending() if r["message"].startswith("Timer")]
+    if not timers:
+        return "No active timers."
+    if label:
+        matches = [t for t in timers if label.lower() in t["message"].lower()]
+        if not matches:
+            return f"No timer found matching '{label}'."
+        target = matches[0]
+    else:
+        target = max(timers, key=lambda t: t["id"])
+    store.mark_reminder_done(target["id"])
+    return f"Cancelled: {target['message']}"
+
+
 @tool(description="Set a reminder message to fire in N minutes")
 def set_reminder(message: str, minutes: int) -> str:
     from datetime import datetime, timezone, timedelta

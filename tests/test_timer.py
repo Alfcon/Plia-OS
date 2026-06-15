@@ -100,6 +100,53 @@ def test_list_timers_shows_remaining_time():
     assert "3m" in result
 
 
+def test_cancel_timer_by_label():
+    mock_store = MagicMock()
+    mock_store.list_pending.return_value = [
+        {"id": 3, "message": "Timer done: pasta!", "fire_at": "2099-01-01T00:03:00+00:00"},
+        {"id": 4, "message": "Timer done: eggs!", "fire_at": "2099-01-01T00:05:00+00:00"},
+    ]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.example_module import cancel_timer
+        result = cancel_timer(label="pasta")
+    mock_store.mark_reminder_done.assert_called_once_with(3)
+    assert "pasta" in result
+
+
+def test_cancel_timer_no_label_cancels_most_recent():
+    mock_store = MagicMock()
+    mock_store.list_pending.return_value = [
+        {"id": 3, "message": "Timer done!", "fire_at": "2099-01-01T00:03:00+00:00"},
+        {"id": 7, "message": "Timer done: tea!", "fire_at": "2099-01-01T00:01:00+00:00"},
+    ]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.example_module import cancel_timer
+        result = cancel_timer()
+    mock_store.mark_reminder_done.assert_called_once_with(7)
+
+
+def test_cancel_timer_no_timers():
+    mock_store = MagicMock()
+    mock_store.list_pending.return_value = []
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.example_module import cancel_timer
+        result = cancel_timer()
+    mock_store.mark_reminder_done.assert_not_called()
+    assert "No active" in result
+
+
+def test_cancel_timer_label_not_found():
+    mock_store = MagicMock()
+    mock_store.list_pending.return_value = [
+        {"id": 3, "message": "Timer done: pasta!", "fire_at": "2099-01-01T00:03:00+00:00"},
+    ]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.example_module import cancel_timer
+        result = cancel_timer(label="coffee")
+    mock_store.mark_reminder_done.assert_not_called()
+    assert "coffee" in result
+
+
 def test_list_timers_excludes_non_timer_reminders():
     from datetime import datetime, timezone, timedelta
     future = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
