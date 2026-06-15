@@ -99,7 +99,7 @@
         <button class="m-nav-btn" data-section="web" onclick="showMenuSection('web')">Web</button>
         <button class="m-nav-btn" data-section="agents" onclick="showMenuSection('agents')">Agents</button>
         <button class="m-nav-btn" data-section="llm" onclick="showMenuSection('llm')">LLM</button>
-        <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system')">System</button>
+        <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system');loadPipelineStatus()">System</button>
         <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders();_requestNotifPermission()">Reminders</button>
         <button class="m-nav-btn" data-section="calendar" onclick="showMenuSection('calendar');loadCalendar();loadGcalStatus()">Calendar</button>
         <button class="m-nav-btn" data-section="memory" onclick="showMenuSection('memory');loadMemory()">Memory</button>
@@ -286,7 +286,17 @@
           <div id="agent-log"></div>
         </div>
         <div id="m-section-system" class="m-pane" style="display:none">
-          <ul id="module-list" style="font-size:0.78rem;list-style:none;padding:0;">Loading...</ul>
+          <div style="font-size:0.78rem;color:#aaa;margin-bottom:10px;">Voice Pipeline</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span id="pipeline-state-dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#555;flex-shrink:0;"></span>
+              <span id="pipeline-state-label" style="font-size:0.78rem;color:#aaa;">—</span>
+            </div>
+            <button id="pipeline-toggle-btn" onclick="togglePipeline()"
+              style="background:#1e1e1e;border:1px solid #333;border-radius:3px;color:#aaa;font-size:0.75rem;padding:3px 10px;cursor:pointer;">
+              Stop
+            </button>
+          </div>
         </div>
         <div id="m-section-reminders" class="m-pane" style="display:none">
           <div style="margin-bottom:10px;">
@@ -449,6 +459,7 @@
     const msg = JSON.parse(ev.data);
     if (msg.type === 'status') {
       document.getElementById('status-badge').textContent = msg.state;
+      _updatePipelineUI(msg.state);
       const dbProg = document.getElementById('db-progress');
       if (dbProg) {
         const isDramabox = document.getElementById('tts-engine').value === 'dramabox';
@@ -538,6 +549,42 @@
   document.getElementById('chat-input').addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
   });
+
+  function _updatePipelineUI(state) {
+    const dot = document.getElementById('pipeline-state-dot');
+    const label = document.getElementById('pipeline-state-label');
+    const btn = document.getElementById('pipeline-toggle-btn');
+    if (!dot) return;
+    const colors = {armed:'#81c784', listening:'#4fc3f7', processing:'#ffb74d', speaking:'#ce93d8', stopped:'#555', starting:'#888'};
+    dot.style.background = colors[state] || '#555';
+    label.textContent = state;
+    btn.textContent = (state === 'stopped') ? 'Start' : 'Stop';
+    btn.disabled = (state === 'starting');
+  }
+
+  async function loadPipelineStatus() {
+    try {
+      const r = await fetch('/api/pipeline/status');
+      if (!r.ok) return;
+      const data = await r.json();
+      _updatePipelineUI(data.state);
+    } catch(e) {}
+  }
+
+  async function togglePipeline() {
+    const label = document.getElementById('pipeline-state-label');
+    const btn = document.getElementById('pipeline-toggle-btn');
+    const isStopped = label.textContent === 'stopped' || label.textContent === '—';
+    btn.disabled = true;
+    try {
+      const r = await fetch(isStopped ? '/api/pipeline/start' : '/api/pipeline/stop', {method: 'POST'});
+      if (!r.ok) throw new Error(r.status);
+      const data = await r.json();
+      _updatePipelineUI(data.state);
+    } catch(e) {
+      btn.disabled = false;
+    }
+  }
 
   async function downloadHistory() {
     const r = await fetch('/api/history?n=10000');
