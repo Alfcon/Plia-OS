@@ -64,6 +64,26 @@ def clear_conversation() -> str:
     return "Conversation cleared. Starting fresh."
 
 
+@tool(description="Set a countdown timer that announces when it's done. "
+      "Specify minutes and/or seconds. Optional label describes what the timer is for.")
+def set_timer(minutes: int = 0, seconds: int = 0, label: str = "") -> str:
+    from datetime import datetime, timezone, timedelta
+    from agents.memory_store import get_memory_store
+    total = minutes * 60 + seconds
+    if total <= 0:
+        return "Specify at least 1 second."
+    fire_at = datetime.now(timezone.utc) + timedelta(seconds=total)
+    message = f"Timer done{': ' + label if label else ''}!"
+    get_memory_store().add_reminder(message, fire_at.isoformat())
+    parts = []
+    if minutes:
+        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+    if seconds:
+        parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
+    duration = " and ".join(parts)
+    return f"Timer set for {duration}{': ' + label if label else ''}."
+
+
 @tool(description="Set a reminder message to fire in N minutes")
 def set_reminder(message: str, minutes: int) -> str:
     from datetime import datetime, timezone, timedelta
