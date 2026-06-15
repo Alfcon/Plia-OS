@@ -22,6 +22,7 @@ _BLOCK_SIZE = 1280  # ~80ms per chunk at 16kHz
 _ENERGY_FLOOR = 0.03  # RMS below this = silence (normalised to [-1,1])
 _INT16_MAX = 32768.0  # used to normalise int16 → float for RMS and STT
 _HISTORY_PRELOAD = 20  # number of recent messages to preload on startup
+_CONVERSATION_CAP = 40  # max non-system messages kept in-memory (20 pairs)
 _TTS_SAMPLE_RATE = 24000
 
 
@@ -209,6 +210,8 @@ class VoicePipeline:
             logger.info("Calling LLM...")
             try:
                 response, self._conversation = await run_turn(self._conversation)
+                if len(self._conversation) > _CONVERSATION_CAP + 1:
+                    self._conversation = self._conversation[:1] + self._conversation[-_CONVERSATION_CAP:]
             except Exception as exc:
                 logger.error("Agent error: %s", exc)
                 response = "I encountered an error. Please try again."
