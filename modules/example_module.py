@@ -13,6 +13,27 @@ def get_current_date() -> str:
     return datetime.now().strftime("%A, %B %d, %Y")
 
 
+@tool(description="List all pending (not yet fired) reminders with their ID, message, and scheduled time")
+def list_pending_reminders() -> str:
+    from agents.memory_store import get_memory_store
+    reminders = get_memory_store().list_pending()
+    if not reminders:
+        return "No pending reminders."
+    lines = [f"- [{r['id']}] {r['message']} (at {r['fire_at']})" for r in reminders]
+    return "\n".join(lines)
+
+
+@tool(description="Delete a pending reminder by its ID. Use list_pending_reminders first to get the ID.")
+def delete_reminder(reminder_id: int) -> str:
+    from agents.memory_store import get_memory_store
+    store = get_memory_store()
+    pending = store.list_pending()
+    if not any(r["id"] == reminder_id for r in pending):
+        return f"No pending reminder with ID {reminder_id}."
+    store.mark_reminder_done(reminder_id)
+    return f"Reminder {reminder_id} deleted."
+
+
 @tool(description="Set a reminder message to fire in N minutes")
 def set_reminder(message: str, minutes: int) -> str:
     from datetime import datetime, timezone, timedelta
