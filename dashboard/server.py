@@ -10,7 +10,7 @@ from scipy.io import wavfile
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Request
 from fastapi.responses import HTMLResponse
 from pathlib import Path
-from core import events, registry
+from core import events, registry, pipeline_registry
 from core.config import get_config, update_config, restore_system_prompt, reset_system_prompt_to_default
 from voice.tts import get_tts_service
 from voice.vram_broker import get_vram_broker
@@ -459,6 +459,33 @@ async def shutdown():
         os.kill(os.getpid(), signal.SIGTERM)
     asyncio.create_task(_do())
     return {"status": "shutting down"}
+
+
+@router.get("/api/pipeline/status")
+async def pipeline_status():
+    return {"state": pipeline_registry.get_state()}
+
+
+@router.post("/api/pipeline/stop")
+async def pipeline_stop():
+    task = pipeline_registry.get_task()
+    if task and not task.done():
+        task.cancel()
+    pipeline_registry.set_state("stopped")
+    pipeline_registry.set_task(None)
+    return {"state": "stopped"}
+
+
+@router.post("/api/pipeline/start")
+async def pipeline_start():
+    task = pipeline_registry.get_task()
+    if task and not task.done():
+        return {"state": pipeline_registry.get_state()}
+    from core.pipeline_runner import start_pipeline
+    new_task = asyncio.create_task(start_pipeline())
+    pipeline_registry.set_task(new_task)
+    pipeline_registry.set_state("starting")
+    return {"state": "starting"}
 
 
 @router.get("/api/system/info")
