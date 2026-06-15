@@ -8,6 +8,7 @@ from core import events
 from voice.wake import WakeWordDetector
 from voice.stt import get_stt_service
 from voice.tts import TTSService
+from voice.text_utils import strip_markdown
 
 try:
     import sounddevice as sd
@@ -74,7 +75,7 @@ class VoicePipeline:
         self._wake_muted_until = time.monotonic() + 4.0  # minimum mute even if synthesis fails
         try:
             await events.emit("transcript", {"role": "assistant", "text": message})
-            audio_out = self._tts.synthesise(message)
+            audio_out = self._tts.synthesise(strip_markdown(message))
             self._set_wake_mute(audio_out)
             sd.play(audio_out, samplerate=24000, blocking=True)
         except Exception:
@@ -219,7 +220,7 @@ class VoicePipeline:
             await events.emit("status", {"state": "speaking"})
             logger.info("Synthesising speech...")
             try:
-                audio_out = self._tts.synthesise(response)
+                audio_out = self._tts.synthesise(strip_markdown(response))
                 logger.info("Playing audio (%d samples)...", len(audio_out))
                 # Mute before playback: audio duration + 4s tail covers hardware buffer echo
                 self._set_wake_mute(audio_out)
