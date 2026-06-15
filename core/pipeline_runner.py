@@ -13,8 +13,6 @@ async def _on_pipeline_status(payload: dict) -> None:
 
 async def start_pipeline() -> None:
     from voice.pipeline import VoicePipeline
-    from core.config import get_config
-    config = get_config()
     pipeline = VoicePipeline()
     events.subscribe(pipeline._on_event)
     if _on_pipeline_status not in events._subscribers:
@@ -29,3 +27,4 @@ async def start_pipeline() -> None:
         )
     finally:
         pipeline_registry.set_state("stopped")
+        pipeline_registry.set_task(None)
