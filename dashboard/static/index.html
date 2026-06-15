@@ -597,7 +597,7 @@
       const modelSection = modelRows.length
         ? `<div style="margin-top:6px;font-size:0.72rem;color:#666;margin-bottom:3px;">VRAM models</div>${modelRows.join('')}`
         : '';
-      el.innerHTML = rows.join('') + modelSection || '<span style="color:#555;">No data</span>';
+      el.innerHTML = (rows.join('') + modelSection) || '<span style="color:#555;">No data</span>';
     } catch(e) {
       el.textContent = 'Failed to load';
     }
