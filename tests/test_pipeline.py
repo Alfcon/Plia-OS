@@ -93,3 +93,56 @@ async def test_empty_transcription_resets_to_armed():
 
     statuses = [e["state"] for e in emitted if e["type"] == "status"]
     assert statuses[-1] == "armed"
+
+
+@pytest.mark.asyncio
+async def test_studio_pause_mode_skips_wake_word():
+    """studio_pipeline_mode='pause' + heavy model active → wake detector never called."""
+    from core.config import update_config
+
+    update_config(studio_pipeline_mode="pause")
+
+    pipeline = _make_pipeline(wake_detects_on=0)
+    pipeline._conversation = [{"role": "system", "content": "sys"}]
+
+    audio_q: asyncio.Queue = asyncio.Queue()
+    audio_q.put_nowait(np.zeros(1280, dtype=np.int16))
+
+    mock_broker = MagicMock()
+    mock_broker.status.return_value = {"studio_mode": True}
+
+    with patch("voice.vram_broker.get_vram_broker", return_value=mock_broker):
+        await pipeline._process_loop(audio_q, max_iterations=1)
+
+    pipeline._wake.detect.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_studio_pause_mode_cpu_stt_does_not_skip():
+    """studio_pipeline_mode='cpu_stt' (default) does not skip wake word even with heavy model."""
+    from core.config import update_config
+
+    update_config(studio_pipeline_mode="cpu_stt")
+
+    pipeline = _make_pipeline(wake_detects_on=0)
+    pipeline._conversation = [{"role": "system", "content": "sys"}]
+
+    speech = np.ones(1280, dtype=np.float32) * 0.1
+    silence = np.zeros(1280, dtype=np.float32)
+    chunks = [np.ones(1280, dtype=np.int16) * 8000]  # triggers wake (detect returns True on call 0)
+    chunks += [speech.astype(np.int16)] * 3
+    chunks += [(silence * 0).astype(np.int16)] * 25
+
+    audio_q: asyncio.Queue = asyncio.Queue()
+    for c in chunks:
+        await audio_q.put(c)
+
+    mock_broker = MagicMock()
+    mock_broker.status.return_value = {"studio_mode": True}
+
+    with patch("voice.vram_broker.get_vram_broker", return_value=mock_broker), \
+         patch("voice.pipeline.run_turn", new=AsyncMock(return_value=("ok", []))), \
+         patch("voice.pipeline.sd"):
+        await pipeline._process_loop(audio_q, max_iterations=1)
+
+    pipeline._wake.detect.assert_called()

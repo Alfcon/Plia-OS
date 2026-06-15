@@ -129,6 +129,18 @@ class VoicePipeline:
                 except asyncio.QueueEmpty:
                     break
 
+            # --- Phase 0.5: studio pause mode ---
+            # Re-read config each iteration so toggling in the dashboard takes effect immediately.
+            config = get_config()
+            if config.studio_pipeline_mode == "pause":
+                from voice.vram_broker import get_vram_broker
+                if get_vram_broker().status().get("studio_mode"):
+                    logger.debug("Studio pause: heavy model active, skipping wake word")
+                    while not audio_q.empty():
+                        audio_q.get_nowait()
+                    await asyncio.sleep(0.5)
+                    continue
+
             # --- Phase 1: wait for wake word ---
             await events.emit("status", {"state": "armed"})
             remaining = self._wake_muted_until - time.monotonic()
