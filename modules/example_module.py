@@ -34,6 +34,26 @@ def delete_reminder(reminder_id: int) -> str:
     return f"Reminder {reminder_id} deleted."
 
 
+@tool(description="List all stored memory facts as key-value pairs")
+def list_memories() -> str:
+    from agents.memory_store import get_memory_store
+    facts = get_memory_store().list_all()
+    if not facts:
+        return "No memories stored."
+    lines = [f"- {f['key']}: {f['value']}" for f in facts]
+    return "\n".join(lines)
+
+
+@tool(description="Forget a stored memory fact by its exact key. Use list_memories first to get the key.")
+def forget_memory(key: str) -> str:
+    from agents.memory_store import get_memory_store
+    store = get_memory_store()
+    if store.get_fact(key) is None:
+        return f"No memory with key '{key}'."
+    store.forget(key)
+    return f"Forgotten: '{key}'."
+
+
 @tool(description="Set a reminder message to fire in N minutes")
 def set_reminder(message: str, minutes: int) -> str:
     from datetime import datetime, timezone, timedelta
