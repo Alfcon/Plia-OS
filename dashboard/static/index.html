@@ -414,6 +414,7 @@
     <input type="text" id="chat-input" placeholder="Type a message… (or speak)" autocomplete="off" />
     <button id="mic-btn" onclick="toggleMicRecording()" title="Voice input" style="background:#1e1e1e;border:1px solid #333;border-radius:4px;color:#aaa;font-size:1rem;padding:6px 10px;cursor:pointer;">🎤</button>
     <button id="chat-send-btn" onclick="sendChat()">Send</button>
+    <button onclick="downloadHistory()" title="Export chat history" style="width:auto;padding:6px 10px;background:#0d1b0d;color:#81c784;border:1px solid #1b5e20;flex-shrink:0;">↓</button>
     <button id="chat-clear-btn" onclick="clearHistory()" title="Clear history">✕</button>
   </div>
 </div>
@@ -537,6 +538,20 @@
   document.getElementById('chat-input').addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
   });
+
+  async function downloadHistory() {
+    const r = await fetch('/api/history?n=10000');
+    if (!r.ok) return;
+    const msgs = await r.json();
+    const lines = msgs.map(m => `[${m.ts}] ${m.role}: ${m.content}`).join('\n');
+    const blob = new Blob([lines], {type: 'text/plain'});
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(blob),
+      download: `plia-chat-${new Date().toISOString().slice(0,10)}.txt`,
+    });
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 
   async function clearHistory() {
     if (!confirm('Clear all chat history?')) return;
