@@ -3,6 +3,8 @@ import re
 
 def strip_markdown(text: str) -> str:
     """Remove markdown formatting so TTS reads clean prose."""
+    if not text:
+        return ""
     # Fenced code blocks → "code block"
     text = re.sub(r'```[\s\S]*?```', 'code block', text)
     # Inline code → bare text

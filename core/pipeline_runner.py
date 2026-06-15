@@ -26,5 +26,9 @@ async def start_pipeline() -> None:
             "Dashboard and API remain available."
         )
     finally:
+        events.unsubscribe(pipeline._on_event)
         pipeline_registry.set_state("stopped")
-        pipeline_registry.set_task(None)
+        # Only clear the task ref if we are still the registered task — a
+        # stop→start race can replace the registry entry before our finally runs.
+        if pipeline_registry.get_task() is asyncio.current_task():
+            pipeline_registry.set_task(None)

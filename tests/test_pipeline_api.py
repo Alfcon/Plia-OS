@@ -3,7 +3,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from unittest.mock import patch, AsyncMock, MagicMock
 from core.main import create_app
-from core import pipeline_registry
+from core import pipeline_registry, events
 
 
 @pytest.fixture(autouse=True)
@@ -75,3 +75,46 @@ async def test_pipeline_start_when_stopped_creates_task(app):
     assert r.status_code == 200
     assert r.json()["state"] == "starting"
     assert pipeline_registry.get_task() is not None
+
+
+@pytest.mark.asyncio
+async def test_pipeline_finally_unsubscribes_on_event():
+    """start_pipeline() must remove pipeline._on_event from subscribers in finally."""
+    mock_pipeline = MagicMock()
+    mock_pipeline.load.side_effect = RuntimeError("no device")
+    mock_pipeline._on_event = AsyncMock()
+
+    with patch("voice.pipeline.VoicePipeline", return_value=mock_pipeline):
+        task = asyncio.create_task(__import__("core.pipeline_runner", fromlist=["start_pipeline"]).start_pipeline())
+        pipeline_registry.set_task(task)
+        try:
+            await task
+        except Exception:
+            pass
+
+    assert mock_pipeline._on_event not in events._subscribers
+
+
+@pytest.mark.asyncio
+async def test_pipeline_finally_does_not_clobber_replaced_task():
+    """If registry was updated to a new task before finally runs, finally must not clear it."""
+    mock_pipeline = MagicMock()
+    mock_pipeline.load.side_effect = RuntimeError("no device")
+    mock_pipeline._on_event = AsyncMock()
+
+    with patch("voice.pipeline.VoicePipeline", return_value=mock_pipeline):
+        from core.pipeline_runner import start_pipeline
+        task = asyncio.create_task(start_pipeline())
+        pipeline_registry.set_task(task)
+
+        # Simulate stop→start race: replace registry task before finally fires
+        replacement = MagicMock(spec=asyncio.Task)
+        pipeline_registry.set_task(replacement)
+
+        try:
+            await task
+        except Exception:
+            pass
+
+    # finally saw get_task() is replacement ≠ current_task (task), so did not clear
+    assert pipeline_registry.get_task() is replacement

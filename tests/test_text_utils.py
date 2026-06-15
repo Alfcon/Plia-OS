@@ -76,3 +76,11 @@ def test_underscore_bold_removed():
 
 def test_strips_leading_trailing_whitespace():
     assert strip_markdown("  hello  ") == "hello"
+
+
+def test_none_returns_empty_string():
+    assert strip_markdown(None) == ""
+
+
+def test_empty_string_returns_empty_string():
+    assert strip_markdown("") == ""
