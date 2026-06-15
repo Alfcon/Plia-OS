@@ -186,6 +186,14 @@
             <label>Seed
               <input type="number" id="db-seed" value="42" min="0" style="width:100%" onchange="applyVoiceConfig()" />
             </label>
+            <label>Duration Multiplier <span style="font-size:0.7rem;color:#555;">— scale audio length</span>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <input type="range" id="db-duration-mult" min="0.5" max="2.0" step="0.05" value="1.1"
+                  oninput="document.getElementById('db-duration-mult-val').textContent=parseFloat(this.value).toFixed(2)"
+                  style="flex:1;" />
+                <span id="db-duration-mult-val" style="font-size:0.75rem;color:#888;width:30px;text-align:right;">1.10</span>
+              </div>
+            </label>
             <hr style="border-color:#333;margin:8px 0;" />
             <h2>Generate Clip</h2>
             <label>Prompt
@@ -225,6 +233,20 @@
           </label>
           <label>Language
             <input type="text" id="stt-language" value="en" placeholder="e.g. en, fr, de, zh"
+              style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#eee;padding:4px 6px;border-radius:3px;font-size:0.75rem;" />
+          </label>
+          <hr style="border-color:#333;margin:10px 0;" />
+          <div style="font-size:0.78rem;color:#aaa;margin-bottom:6px;">Voice Activity Detection</div>
+          <label>Silence Timeout <span style="font-size:0.7rem;color:#555;">— seconds before STT triggers</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="range" id="silence-timeout" min="0.5" max="30" step="0.5" value="8.0"
+                oninput="document.getElementById('silence-timeout-val').textContent=parseFloat(this.value).toFixed(1)+'s'"
+                style="flex:1;" />
+              <span id="silence-timeout-val" style="font-size:0.75rem;color:#888;width:32px;text-align:right;">8.0s</span>
+            </div>
+          </label>
+          <label>Silence Chunks <span style="font-size:0.7rem;color:#555;">— consecutive silent ~80ms chunks</span>
+            <input type="number" id="silence-chunks" min="1" max="100" value="10"
               style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#eee;padding:4px 6px;border-radius:3px;font-size:0.75rem;" />
           </label>
           <button class="apply-btn" onclick="applyVoiceConfig()">Apply</button>
@@ -699,6 +721,15 @@
       }
       if (cfg.stt_model_size) document.getElementById('stt-model-size').value = cfg.stt_model_size;
       if (cfg.stt_language) document.getElementById('stt-language').value = cfg.stt_language;
+      if (cfg.silence_timeout_seconds !== undefined) {
+        document.getElementById('silence-timeout').value = cfg.silence_timeout_seconds;
+        document.getElementById('silence-timeout-val').textContent = parseFloat(cfg.silence_timeout_seconds).toFixed(1) + 's';
+      }
+      if (cfg.silence_chunks_threshold !== undefined) document.getElementById('silence-chunks').value = cfg.silence_chunks_threshold;
+      if (cfg.dramabox_duration_multiplier !== undefined) {
+        document.getElementById('db-duration-mult').value = cfg.dramabox_duration_multiplier;
+        document.getElementById('db-duration-mult-val').textContent = parseFloat(cfg.dramabox_duration_multiplier).toFixed(2);
+      }
       onWebProviderChange();
       onEngineChange();
       startVramPolling();
@@ -1170,6 +1201,9 @@
       wake_word_threshold: parseFloat(document.getElementById('wake-threshold').value),
       stt_model_size: document.getElementById('stt-model-size').value,
       stt_language: document.getElementById('stt-language').value.trim() || 'en',
+      silence_timeout_seconds: parseFloat(document.getElementById('silence-timeout').value),
+      silence_chunks_threshold: parseInt(document.getElementById('silence-chunks').value, 10),
+      dramabox_duration_multiplier: parseFloat(document.getElementById('db-duration-mult').value),
     };
     fetch('/api/config', {
       method: 'POST',
