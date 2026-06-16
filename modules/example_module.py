@@ -389,6 +389,24 @@ def get_system_info() -> str:
     )
 
 
+@tool(description="Show current GPU VRAM usage and which models are loaded on the GPU.")
+def get_vram_status() -> str:
+    from voice.vram_broker import get_vram_broker
+    s = get_vram_broker().status()
+    lines = [
+        f"VRAM: {s['vram_used_gb']:.1f} / {s['vram_total_gb']:.1f} GB",
+        f"Studio mode: {'yes' if s['studio_mode'] else 'no'}",
+    ]
+    if s.get("active_heavy"):
+        lines.append(f"Active heavy model: {s['active_heavy']}")
+    models = s.get("models", {})
+    if models:
+        lines.append("Models:")
+        for name, m in models.items():
+            lines.append(f"  {name}: {m['state']}" + (f" ({m['vram_gb']:.1f} GB)" if m["state"] == "gpu" else ""))
+    return "\n".join(lines)
+
+
 @tool(description="Check if a model or application will fit on this system's GPU. "
       "Pass the model name and how much GPU VRAM it requires in gigabytes. "
       "Returns whether it fits and how much VRAM is available. "
