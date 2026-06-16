@@ -390,6 +390,14 @@
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
             <span style="font-size:0.78rem;color:#aaa;">Stored memories</span>
           </div>
+          <div style="display:flex;gap:4px;margin-bottom:4px;">
+            <input id="mem-key-input" type="text" placeholder="Key"
+              style="flex:1;background:#111;border:1px solid #333;color:#eee;padding:4px 6px;border-radius:3px;font-size:0.75rem;">
+            <input id="mem-val-input" type="text" placeholder="Value"
+              style="flex:2;background:#111;border:1px solid #333;color:#eee;padding:4px 6px;border-radius:3px;font-size:0.75rem;"
+              onkeydown="if(event.key==='Enter')addMemory()">
+            <button onclick="addMemory()" style="background:#2a2a2a;border:1px solid #555;border-radius:3px;color:#a5d6a7;font-size:0.75rem;padding:4px 8px;cursor:pointer;">+</button>
+          </div>
           <p style="font-size:0.72rem;color:#555;margin:0 0 8px;">Facts Plia learned from conversation. Say "remember that…" to add.</p>
           <ul id="memory-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
         </div>
@@ -905,6 +913,22 @@
         body: JSON.stringify({text}),
       });
       input.value = '';
+      loadMemory();
+    } catch(e) {}
+  }
+
+  async function addMemory() {
+    const key = document.getElementById('mem-key-input').value.trim();
+    const value = document.getElementById('mem-val-input').value.trim();
+    if (!key || !value) return;
+    try {
+      await fetch('/api/memory', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({key, value}),
+      });
+      document.getElementById('mem-key-input').value = '';
+      document.getElementById('mem-val-input').value = '';
       loadMemory();
     } catch(e) {}
   }

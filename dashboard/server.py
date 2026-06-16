@@ -332,6 +332,19 @@ async def list_memory():
     return [f for f in all_facts if not f["key"].startswith("note_")]
 
 
+@router.post("/api/memory")
+async def create_memory(request: Request):
+    from agents.memory_store import get_memory_store
+    body = await request.json()
+    key = (body.get("key") or "").strip()
+    value = (body.get("value") or "").strip()
+    if not key or not value:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="key and value required")
+    await asyncio.to_thread(lambda: get_memory_store().remember(key, value))
+    return {"key": key, "value": value}
+
+
 @router.delete("/api/memory/{key}")
 async def forget_memory(key: str):
     from agents.memory_store import get_memory_store
