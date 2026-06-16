@@ -27,16 +27,28 @@ def test_keyword_route_calendar_unaffected():
     assert _keyword_route("schedule a meeting for Monday") == "calendar"
 
 
-def test_keyword_route_set_a_timer():
-    assert _keyword_route("set a timer for 5 minutes") == "reminder"
+def test_keyword_route_set_a_timer_goes_to_respond():
+    assert _keyword_route("set a timer for 5 minutes") == "respond"
 
 
-def test_keyword_route_start_a_timer():
-    assert _keyword_route("start a timer for pasta") == "reminder"
+def test_keyword_route_start_a_timer_goes_to_respond():
+    assert _keyword_route("start a timer for pasta") == "respond"
 
 
-def test_keyword_route_timer_for():
-    assert _keyword_route("timer for 10 minutes") == "reminder"
+def test_keyword_route_timer_for_goes_to_respond():
+    assert _keyword_route("timer for 10 minutes") == "respond"
+
+
+def test_keyword_route_mute_goes_to_respond():
+    assert _keyword_route("mute the audio") == "respond"
+
+
+def test_keyword_route_volume_up_goes_to_respond():
+    assert _keyword_route("turn volume up please") == "respond"
+
+
+def test_keyword_route_system_info_goes_to_respond():
+    assert _keyword_route("how much ram am I using") == "respond"
 
 
 def test_keyword_route_remember_this():
