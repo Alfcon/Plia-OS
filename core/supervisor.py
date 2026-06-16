@@ -121,10 +121,15 @@ async def _respond_node(state: AgentState) -> dict:
                     result = await result
             except Exception as exc:
                 result = f"Error: {exc}"
+            result_str = str(result)
+            await events.emit("transcript", {
+                "role": "tool",
+                "text": f"[{fn['name']}] {result_str}",
+            })
             history.append({
                 "role": "tool",
                 "tool_call_id": tc.get("id", ""),
-                "content": str(result),
+                "content": result_str,
             })
     else:
         logger.warning("Tool-call limit (%d) reached; returning fallback reply", _TOOL_CALL_LIMIT)
