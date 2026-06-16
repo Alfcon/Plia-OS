@@ -258,6 +258,19 @@ def list_calendar_events() -> str:
     return "\n".join(events)
 
 
+@tool(description="Get the next upcoming calendar event.")
+def get_next_event() -> str:
+    from datetime import datetime, timezone
+    from agents.calendar_store import get_calendar_store
+    events = get_calendar_store().list_events_json()
+    now = datetime.now(timezone.utc).isoformat()
+    upcoming = [e for e in events if e["dtstart"] >= now]
+    if not upcoming:
+        return "No upcoming events."
+    e = upcoming[0]
+    return f"Next event: '{e['title']}' on {e['dtstart'][:16].replace('T', ' ')} (uid: {e['uid'][:8]})"
+
+
 @tool(description="Delete a calendar event by its UID prefix (first 8 chars). Use list_calendar_events first.")
 def delete_calendar_event(uid: str) -> str:
     from agents.calendar_store import get_calendar_store
@@ -391,6 +404,19 @@ def scrape_url(url: str) -> str:
         return text[:2000] or "(no content)"
     except httpx.HTTPError as exc:
         return f"Fetch error: {exc}"
+
+
+@tool(description="Get current weather for a location. location can be a city name or 'here' for auto-detect.")
+def get_weather(location: str = "here") -> str:
+    import httpx
+    loc = "" if location.lower() in ("here", "my location", "") else location
+    url = f"https://wttr.in/{loc}?format=3&m"
+    try:
+        resp = httpx.get(url, timeout=10.0, headers={"User-Agent": "curl/7.68.0"})
+        resp.raise_for_status()
+        return resp.text.strip() or "Weather data unavailable."
+    except httpx.HTTPError as exc:
+        return f"Weather fetch failed: {exc}"
 
 
 @tool(description="Search the web for current information. Returns top results with title, snippet, and URL.")

@@ -53,6 +53,46 @@ def test_delete_calendar_event_found():
     assert "deleted" in result
 
 
+def test_get_next_event_returns_soonest():
+    from datetime import datetime, timezone, timedelta
+    future1 = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    future2 = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
+    mock_store = MagicMock()
+    mock_store.list_events_json.return_value = [
+        {"uid": "aaa-111", "title": "Doctor", "dtstart": future1, "dtend": future1},
+        {"uid": "bbb-222", "title": "Dentist", "dtstart": future2, "dtend": future2},
+    ]
+    with patch("agents.calendar_store.get_calendar_store", return_value=mock_store):
+        from modules.example_module import get_next_event
+        result = get_next_event()
+    assert "Doctor" in result
+    assert "aaa-111"[:8] in result
+
+
+def test_get_next_event_skips_past():
+    from datetime import datetime, timezone, timedelta
+    past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+    future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    mock_store = MagicMock()
+    mock_store.list_events_json.return_value = [
+        {"uid": "old-111", "title": "Past Event", "dtstart": past, "dtend": past},
+        {"uid": "new-222", "title": "Future Event", "dtstart": future, "dtend": future},
+    ]
+    with patch("agents.calendar_store.get_calendar_store", return_value=mock_store):
+        from modules.example_module import get_next_event
+        result = get_next_event()
+    assert "Future Event" in result
+
+
+def test_get_next_event_empty():
+    mock_store = MagicMock()
+    mock_store.list_events_json.return_value = []
+    with patch("agents.calendar_store.get_calendar_store", return_value=mock_store):
+        from modules.example_module import get_next_event
+        result = get_next_event()
+    assert "No upcoming" in result
+
+
 def test_delete_calendar_event_not_found():
     mock_store = MagicMock()
     mock_store.delete_event.return_value = False
