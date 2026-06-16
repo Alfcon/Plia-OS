@@ -346,6 +346,20 @@ async def list_notes():
     return [f for f in all_facts if f["key"].startswith("note_")]
 
 
+@router.post("/api/notes")
+async def create_note(request: Request):
+    from datetime import datetime, timezone
+    from agents.memory_store import get_memory_store
+    body = await request.json()
+    text = (body.get("text") or "").strip()
+    if not text:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="text required")
+    key = f"note_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+    await asyncio.to_thread(lambda: get_memory_store().remember(key, text))
+    return {"key": key, "value": text}
+
+
 @router.delete("/api/notes/{key}")
 async def delete_note(key: str):
     from agents.memory_store import get_memory_store
