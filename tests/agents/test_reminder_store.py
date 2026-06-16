@@ -62,6 +62,15 @@ def test_get_pending_returns_id_and_message(store):
     assert r["message"] == "Check oven"
 
 
+def test_init_db_idempotent_with_is_timer_column(store):
+    # second call must not raise even though is_timer column already exists
+    store._init_db()
+    store._init_db()
+    future = (_now() + timedelta(minutes=5)).isoformat()
+    store.add_reminder("sanity", future)
+    assert store.list_pending()[0]["message"] == "sanity"
+
+
 def test_list_pending_excludes_timers_by_default(store):
     future = (_now() + timedelta(minutes=5)).isoformat()
     store.add_reminder("Call dentist", future, is_timer=False)
