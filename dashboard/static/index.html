@@ -519,9 +519,25 @@
     }
   }
 
-  const ws = new WebSocket(`ws://${location.host}/ws`);
+  let _ws = null;
+  let _wsBackoff = 1000;
 
-  ws.onmessage = (ev) => {
+  function _connectWS() {
+    _ws = new WebSocket(`ws://${location.host}/ws`);
+    _ws.onopen = () => {
+      _wsBackoff = 1000;
+      document.getElementById('status-badge').style.opacity = '1';
+    };
+    _ws.onclose = () => {
+      document.getElementById('status-badge').style.opacity = '0.4';
+      setTimeout(_connectWS, _wsBackoff);
+      _wsBackoff = Math.min(_wsBackoff * 2, 30000);
+    };
+    _ws.onerror = () => _ws.close();
+    _ws.onmessage = _onWSMessage;
+  }
+
+  function _onWSMessage(ev) {
     const msg = JSON.parse(ev.data);
     if (msg.type === 'status') {
       document.getElementById('status-badge').textContent = msg.state;
@@ -571,7 +587,9 @@
     if (msg.type === 'vram_status') {
       updateVramBar(msg);
     }
-  };
+  }
+
+  _connectWS();
 
   function _appendMsg(role, text, scroll = true) {
     const div = document.createElement('div');
