@@ -41,7 +41,7 @@ UPLOADS_DIR.mkdir(exist_ok=True)
 router = APIRouter()
 _ws_clients: list[WebSocket] = []
 _recent_notifications: list[dict] = []  # replay buffer for clients that connect after startup
-_NOTIFICATION_REPLAY_TYPES: set[str] = set()
+_NOTIFICATION_REPLAY_TYPES: set[str] = {"status", "vram_status", "agent_routing"}
 _NOTIFICATION_REPLAY_MAX = 20
 
 STATIC_DIR = Path(__file__).parent / "static"
