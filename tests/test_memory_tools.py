@@ -44,6 +44,26 @@ def test_forget_memory_not_found():
     assert "unknown" in result
 
 
+def test_search_memories_returns_results():
+    mock_store = MagicMock()
+    mock_store.recall.return_value = ["user: my dog is named Rex", "I love hiking"]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.example_module import search_memories
+        result = search_memories("dog")
+    mock_store.recall.assert_called_once_with("dog")
+    assert "Rex" in result
+    assert "hiking" in result
+
+
+def test_search_memories_empty():
+    mock_store = MagicMock()
+    mock_store.recall.return_value = []
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.example_module import search_memories
+        result = search_memories("nothing")
+    assert "No relevant" in result
+
+
 def test_clear_conversation_clears_db_and_emits_event():
     mock_store = MagicMock()
     mock_emit = AsyncMock()

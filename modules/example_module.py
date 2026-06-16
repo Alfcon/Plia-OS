@@ -44,6 +44,15 @@ def list_memories() -> str:
     return "\n".join(lines)
 
 
+@tool(description="Search stored memories semantically. Use for 'what do you know about X?' or 'what did I tell you about Y?'")
+def search_memories(query: str) -> str:
+    from agents.memory_store import get_memory_store
+    results = get_memory_store().recall(query)
+    if not results:
+        return "No relevant memories found."
+    return "\n".join(results)
+
+
 @tool(description="Forget a stored memory fact by its exact key. Use list_memories first to get the key.")
 def forget_memory(key: str) -> str:
     from agents.memory_store import get_memory_store
