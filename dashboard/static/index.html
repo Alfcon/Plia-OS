@@ -27,6 +27,7 @@
     .msg.user { background: #1e3a5f; align-self: flex-end; }
     .msg.assistant { background: #1a1a1a; border: 1px solid #333; }
     .msg.tool { background: #1a2e1a; border: 1px solid #2e4d2e; font-size: 0.8rem; color: #a5d6a7; }
+    @keyframes pulse { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
     label { font-size: 0.8rem; color: #aaa; display: block; margin-bottom: 4px; }
     select, input[type=range], input[type=number], input[type=text], input[type=password] { width: 100%; background: #1a1a1a; color: #e0e0e0; border: 1px solid #333; border-radius: 4px; padding: 4px 6px; }
     input[type=file] { width: 100%; font-size: 0.75rem; color: #e0e0e0; }
@@ -524,6 +525,7 @@
       }
     }
     if (msg.type === 'transcript') {
+      if (msg.role === 'assistant') _clearThinking();
       _appendMsg(msg.role, msg.text);
     }
     if (msg.type === 'reminder_fired') {
@@ -577,12 +579,30 @@
       _appendMsg('system', '[History unavailable — could not load previous messages]', false);
     });
 
+  function _showThinking() {
+    const existing = document.getElementById('thinking-indicator');
+    if (existing) return;
+    const div = document.createElement('div');
+    div.id = 'thinking-indicator';
+    div.className = 'msg system';
+    div.textContent = '⋯';
+    div.style.cssText = 'animation:pulse 1.2s ease-in-out infinite;opacity:0.6;';
+    document.getElementById('conversation').appendChild(div);
+    div.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function _clearThinking() {
+    const el = document.getElementById('thinking-indicator');
+    if (el) el.remove();
+  }
+
   async function sendChat() {
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
     _appendMsg('user', text);
+    _showThinking();
     input.disabled = true;
     document.getElementById('chat-send-btn').disabled = true;
     try {
@@ -592,6 +612,7 @@
         body: JSON.stringify({ text }),
       });
     } finally {
+      _clearThinking();
       input.disabled = false;
       document.getElementById('chat-send-btn').disabled = false;
       input.focus();
