@@ -290,6 +290,45 @@ def search_web(query: str) -> str:
     return "\n\n".join(results)
 
 
+@tool(description="Set system audio volume. percent must be 0–100.")
+def set_volume(percent: int) -> str:
+    import subprocess
+    if not 0 <= percent <= 100:
+        return "Volume must be 0–100."
+    level = percent / 100
+    try:
+        subprocess.run(
+            ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{level:.2f}"],
+            check=True, capture_output=True, timeout=5,
+        )
+        return f"Volume set to {percent}%."
+    except FileNotFoundError:
+        return "wpctl not found. Install pipewire-tools."
+    except subprocess.CalledProcessError as exc:
+        return f"wpctl error: {exc.stderr.decode().strip()}"
+
+
+@tool(description="Get current system audio volume as a percentage.")
+def get_volume() -> str:
+    import subprocess
+    import re
+    try:
+        result = subprocess.run(
+            ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"],
+            check=True, capture_output=True, text=True, timeout=5,
+        )
+        match = re.search(r"[\d.]+", result.stdout)
+        if not match:
+            return "Could not parse volume."
+        percent = round(float(match.group()) * 100)
+        muted = "[MUTED]" in result.stdout
+        return f"Volume: {percent}%{' (muted)' if muted else ''}"
+    except FileNotFoundError:
+        return "wpctl not found. Install pipewire-tools."
+    except subprocess.CalledProcessError as exc:
+        return f"wpctl error: {exc.stderr.decode().strip()}"
+
+
 @tool(description="Get current system resource usage: CPU percent, RAM used/total, and disk used/total.")
 def get_system_info() -> str:
     import psutil
