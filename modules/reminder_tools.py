@@ -41,7 +41,7 @@ def set_timer(minutes: int = 0, seconds: int = 0, label: str = "") -> str:
         return "Specify at least 1 second."
     fire_at = datetime.now(timezone.utc) + timedelta(seconds=total)
     message = f"Timer done{': ' + label if label else ''}!"
-    get_memory_store().add_reminder(message, fire_at.isoformat())
+    get_memory_store().add_reminder(message, fire_at.isoformat(), is_timer=True)
     parts = []
     if minutes:
         parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")

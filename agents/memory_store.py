@@ -41,6 +41,10 @@ class MemoryStore:
                     done INTEGER NOT NULL DEFAULT 0
                 );
             """)
+            try:
+                conn.execute("ALTER TABLE reminders ADD COLUMN is_timer INTEGER NOT NULL DEFAULT 0")
+            except Exception:
+                pass
 
     def _init_chroma(self) -> None:
         try:
@@ -129,29 +133,34 @@ class MemoryStore:
                 logger.warning("ChromaDB clear failed; semantic recall disabled until restart", exc_info=True)
                 self._collection = None
 
-    def add_reminder(self, message: str, fire_at_iso: str) -> int:
+    def add_reminder(self, message: str, fire_at_iso: str, is_timer: bool = False) -> int:
         with self._conn() as conn:
             cur = conn.execute(
-                "INSERT INTO reminders (message, fire_at, done) VALUES (?, ?, 0)",
-                (message, fire_at_iso),
+                "INSERT INTO reminders (message, fire_at, done, is_timer) VALUES (?, ?, 0, ?)",
+                (message, fire_at_iso, int(is_timer)),
             )
             return cur.lastrowid
 
-    def list_pending(self) -> list[dict]:
+    def list_pending(self, timers_only: bool = False) -> list[dict]:
         with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT id, message, fire_at FROM reminders WHERE done=0 ORDER BY fire_at ASC",
-            ).fetchall()
-        return [{"id": r[0], "message": r[1], "fire_at": r[2]} for r in rows]
+            if timers_only:
+                rows = conn.execute(
+                    "SELECT id, message, fire_at, is_timer FROM reminders WHERE done=0 AND is_timer=1 ORDER BY fire_at ASC",
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT id, message, fire_at, is_timer FROM reminders WHERE done=0 AND is_timer=0 ORDER BY fire_at ASC",
+                ).fetchall()
+        return [{"id": r[0], "message": r[1], "fire_at": r[2], "is_timer": bool(r[3])} for r in rows]
 
     def get_pending(self) -> list[dict]:
         now_iso = datetime.now(timezone.utc).isoformat()
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT id, message, fire_at FROM reminders WHERE done=0 AND fire_at <= ?",
+                "SELECT id, message, fire_at, is_timer FROM reminders WHERE done=0 AND fire_at <= ?",
                 (now_iso,),
             ).fetchall()
-        return [{"id": r[0], "message": r[1], "fire_at": r[2]} for r in rows]
+        return [{"id": r[0], "message": r[1], "fire_at": r[2], "is_timer": bool(r[3])} for r in rows]
 
     def mark_reminder_done(self, reminder_id: int) -> None:
         with self._conn() as conn:

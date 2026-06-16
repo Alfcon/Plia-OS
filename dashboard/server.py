@@ -427,6 +427,19 @@ async def cancel_reminder(reminder_id: int):
     return {"status": "cancelled", "id": reminder_id}
 
 
+@router.get("/api/timers")
+async def list_timers():
+    from agents.memory_store import get_memory_store
+    return await asyncio.to_thread(lambda: get_memory_store().list_pending(timers_only=True))
+
+
+@router.delete("/api/timers/{timer_id}")
+async def cancel_timer(timer_id: int):
+    from agents.memory_store import get_memory_store
+    await asyncio.to_thread(get_memory_store().mark_reminder_done, timer_id)
+    return {"status": "cancelled", "id": timer_id}
+
+
 @router.get("/api/calendar/google/status")
 async def google_calendar_status():
     from agents.google_calendar import is_connected
