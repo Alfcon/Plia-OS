@@ -355,6 +355,18 @@ async def create_memory(request: Request):
     return {"key": key, "value": value}
 
 
+@router.put("/api/memory/{key}")
+async def update_memory(key: str, request: Request):
+    from agents.memory_store import get_memory_store
+    body = await request.json()
+    value = (body.get("value") or "").strip()
+    if not value:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="value required")
+    await asyncio.to_thread(lambda: get_memory_store().remember(key, value))
+    return {"key": key, "value": value}
+
+
 @router.delete("/api/memory/{key}")
 async def forget_memory(key: str):
     from agents.memory_store import get_memory_store

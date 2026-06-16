@@ -94,6 +94,62 @@ async def test_create_memory_empty_key_rejected(app):
 
 
 @pytest.mark.asyncio
+async def test_update_memory_stores_new_value(app):
+    mock_store = MagicMock()
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            r = await ac.put("/api/memory/user_name", json={"value": "Bob"})
+    assert r.status_code == 200
+    assert r.json() == {"key": "user_name", "value": "Bob"}
+    mock_store.remember.assert_called_once_with("user_name", "Bob")
+
+
+@pytest.mark.asyncio
+async def test_update_memory_empty_value_rejected(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        r = await ac.put("/api/memory/user_name", json={"value": ""})
+    assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_search_memory_empty_query_returns_all_non_notes(app):
+    mock_store = MagicMock()
+    mock_store.list_all.return_value = [
+        {"key": "user_name", "value": "Alice"},
+        {"key": "note_20260616_120000", "value": "buy milk"},
+    ]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            r = await ac.get("/api/memory/search?q=")
+    data = r.json()
+    assert len(data) == 1
+    assert data[0]["key"] == "user_name"
+
+
+@pytest.mark.asyncio
+async def test_search_memory_with_query_uses_recall(app):
+    mock_store = MagicMock()
+    mock_store.recall.return_value = ["user_name: Alice", "favorite_color: blue"]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            r = await ac.get("/api/memory/search?q=Alice")
+    data = r.json()
+    assert len(data) == 2
+    assert data[0]["value"] == "user_name: Alice"
+    mock_store.recall.assert_called_once_with("Alice")
+
+
+@pytest.mark.asyncio
+async def test_search_memory_no_results(app):
+    mock_store = MagicMock()
+    mock_store.recall.return_value = []
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            r = await ac.get("/api/memory/search?q=xyzzy")
+    assert r.json() == []
+
+
+@pytest.mark.asyncio
 async def test_list_memory_excludes_note_keys(app):
     mock_store = MagicMock()
     mock_store.list_all.return_value = [
