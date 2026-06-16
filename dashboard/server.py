@@ -395,6 +395,18 @@ async def create_note(request: Request):
     return {"key": key, "value": text}
 
 
+@router.put("/api/notes/{key}")
+async def update_note(key: str, request: Request):
+    from agents.memory_store import get_memory_store
+    body = await request.json()
+    text = (body.get("text") or "").strip()
+    if not text:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="text required")
+    await asyncio.to_thread(lambda: get_memory_store().remember(key, text))
+    return {"key": key, "value": text}
+
+
 @router.delete("/api/notes/{key}")
 async def delete_note(key: str):
     from agents.memory_store import get_memory_store
