@@ -655,6 +655,16 @@
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
   });
 
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const tag = document.activeElement.tagName;
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !document.activeElement.isContentEditable) {
+        e.preventDefault();
+        document.getElementById('chat-input').focus();
+      }
+    }
+  });
+
   function _updatePipelineUI(state) {
     const dot = document.getElementById('pipeline-state-dot');
     const label = document.getElementById('pipeline-state-label');
