@@ -290,6 +290,23 @@ def search_web(query: str) -> str:
     return "\n\n".join(results)
 
 
+@tool(description="Get current system resource usage: CPU percent, RAM used/total, and disk used/total.")
+def get_system_info() -> str:
+    import psutil
+    cpu = psutil.cpu_percent(interval=0.5)
+    ram = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+    ram_used = ram.used / 1024 ** 3
+    ram_total = ram.total / 1024 ** 3
+    disk_used = disk.used / 1024 ** 3
+    disk_total = disk.total / 1024 ** 3
+    return (
+        f"CPU: {cpu:.1f}%  "
+        f"RAM: {ram_used:.1f}/{ram_total:.1f} GB ({ram.percent:.1f}%)  "
+        f"Disk: {disk_used:.1f}/{disk_total:.1f} GB ({disk.percent:.1f}%)"
+    )
+
+
 @tool(description="Check if a model or application will fit on this system's GPU. "
       "Pass the model name and how much GPU VRAM it requires in gigabytes. "
       "Returns whether it fits and how much VRAM is available. "
