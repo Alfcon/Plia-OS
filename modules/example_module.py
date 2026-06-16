@@ -1,6 +1,30 @@
 from core.registry import tool
 
 
+@tool(description="Stop the voice pipeline (wake word, STT, TTS). Use when asked to 'go to sleep' or 'stop listening'.")
+def stop_voice_pipeline() -> str:
+    import asyncio
+    from core import pipeline_registry
+    task = pipeline_registry.get_task()
+    if task and not task.done():
+        asyncio.get_event_loop().call_soon_threadsafe(task.cancel)
+        return "Voice pipeline stopping."
+    return "Pipeline is not running."
+
+
+@tool(description="Start the voice pipeline. Use when asked to 'wake up' or 'start listening'.")
+def start_voice_pipeline() -> str:
+    import asyncio
+    from core import pipeline_registry
+    from core.pipeline_runner import start_pipeline as _start
+    task = pipeline_registry.get_task()
+    if task and not task.done():
+        return "Pipeline is already running."
+    new_task = asyncio.get_event_loop().create_task(_start())
+    pipeline_registry.set_task(new_task)
+    return "Voice pipeline starting."
+
+
 @tool(description="List all available tools with their descriptions. Use when asked 'what can you do?' or 'what tools do you have?'")
 def list_tools() -> str:
     from core.registry import get_tool_schemas
