@@ -25,3 +25,39 @@ def test_keyword_route_alert_me_routes_to_llm():
 
 def test_keyword_route_calendar_unaffected():
     assert _keyword_route("schedule a meeting for Monday") == "calendar"
+
+
+def test_keyword_route_set_a_timer():
+    assert _keyword_route("set a timer for 5 minutes") == "reminder"
+
+
+def test_keyword_route_start_a_timer():
+    assert _keyword_route("start a timer for pasta") == "reminder"
+
+
+def test_keyword_route_timer_for():
+    assert _keyword_route("timer for 10 minutes") == "reminder"
+
+
+def test_keyword_route_remember_this():
+    assert _keyword_route("remember this: my dog is named Rex") == "memory"
+
+
+def test_keyword_route_store_that():
+    assert _keyword_route("store that in memory") == "memory"
+
+
+def test_keyword_route_save_that():
+    assert _keyword_route("save that for later") == "memory"
+
+
+def test_keyword_route_read_this_article():
+    assert _keyword_route("read this article https://example.com") == "web"
+
+
+def test_keyword_route_what_does_this_page():
+    assert _keyword_route("what does this page say https://news.com") == "web"
+
+
+def test_keyword_route_summarize_url():
+    assert _keyword_route("summarize this url for me https://blog.com") == "web"

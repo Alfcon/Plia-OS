@@ -25,17 +25,23 @@ _TOOL_CALL_LIMIT = 10
 _CLASSIFY_SYSTEM = (
     "You are a router. Given the conversation, output exactly one word — "
     "the specialist to handle the request: memory, web, code, calendar, home, reminder. "
-    "Use 'reminder' when the user wants to be reminded of something at a future time. "
-    "If the request needs no specialist, output: respond."
+    "Use 'reminder' for reminders at a future time OR countdown timers. "
+    "Use 'home' only for Home Assistant device control (lights, switches, sensors). "
+    "Use 'respond' for volume/system queries, calculations, or anything answerable with tools directly."
 )
 
 _KEYWORD_ROUTES: dict[str, list[str]] = {
-    "memory": ["remember that", "don't forget", "make a note", "recall what", "what did i tell you", "store this", "memorize"],
-    "web": ["search for", "search the web", "look it up", "look up", "google ", "find online", "look online", "browse to", "visit http"],
+    "memory": ["remember that", "remember this", "don't forget", "make a note", "recall what",
+               "what did i tell you", "store this", "store that", "save that", "memorize",
+               "i want you to remember"],
+    "web": ["search for", "search the web", "look it up", "look up", "google ", "find online",
+            "look online", "browse to", "visit http", "read this article", "read the page",
+            "open this url", "summarize this url", "read http", "what does this page"],
     "code": ["run this code", "execute this", "run python", "run shell", "```python", "```sh", "run the code"],
     "calendar": ["add to calendar", "schedule a", "create an event", "calendar event", "add an appointment", "add event"],
     "home": ["turn on the", "turn off the", "lights on", "lights off", "home automation", "smart home"],
-    "reminder": ["set a reminder", "set reminder", "don't let me forget", "notify me when", "remind me to"],
+    "reminder": ["set a reminder", "set reminder", "don't let me forget", "notify me when", "remind me to",
+                 "set a timer", "set timer", "start a timer", "start timer", "timer for"],
 }
 
 
