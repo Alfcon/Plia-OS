@@ -31,7 +31,7 @@ def _stack(mem, disk, cpu, cpu_count, gpu_name=None, gpu_vram=0.0):
 def test_get_system_info_shows_cpu():
     mem, disk, cpu, cpu_count = _mock_psutil(cpu=55.2, cpu_count=4)
     with _stack(mem, disk, cpu, cpu_count):
-        from modules.example_module import get_system_info
+        from modules.system_tools import get_system_info
         result = get_system_info()
     assert "55.2%" in result
     assert "CPU" in result
@@ -41,7 +41,7 @@ def test_get_system_info_shows_cpu():
 def test_get_system_info_shows_ram():
     mem, disk, cpu, cpu_count = _mock_psutil(ram_used=8, ram_total=32, ram_percent=25.0)
     with _stack(mem, disk, cpu, cpu_count):
-        from modules.example_module import get_system_info
+        from modules.system_tools import get_system_info
         result = get_system_info()
     assert "8.0/32.0 GB" in result
     assert "RAM" in result
@@ -50,7 +50,7 @@ def test_get_system_info_shows_ram():
 def test_get_system_info_shows_disk():
     mem, disk, cpu, cpu_count = _mock_psutil(disk_used=200, disk_total=1000, disk_percent=20.0)
     with _stack(mem, disk, cpu, cpu_count):
-        from modules.example_module import get_system_info
+        from modules.system_tools import get_system_info
         result = get_system_info()
     assert "200.0/1000.0 GB" in result
     assert "Disk" in result
@@ -59,7 +59,7 @@ def test_get_system_info_shows_disk():
 def test_get_system_info_shows_gpu_when_present():
     mem, disk, cpu, cpu_count = _mock_psutil()
     with _stack(mem, disk, cpu, cpu_count, gpu_name="RTX 3080", gpu_vram=10.0):
-        from modules.example_module import get_system_info
+        from modules.system_tools import get_system_info
         result = get_system_info()
     assert "RTX 3080" in result
     assert "10.0 GB VRAM" in result
@@ -68,13 +68,13 @@ def test_get_system_info_shows_gpu_when_present():
 def test_get_system_info_omits_gpu_when_absent():
     mem, disk, cpu, cpu_count = _mock_psutil()
     with _stack(mem, disk, cpu, cpu_count, gpu_name=None, gpu_vram=0.0):
-        from modules.example_module import get_system_info
+        from modules.system_tools import get_system_info
         result = get_system_info()
     assert "GPU" not in result
 
 
 def test_get_system_info_integration():
-    from modules.example_module import get_system_info
+    from modules.system_tools import get_system_info
     result = get_system_info()
     assert "CPU" in result
     assert "RAM" in result

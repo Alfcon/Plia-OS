@@ -1,4 +1,5 @@
-from modules.example_module import get_time, set_reminder
+from modules.utility_tools import get_time
+from modules.reminder_tools import set_reminder
 
 
 def test_get_time_returns_hhmm():
