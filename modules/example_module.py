@@ -34,6 +34,13 @@ def delete_reminder(reminder_id: int) -> str:
     return f"Reminder {reminder_id} deleted."
 
 
+@tool(description="Save a fact to memory with a key and value. Use for user preferences, names, important details to remember long-term.")
+def save_memory(key: str, value: str) -> str:
+    from agents.memory_store import get_memory_store
+    get_memory_store().remember(key, value)
+    return f"Remembered: {key} = {value}"
+
+
 @tool(description="List all stored memory facts as key-value pairs")
 def list_memories() -> str:
     from agents.memory_store import get_memory_store
