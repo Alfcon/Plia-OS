@@ -391,6 +391,11 @@
             <span style="font-size:0.78rem;color:#aaa;">Stored memories</span>
           </div>
           <div style="display:flex;gap:4px;margin-bottom:4px;">
+            <input id="mem-search" type="text" placeholder="Search memories…"
+              style="flex:1;background:#111;border:1px solid #333;color:#eee;padding:4px 6px;border-radius:3px;font-size:0.75rem;"
+              oninput="searchMemory(this.value)">
+          </div>
+          <div style="display:flex;gap:4px;margin-bottom:4px;">
             <input id="mem-key-input" type="text" placeholder="Key"
               style="flex:1;background:#111;border:1px solid #333;color:#eee;padding:4px 6px;border-radius:3px;font-size:0.75rem;">
             <input id="mem-val-input" type="text" placeholder="Value"
@@ -915,6 +920,24 @@
       input.value = '';
       loadMemory();
     } catch(e) {}
+  }
+
+  let _memSearchTimer = null;
+  function searchMemory(q) {
+    clearTimeout(_memSearchTimer);
+    _memSearchTimer = setTimeout(async () => {
+      const list = document.getElementById('memory-list');
+      try {
+        const r = await fetch('/api/memory/search?q=' + encodeURIComponent(q));
+        const items = await r.json();
+        list.innerHTML = !items.length
+          ? '<li style="color:#555;font-size:0.75rem;">No results</li>'
+          : items.map(m => `<li style="padding:4px 0;border-bottom:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+              <span style="word-break:break-word;">${m.key ? `<strong style="color:#e0e0e0;">${_esc(m.key)}</strong><br>` : ''}<span style="color:#888;">${_esc(m.value)}</span></span>
+              ${m.key ? `<button onclick="deleteMemory(this.dataset.key)" data-key="${_esc(m.key)}" style="background:none;border:none;color:#ef9a9a;font-size:0.9rem;cursor:pointer;padding:2px 6px;flex-shrink:0;" title="Forget">✕</button>` : ''}
+            </li>`).join('');
+      } catch(e) {}
+    }, 300);
   }
 
   async function addMemory() {

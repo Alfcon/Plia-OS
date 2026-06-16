@@ -332,6 +332,16 @@ async def list_memory():
     return [f for f in all_facts if not f["key"].startswith("note_")]
 
 
+@router.get("/api/memory/search")
+async def search_memory(q: str = ""):
+    from agents.memory_store import get_memory_store
+    if not q.strip():
+        all_facts = await asyncio.to_thread(lambda: get_memory_store().list_all())
+        return [f for f in all_facts if not f["key"].startswith("note_")]
+    results = await asyncio.to_thread(lambda: get_memory_store().recall(q))
+    return [{"key": "", "value": r} for r in results]
+
+
 @router.post("/api/memory")
 async def create_memory(request: Request):
     from agents.memory_store import get_memory_store
