@@ -1,6 +1,16 @@
 from core.registry import tool
 
 
+@tool(description="List all available tools with their descriptions. Use when asked 'what can you do?' or 'what tools do you have?'")
+def list_tools() -> str:
+    from core.registry import get_tool_schemas
+    schemas = get_tool_schemas()
+    if not schemas:
+        return "No tools registered."
+    lines = [f"- {s['function']['name']}: {s['function'].get('description', '')}" for s in schemas]
+    return f"{len(lines)} tools available:\n" + "\n".join(lines)
+
+
 @tool(description="Get the current time in HH:MM format")
 def get_time() -> str:
     from datetime import datetime
@@ -372,21 +382,30 @@ def get_volume() -> str:
         return f"wpctl error: {exc.stderr.decode().strip()}"
 
 
-@tool(description="Get current system resource usage: CPU percent, RAM used/total, and disk used/total.")
+@tool(description="Get current system resource usage: CPU, RAM, disk, and GPU info.")
 def get_system_info() -> str:
+    import platform
     import psutil
+    from core.system_fit import get_gpu_name, get_gpu_vram_gb
     cpu = psutil.cpu_percent(interval=0.5)
+    cpu_count = psutil.cpu_count(logical=True)
     ram = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
     ram_used = ram.used / 1024 ** 3
     ram_total = ram.total / 1024 ** 3
     disk_used = disk.used / 1024 ** 3
     disk_total = disk.total / 1024 ** 3
-    return (
-        f"CPU: {cpu:.1f}%  "
-        f"RAM: {ram_used:.1f}/{ram_total:.1f} GB ({ram.percent:.1f}%)  "
-        f"Disk: {disk_used:.1f}/{disk_total:.1f} GB ({disk.percent:.1f}%)"
-    )
+    lines = [
+        f"OS: {platform.system()}",
+        f"CPU: {cpu:.1f}% ({cpu_count} cores)",
+        f"RAM: {ram_used:.1f}/{ram_total:.1f} GB ({ram.percent:.1f}%)",
+        f"Disk: {disk_used:.1f}/{disk_total:.1f} GB ({disk.percent:.1f}%)",
+    ]
+    gpu = get_gpu_name()
+    vram = get_gpu_vram_gb()
+    if gpu:
+        lines.append(f"GPU: {gpu} ({vram:.1f} GB VRAM)")
+    return "  ".join(lines)
 
 
 @tool(description="Show current GPU VRAM usage and which models are loaded on the GPU.")
