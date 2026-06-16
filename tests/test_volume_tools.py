@@ -61,3 +61,30 @@ def test_get_volume_wpctl_not_found():
         from modules.example_module import get_volume
         result = get_volume()
     assert "not found" in result.lower()
+
+
+def test_mute_audio_calls_wpctl():
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        from modules.example_module import mute_audio
+        result = mute_audio()
+    args = mock_run.call_args[0][0]
+    assert args == ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "1"]
+    assert "muted" in result.lower()
+
+
+def test_unmute_audio_calls_wpctl():
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        from modules.example_module import unmute_audio
+        result = unmute_audio()
+    args = mock_run.call_args[0][0]
+    assert args == ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0"]
+    assert "unmuted" in result.lower()
+
+
+def test_mute_audio_wpctl_not_found():
+    with patch("subprocess.run", side_effect=FileNotFoundError):
+        from modules.example_module import mute_audio
+        result = mute_audio()
+    assert "not found" in result.lower()

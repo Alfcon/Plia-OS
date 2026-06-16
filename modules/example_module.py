@@ -49,6 +49,15 @@ def save_memory(key: str, value: str) -> str:
     return f"Remembered: {key} = {value}"
 
 
+@tool(description="Look up a single stored memory fact by its exact key.")
+def get_fact(key: str) -> str:
+    from agents.memory_store import get_memory_store
+    value = get_memory_store().get_fact(key)
+    if value is None:
+        return f"No memory found for key '{key}'."
+    return f"{key}: {value}"
+
+
 @tool(description="List all stored memory facts as key-value pairs")
 def list_memories() -> str:
     from agents.memory_store import get_memory_store
@@ -296,6 +305,32 @@ def search_web(query: str) -> str:
     if not results:
         return "No results found."
     return "\n\n".join(results)
+
+
+@tool(description="Mute system audio output.")
+def mute_audio() -> str:
+    import subprocess
+    try:
+        subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "1"],
+                       check=True, capture_output=True, timeout=5)
+        return "Audio muted."
+    except FileNotFoundError:
+        return "wpctl not found. Install pipewire-tools."
+    except subprocess.CalledProcessError as exc:
+        return f"wpctl error: {exc.stderr.decode().strip()}"
+
+
+@tool(description="Unmute system audio output.")
+def unmute_audio() -> str:
+    import subprocess
+    try:
+        subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0"],
+                       check=True, capture_output=True, timeout=5)
+        return "Audio unmuted."
+    except FileNotFoundError:
+        return "wpctl not found. Install pipewire-tools."
+    except subprocess.CalledProcessError as exc:
+        return f"wpctl error: {exc.stderr.decode().strip()}"
 
 
 @tool(description="Set system audio volume. percent must be 0–100.")

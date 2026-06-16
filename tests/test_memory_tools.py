@@ -15,6 +15,26 @@ def test_announce_emits_speak_event():
     assert mock_emit.call_args.args[1]["message"] == "dinner is ready"
 
 
+def test_get_fact_returns_value():
+    mock_store = MagicMock()
+    mock_store.get_fact.return_value = "Alice"
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.example_module import get_fact
+        result = get_fact("name")
+    assert "name" in result
+    assert "Alice" in result
+
+
+def test_get_fact_not_found():
+    mock_store = MagicMock()
+    mock_store.get_fact.return_value = None
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.example_module import get_fact
+        result = get_fact("unknown")
+    assert "unknown" in result
+    assert "No memory" in result
+
+
 def test_save_memory_stores_fact():
     mock_store = MagicMock()
     with patch("agents.memory_store.get_memory_store", return_value=mock_store):
