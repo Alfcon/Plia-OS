@@ -759,23 +759,42 @@
       startVramPolling();
     });
 
+  let _reminderCountdownInterval = null;
+  let _reminderData = [];
+
+  function _fmtCountdown(fireAt) {
+    const secs = Math.max(0, Math.round((new Date(fireAt) - Date.now()) / 1000));
+    if (secs === 0) return 'now';
+    const m = Math.floor(secs / 60), s = secs % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }
+
+  function _renderReminderCountdowns() {
+    _reminderData.forEach(r => {
+      const el = document.getElementById(`r-cd-${r.id}`);
+      if (el) el.textContent = _fmtCountdown(r.fire_at);
+    });
+  }
+
   async function loadReminders() {
     const ul = document.getElementById('reminder-list');
     if (!ul) return;
+    clearInterval(_reminderCountdownInterval);
     try {
-      const rows = await fetch('/api/reminders').then(r => r.json());
-      if (!rows.length) {
+      _reminderData = await fetch('/api/reminders').then(r => r.json());
+      if (!_reminderData.length) {
         ul.innerHTML = '<li style="color:#555;font-style:italic;">No pending reminders</li>';
         return;
       }
-      ul.innerHTML = rows.map(r => {
-        const when = new Date(r.fire_at).toLocaleString();
+      ul.innerHTML = _reminderData.map(r => {
+        const isTimer = r.message.startsWith('Timer');
         return `<li style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #1e1e1e;">
           <span style="flex:1;margin-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.message)}">${_esc(r.message)}</span>
-          <span style="color:#888;font-size:0.72rem;white-space:nowrap;margin-right:6px;">${when}</span>
+          <span id="r-cd-${r.id}" style="color:${isTimer ? '#4fc3f7' : '#888'};font-size:0.72rem;white-space:nowrap;margin-right:6px;font-variant-numeric:tabular-nums;">${_fmtCountdown(r.fire_at)}</span>
           <button onclick="cancelReminder(${r.id})" style="background:none;border:1px solid #555;border-radius:3px;color:#ef9a9a;font-size:0.72rem;padding:1px 5px;cursor:pointer;">✕</button>
         </li>`;
       }).join('');
+      _reminderCountdownInterval = setInterval(_renderReminderCountdowns, 1000);
     } catch(e) {
       ul.innerHTML = '<li style="color:#ef9a9a;">Failed to load</li>';
     }
@@ -1770,6 +1789,7 @@
     document.querySelector(`.m-nav-btn[data-section="${name}"]`).classList.add('active');
     document.querySelectorAll('.m-pane').forEach(p => p.style.display = 'none');
     document.getElementById(`m-section-${name}`).style.display = 'block';
+    if (name !== 'reminders') clearInterval(_reminderCountdownInterval);
   }
 
   function _syncMenuInputs() {
