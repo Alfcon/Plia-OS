@@ -95,6 +95,18 @@ def list_notes() -> str:
     return "\n".join(f"- {n['value']}" for n in notes)
 
 
+@tool(description="Delete a specific note by matching text. Deletes the first note containing the given text.")
+def delete_note(text: str) -> str:
+    from agents.memory_store import get_memory_store
+    store = get_memory_store()
+    notes = [f for f in store.list_all() if f["key"].startswith("note_")]
+    match = next((n for n in notes if text.lower() in n["value"].lower()), None)
+    if not match:
+        return f"No note found matching '{text}'."
+    store.forget(match["key"])
+    return f"Deleted note: {match['value']}"
+
+
 @tool(description="Delete all saved notes.")
 def clear_notes() -> str:
     from agents.memory_store import get_memory_store
@@ -299,6 +311,31 @@ def get_entity_state(entity_id: str) -> str:
         resp.raise_for_status()
         data = resp.json()
         return f"{entity_id}: {data.get('state', 'unknown')}"
+    except httpx.HTTPError as exc:
+        return f"HA request failed: {exc}"
+
+
+@tool(description="Set the brightness of a light. brightness_pct must be 0–100. entity_id example: 'light.living_room'.")
+def set_brightness(entity_id: str, brightness_pct: int) -> str:
+    import httpx
+    url, token, err = _ha_config()
+    if err:
+        return err
+    if not 0 <= brightness_pct <= 100:
+        return "brightness_pct must be 0–100."
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    brightness = round(brightness_pct * 255 / 100)
+    try:
+        resp = httpx.post(
+            f"{url}/api/services/light/turn_on",
+            headers=headers,
+            json={"entity_id": entity_id, "brightness": brightness},
+            timeout=10.0,
+        )
+        if resp.status_code == 404:
+            return f"Entity not found: {entity_id!r}"
+        resp.raise_for_status()
+        return f"Set {entity_id} to {brightness_pct}% brightness."
     except httpx.HTTPError as exc:
         return f"HA request failed: {exc}"
 
