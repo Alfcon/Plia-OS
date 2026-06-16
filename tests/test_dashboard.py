@@ -81,6 +81,33 @@ async def test_post_config_unknown_key_returns_422(app):
     assert resp.status_code == 422
 
 
+async def test_post_config_invalid_literal_tts_engine_returns_422(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/config", json={"tts_engine": "invalid_engine"})
+    assert resp.status_code == 422
+
+
+async def test_post_config_valid_literal_tts_engine_accepted(app):
+    for engine in ("kokoro", "chatterbox", "dramabox"):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post("/api/config", json={"tts_engine": engine})
+        assert resp.status_code == 200, f"expected 200 for tts_engine={engine!r}"
+        assert resp.json()["tts_engine"] == engine
+
+
+async def test_post_config_invalid_stt_model_size_returns_422(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/config", json={"stt_model_size": "huge"})
+    assert resp.status_code == 422
+
+
+async def test_post_config_system_prompt_backup_silently_ignored(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/config", json={"system_prompt_backup": "injected"})
+    assert resp.status_code == 200
+    assert resp.json().get("system_prompt_backup", "") == ""
+
+
 async def test_start_recording_returns_200(app):
     with patch("dashboard.server.sd", _make_mock_sd()):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
