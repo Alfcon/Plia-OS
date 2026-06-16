@@ -60,3 +60,33 @@ def test_get_pending_returns_id_and_message(store):
     r = pending[0]
     assert "id" in r and "message" in r
     assert r["message"] == "Check oven"
+
+
+def test_list_pending_excludes_timers_by_default(store):
+    future = (_now() + timedelta(minutes=5)).isoformat()
+    store.add_reminder("Call dentist", future, is_timer=False)
+    store.add_reminder("Timer done!", future, is_timer=True)
+    reminders = store.list_pending()
+    assert len(reminders) == 1
+    assert reminders[0]["message"] == "Call dentist"
+    assert reminders[0]["is_timer"] is False
+
+
+def test_list_pending_timers_only(store):
+    future = (_now() + timedelta(minutes=5)).isoformat()
+    store.add_reminder("Call dentist", future, is_timer=False)
+    store.add_reminder("Timer done!", future, is_timer=True)
+    timers = store.list_pending(timers_only=True)
+    assert len(timers) == 1
+    assert timers[0]["message"] == "Timer done!"
+    assert timers[0]["is_timer"] is True
+
+
+def test_is_timer_flag_stored_correctly(store):
+    future = (_now() + timedelta(minutes=5)).isoformat()
+    store.add_reminder("reminder", future, is_timer=False)
+    store.add_reminder("timer", future, is_timer=True)
+    with store._conn() as conn:
+        rows = conn.execute("SELECT message, is_timer FROM reminders ORDER BY id").fetchall()
+    assert rows[0] == ("reminder", 0)
+    assert rows[1] == ("timer", 1)

@@ -151,12 +151,13 @@ def test_list_timers_excludes_non_timer_reminders():
     from datetime import datetime, timezone, timedelta
     future = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
     mock_store = MagicMock()
+    # list_pending(timers_only=True) returns only timers
     mock_store.list_pending.return_value = [
-        {"id": 1, "message": "Call John", "fire_at": future},
-        {"id": 2, "message": "Timer done!", "fire_at": future},
+        {"id": 2, "message": "Timer done!", "fire_at": future, "is_timer": True},
     ]
     with patch("agents.memory_store.get_memory_store", return_value=mock_store):
         from modules.reminder_tools import list_timers
         result = list_timers()
+    mock_store.list_pending.assert_called_once_with(timers_only=True)
     assert "Call John" not in result
     assert "[2]" in result

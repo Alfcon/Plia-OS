@@ -55,8 +55,7 @@ def set_timer(minutes: int = 0, seconds: int = 0, label: str = "") -> str:
 def list_timers() -> str:
     from datetime import datetime, timezone
     from agents.memory_store import get_memory_store
-    reminders = get_memory_store().list_pending()
-    timers = [r for r in reminders if r["message"].startswith("Timer")]
+    timers = get_memory_store().list_pending(timers_only=True)
     if not timers:
         return "No active timers."
     now = datetime.now(timezone.utc)
@@ -74,7 +73,7 @@ def list_timers() -> str:
 def cancel_timer(label: str = "") -> str:
     from agents.memory_store import get_memory_store
     store = get_memory_store()
-    timers = [r for r in store.list_pending() if r["message"].startswith("Timer")]
+    timers = store.list_pending(timers_only=True)
     if not timers:
         return "No active timers."
     if label:
