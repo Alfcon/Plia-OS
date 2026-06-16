@@ -76,6 +76,37 @@ def announce(message: str) -> str:
     return f"Announcing: {message}"
 
 
+@tool(description="Add a quick note. Unlike save_memory, no key needed — just the text to remember.")
+def add_note(text: str) -> str:
+    from datetime import datetime, timezone
+    from agents.memory_store import get_memory_store
+    key = f"note_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+    get_memory_store().remember(key, text)
+    return f"Note saved: {text}"
+
+
+@tool(description="List all saved notes.")
+def list_notes() -> str:
+    from agents.memory_store import get_memory_store
+    facts = get_memory_store().list_all()
+    notes = [f for f in facts if f["key"].startswith("note_")]
+    if not notes:
+        return "No notes saved."
+    return "\n".join(f"- {n['value']}" for n in notes)
+
+
+@tool(description="Delete all saved notes.")
+def clear_notes() -> str:
+    from agents.memory_store import get_memory_store
+    store = get_memory_store()
+    notes = [f for f in store.list_all() if f["key"].startswith("note_")]
+    if not notes:
+        return "No notes to clear."
+    for n in notes:
+        store.forget(n["key"])
+    return f"Cleared {len(notes)} note{'s' if len(notes) != 1 else ''}."
+
+
 @tool(description="Save a fact to memory with a key and value. Use for user preferences, names, important details to remember long-term.")
 def save_memory(key: str, value: str) -> str:
     from agents.memory_store import get_memory_store
