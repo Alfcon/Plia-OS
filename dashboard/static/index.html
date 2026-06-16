@@ -512,6 +512,7 @@
     }
     if (msg.type === 'wake') {
       document.getElementById('status-badge').textContent = 'listening';
+      _appendMsg('system', '⚡ Wake word detected');
     }
     if (msg.type === 'agent_routing') {
       document.querySelectorAll('.agent-badge').forEach(b => b.classList.remove('active'));
