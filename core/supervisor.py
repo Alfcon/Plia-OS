@@ -31,7 +31,7 @@ _CLASSIFY_SYSTEM = (
 )
 
 _KEYWORD_ROUTES: dict[str, list[str]] = {
-    "memory": ["remember that", "remember this", "don't forget", "make a note", "recall what",
+    "memory": ["remember that", "remember this", "recall what",
                "what did i tell you", "store this", "store that", "save that", "memorize",
                "i want you to remember"],
     "web": ["search for", "search the web", "look it up", "look up", "google ", "find online",
@@ -43,7 +43,10 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
     "reminder": ["set a reminder", "set reminder", "don't let me forget", "notify me when", "remind me to"],
     "respond": ["set a timer", "set timer", "start a timer", "start timer", "timer for",
                 "set the volume", "volume up", "volume down", "mute", "unmute",
-                "system info", "how much ram", "cpu usage", "disk space"],
+                "system info", "how much ram", "cpu usage", "disk space",
+                "make a note", "don't forget", "add a note", "my notes", "list notes",
+                "show notes", "delete note", "clear notes",
+                "dim the", "set brightness", "set the brightness", "lights to "],
 }
 
 

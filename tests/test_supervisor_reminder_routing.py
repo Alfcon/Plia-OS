@@ -51,6 +51,26 @@ def test_keyword_route_system_info_goes_to_respond():
     assert _keyword_route("how much ram am I using") == "respond"
 
 
+def test_keyword_route_make_a_note_goes_to_respond():
+    assert _keyword_route("make a note: buy groceries") == "respond"
+
+
+def test_keyword_route_dont_forget_goes_to_respond():
+    assert _keyword_route("don't forget to call mom") == "respond"
+
+
+def test_keyword_route_list_notes_goes_to_respond():
+    assert _keyword_route("show my notes") == "respond"
+
+
+def test_keyword_route_dim_lights_goes_to_respond():
+    assert _keyword_route("dim the living room lights") == "respond"
+
+
+def test_keyword_route_set_brightness_goes_to_respond():
+    assert _keyword_route("set brightness to 50%") == "respond"
+
+
 def test_keyword_route_remember_this():
     assert _keyword_route("remember this: my dog is named Rex") == "memory"
 
