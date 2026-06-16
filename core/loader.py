@@ -1,6 +1,7 @@
 import importlib.util
 import logging
 from pathlib import Path
+from core.registry import set_loading_module
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,10 @@ def load_modules(directory: Path | None = None) -> None:
         if spec is None or spec.loader is None:
             continue
         module = importlib.util.module_from_spec(spec)
+        set_loading_module(path.stem)
         try:
             spec.loader.exec_module(module)
         except Exception:
             logger.warning("Failed to load module %s", path.name, exc_info=True)
+        finally:
+            set_loading_module("")

@@ -79,6 +79,9 @@ class PliaConfig:
     gcal_credentials_file: str = ""  # path to OAuth 2.0 client_secret.json from Google Cloud Console
     gcal_calendar_id: str = "primary"
 
+    # Module manager
+    disabled_modules: list = field(default_factory=list)
+
 
 _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
     "tts_engine": ("kokoro", "chatterbox", "dramabox"),

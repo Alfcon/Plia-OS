@@ -115,6 +115,35 @@ async def get_tools():
     return registry.list_tools()
 
 
+@router.get("/api/modules")
+async def list_modules():
+    from core.config import get_config
+    disabled = set(get_config().disabled_modules)
+    modules = registry.list_modules()
+    return [
+        {"name": name, "tools": tools, "enabled": name not in disabled}
+        for name, tools in sorted(modules.items())
+    ]
+
+
+@router.post("/api/modules/{name}/enable")
+async def enable_module(name: str):
+    cfg = get_config()
+    disabled = [m for m in cfg.disabled_modules if m != name]
+    update_config(disabled_modules=disabled)
+    return {"name": name, "enabled": True}
+
+
+@router.post("/api/modules/{name}/disable")
+async def disable_module(name: str):
+    cfg = get_config()
+    disabled = cfg.disabled_modules
+    if name not in disabled:
+        disabled = disabled + [name]
+    update_config(disabled_modules=disabled)
+    return {"name": name, "enabled": False}
+
+
 @router.get("/api/config")
 async def get_config_route():
     return dataclasses.asdict(get_config())
