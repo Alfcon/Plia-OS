@@ -146,3 +146,27 @@ async def test_studio_pause_mode_cpu_stt_does_not_skip():
         await pipeline._process_loop(audio_q, max_iterations=1)
 
     pipeline._wake.detect.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_on_event_speak_queues_message():
+    pipeline = VoicePipeline()
+    await pipeline._on_event({"type": "speak", "message": "Hello world"})
+    assert not pipeline._announcement_queue.empty()
+    assert pipeline._announcement_queue.get_nowait() == "Hello world"
+
+
+@pytest.mark.asyncio
+async def test_on_event_speak_empty_message_ignored():
+    pipeline = VoicePipeline()
+    await pipeline._on_event({"type": "speak", "message": ""})
+    assert pipeline._announcement_queue.empty()
+
+
+@pytest.mark.asyncio
+async def test_on_event_speak_queue_full_does_not_raise():
+    pipeline = VoicePipeline()
+    for _ in range(50):  # maxsize=50
+        pipeline._announcement_queue.put_nowait("x")
+    await pipeline._on_event({"type": "speak", "message": "overflow"})
+    # No exception raised

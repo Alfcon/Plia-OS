@@ -2,6 +2,19 @@ import asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
 
 
+def test_announce_emits_speak_event():
+    mock_emit = AsyncMock()
+    async def _run():
+        from modules.example_module import announce
+        with patch("core.events.emit", mock_emit):
+            return announce("dinner is ready")
+    result = asyncio.run(_run())
+    assert "dinner is ready" in result
+    mock_emit.assert_awaited_once()
+    assert mock_emit.call_args.args[0] == "speak"
+    assert mock_emit.call_args.args[1]["message"] == "dinner is ready"
+
+
 def test_save_memory_stores_fact():
     mock_store = MagicMock()
     with patch("agents.memory_store.get_memory_store", return_value=mock_store):

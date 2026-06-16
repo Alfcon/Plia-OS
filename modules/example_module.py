@@ -34,6 +34,14 @@ def delete_reminder(reminder_id: int) -> str:
     return f"Reminder {reminder_id} deleted."
 
 
+@tool(description="Speak a message aloud via the voice pipeline TTS. Use to announce something without waiting for user input.")
+def announce(message: str) -> str:
+    import asyncio
+    from core import events
+    asyncio.get_event_loop().create_task(events.emit("speak", {"message": message}))
+    return f"Announcing: {message}"
+
+
 @tool(description="Save a fact to memory with a key and value. Use for user preferences, names, important details to remember long-term.")
 def save_memory(key: str, value: str) -> str:
     from agents.memory_store import get_memory_store
