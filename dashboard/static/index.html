@@ -377,8 +377,13 @@
         </div>
         <div id="m-section-memory" class="m-pane" style="display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-            <span style="font-size:0.78rem;color:#aaa;">Stored memories</span>
+            <span style="font-size:0.78rem;color:#aaa;">Notes</span>
             <button onclick="loadMemory()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
+          </div>
+          <p style="font-size:0.72rem;color:#555;margin:0 0 6px;">Quick notes. Say "add a note: …" to add.</p>
+          <ul id="notes-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0 0 14px;"></ul>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:0.78rem;color:#aaa;">Stored memories</span>
           </div>
           <p style="font-size:0.72rem;color:#555;margin:0 0 8px;">Facts Plia learned from conversation. Say "remember that…" to add.</p>
           <ul id="memory-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
@@ -850,23 +855,38 @@
   }
 
   async function loadMemory() {
-    const list = document.getElementById('memory-list');
-    list.innerHTML = '<li style="color:#555;font-size:0.75rem;">Loading...</li>';
+    const notesList = document.getElementById('notes-list');
+    const memList = document.getElementById('memory-list');
+    notesList.innerHTML = '<li style="color:#555;font-size:0.75rem;">Loading...</li>';
+    memList.innerHTML = '<li style="color:#555;font-size:0.75rem;">Loading...</li>';
     try {
-      const r = await fetch('/api/memory');
-      if (!r.ok) throw new Error(r.status);
-      const items = await r.json();
-      if (!Array.isArray(items) || items.length === 0) {
-        list.innerHTML = '<li style="color:#555;font-size:0.75rem;">No memories stored</li>';
-        return;
-      }
-      list.innerHTML = items.map(m => `<li style="padding:4px 0;border-bottom:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
-        <span style="word-break:break-word;"><strong style="color:#e0e0e0;">${_esc(m.key)}</strong><br><span style="color:#888;">${_esc(m.value)}</span></span>
-        <button onclick="deleteMemory(this.dataset.key)" data-key="${_esc(m.key)}" style="background:none;border:none;color:#ef9a9a;font-size:0.9rem;cursor:pointer;padding:2px 6px;flex-shrink:0;" title="Forget">✕</button>
-      </li>`).join('');
+      const [notes, mems] = await Promise.all([
+        fetch('/api/notes').then(r => r.json()),
+        fetch('/api/memory').then(r => r.json()),
+      ]);
+      notesList.innerHTML = !notes.length
+        ? '<li style="color:#555;font-size:0.75rem;">No notes</li>'
+        : notes.map(n => `<li style="padding:4px 0;border-bottom:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:center;gap:6px;">
+          <span style="color:#e0e0e0;word-break:break-word;">${_esc(n.value)}</span>
+          <button onclick="deleteNote(this.dataset.key)" data-key="${_esc(n.key)}" style="background:none;border:none;color:#ef9a9a;font-size:0.9rem;cursor:pointer;padding:2px 6px;flex-shrink:0;" title="Delete">✕</button>
+        </li>`).join('');
+      memList.innerHTML = !mems.length
+        ? '<li style="color:#555;font-size:0.75rem;">No memories stored</li>'
+        : mems.map(m => `<li style="padding:4px 0;border-bottom:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+          <span style="word-break:break-word;"><strong style="color:#e0e0e0;">${_esc(m.key)}</strong><br><span style="color:#888;">${_esc(m.value)}</span></span>
+          <button onclick="deleteMemory(this.dataset.key)" data-key="${_esc(m.key)}" style="background:none;border:none;color:#ef9a9a;font-size:0.9rem;cursor:pointer;padding:2px 6px;flex-shrink:0;" title="Forget">✕</button>
+        </li>`).join('');
     } catch(e) {
-      list.innerHTML = '<li style="color:#ef9a9a;font-size:0.75rem;">Failed to load</li>';
+      notesList.innerHTML = '<li style="color:#ef9a9a;font-size:0.75rem;">Failed to load</li>';
+      memList.innerHTML = '';
     }
+  }
+
+  async function deleteNote(key) {
+    try {
+      await fetch('/api/notes/' + encodeURIComponent(key), {method: 'DELETE'});
+      loadMemory();
+    } catch(e) {}
   }
 
   async function deleteMemory(key) {

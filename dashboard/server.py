@@ -328,11 +328,26 @@ async def clear_history():
 @router.get("/api/memory")
 async def list_memory():
     from agents.memory_store import get_memory_store
-    return await asyncio.to_thread(lambda: get_memory_store().list_all())
+    all_facts = await asyncio.to_thread(lambda: get_memory_store().list_all())
+    return [f for f in all_facts if not f["key"].startswith("note_")]
 
 
 @router.delete("/api/memory/{key}")
 async def forget_memory(key: str):
+    from agents.memory_store import get_memory_store
+    await asyncio.to_thread(lambda: get_memory_store().forget(key))
+    return {"status": "deleted", "key": key}
+
+
+@router.get("/api/notes")
+async def list_notes():
+    from agents.memory_store import get_memory_store
+    all_facts = await asyncio.to_thread(lambda: get_memory_store().list_all())
+    return [f for f in all_facts if f["key"].startswith("note_")]
+
+
+@router.delete("/api/notes/{key}")
+async def delete_note(key: str):
     from agents.memory_store import get_memory_store
     await asyncio.to_thread(lambda: get_memory_store().forget(key))
     return {"status": "deleted", "key": key}
