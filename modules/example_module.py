@@ -255,6 +255,25 @@ def run_shell_command(command: str) -> str:
     return run_shell(command)
 
 
+@tool(description="Fetch and read the text content of a web page. Use for reading articles, docs, or any URL.")
+def scrape_url(url: str) -> str:
+    import re
+    import httpx
+    try:
+        resp = httpx.get(
+            url,
+            timeout=15.0,
+            follow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        resp.raise_for_status()
+        text = re.sub(r"<[^>]+>", " ", resp.text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text[:2000] or "(no content)"
+    except httpx.HTTPError as exc:
+        return f"Fetch error: {exc}"
+
+
 @tool(description="Search the web for current information. Returns top results with title, snippet, and URL.")
 def search_web(query: str) -> str:
     from core.config import get_config
