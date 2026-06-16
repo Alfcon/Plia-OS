@@ -236,6 +236,22 @@ def list_home_entities(domain: str = "") -> str:
         return f"HA request failed: {exc}"
 
 
+@tool(description="Search the web for current information. Returns top results with title, snippet, and URL.")
+def search_web(query: str) -> str:
+    from core.config import get_config
+    from agents.web_search import search_ddg, search_google
+    cfg = get_config()
+    provider = cfg.web_search_default
+    max_results = cfg.web_search_max_results
+    if provider == "google" and cfg.google_search_api_key and cfg.google_search_cx:
+        results = search_google(query, cfg.google_search_api_key, cfg.google_search_cx, max_results)
+    else:
+        results = search_ddg(query, max_results)
+    if not results:
+        return "No results found."
+    return "\n\n".join(results)
+
+
 @tool(description="Check if a model or application will fit on this system's GPU. "
       "Pass the model name and how much GPU VRAM it requires in gigabytes. "
       "Returns whether it fits and how much VRAM is available. "
