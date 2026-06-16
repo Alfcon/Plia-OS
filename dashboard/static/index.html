@@ -101,7 +101,7 @@
         <button class="m-nav-btn" data-section="agents" onclick="showMenuSection('agents')">Agents</button>
         <button class="m-nav-btn" data-section="llm" onclick="showMenuSection('llm')">LLM</button>
         <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system');loadPipelineStatus();loadSystemStats()">System</button>
-        <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders();_requestNotifPermission()">Reminders</button>
+        <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders();loadTimers();_requestNotifPermission()">Reminders</button>
         <button class="m-nav-btn" data-section="calendar" onclick="showMenuSection('calendar');loadCalendar();loadGcalStatus()">Calendar</button>
         <button class="m-nav-btn" data-section="memory" onclick="showMenuSection('memory');loadMemory()">Memory</button>
         <button class="m-nav-btn" data-section="modules" onclick="showMenuSection('modules');loadModules()">Modules</button>
@@ -350,7 +350,13 @@
             <span style="font-size:0.78rem;color:#aaa;">Pending reminders</span>
             <button onclick="loadReminders()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
           </div>
-          <ul id="reminder-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
+          <ul id="reminder-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0 0 10px;"></ul>
+          <hr style="border-color:#222;margin:8px 0;" />
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:0.78rem;color:#aaa;">Active timers</span>
+            <button onclick="loadTimers()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
+          </div>
+          <ul id="timer-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
         </div>
         <div id="m-section-calendar" class="m-pane" style="display:none">
           <div style="margin-bottom:10px;">
@@ -561,6 +567,7 @@
     if (msg.type === 'reminder_fired') {
       _appendMsg('system', 'Reminder: ' + msg.message);
       loadReminders();
+      loadTimers();
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('Plia Reminder', {body: msg.message});
       }
@@ -887,18 +894,53 @@
         ul.innerHTML = '<li style="color:#555;font-style:italic;">No pending reminders</li>';
         return;
       }
-      ul.innerHTML = _reminderData.map(r => {
-        const isTimer = r.message.startsWith('Timer');
-        return `<li style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #1e1e1e;">
+      ul.innerHTML = _reminderData.map(r =>
+        `<li style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #1e1e1e;">
           <span style="flex:1;margin-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.message)}">${_esc(r.message)}</span>
-          <span id="r-cd-${r.id}" style="color:${isTimer ? '#4fc3f7' : '#888'};font-size:0.72rem;white-space:nowrap;margin-right:6px;font-variant-numeric:tabular-nums;">${_fmtCountdown(r.fire_at)}</span>
+          <span id="r-cd-${r.id}" style="color:#888;font-size:0.72rem;white-space:nowrap;margin-right:6px;font-variant-numeric:tabular-nums;">${_fmtCountdown(r.fire_at)}</span>
           <button onclick="cancelReminder(${r.id})" style="background:none;border:1px solid #555;border-radius:3px;color:#ef9a9a;font-size:0.72rem;padding:1px 5px;cursor:pointer;">✕</button>
-        </li>`;
-      }).join('');
+        </li>`
+      ).join('');
       _reminderCountdownInterval = setInterval(_renderReminderCountdowns, 1000);
     } catch(e) {
       ul.innerHTML = '<li style="color:#ef9a9a;">Failed to load</li>';
     }
+  }
+
+  let _timerData = [];
+  let _timerCountdownInterval = null;
+
+  async function loadTimers() {
+    const ul = document.getElementById('timer-list');
+    if (!ul) return;
+    clearInterval(_timerCountdownInterval);
+    try {
+      _timerData = await fetch('/api/timers').then(r => r.json());
+      if (!_timerData.length) {
+        ul.innerHTML = '<li style="color:#555;font-style:italic;">No active timers</li>';
+        return;
+      }
+      ul.innerHTML = _timerData.map(t =>
+        `<li style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #1e1e1e;">
+          <span style="flex:1;margin-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(t.message)}">${_esc(t.message)}</span>
+          <span id="t-cd-${t.id}" style="color:#4fc3f7;font-size:0.72rem;white-space:nowrap;margin-right:6px;font-variant-numeric:tabular-nums;">${_fmtCountdown(t.fire_at)}</span>
+          <button onclick="cancelTimer(${t.id})" style="background:none;border:1px solid #555;border-radius:3px;color:#ef9a9a;font-size:0.72rem;padding:1px 5px;cursor:pointer;">✕</button>
+        </li>`
+      ).join('');
+      _timerCountdownInterval = setInterval(() => {
+        _timerData.forEach(t => {
+          const el = document.getElementById(`t-cd-${t.id}`);
+          if (el) el.textContent = _fmtCountdown(t.fire_at);
+        });
+      }, 1000);
+    } catch(e) {
+      ul.innerHTML = '<li style="color:#ef9a9a;">Failed to load</li>';
+    }
+  }
+
+  async function cancelTimer(id) {
+    await fetch(`/api/timers/${id}`, {method: 'DELETE'});
+    await loadTimers();
   }
 
   async function createReminder() {
