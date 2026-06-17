@@ -15,19 +15,21 @@ logger = logging.getLogger(__name__)
 _PARSE_SYSTEM = (
     "Parse the network MAC address request. Current UTC time: {now}. "
     'Output JSON with exactly three keys: '
-    '"action" (one of: show, randomize, set, restore), '
+    '"action" (one of: show, randomize, change, set, restore), '
     '"interface" (interface name string or null for auto-detect), '
     '"mac" (MAC address string for set action, otherwise null). '
+    'Use "change" or "randomize" when the user wants to mask or change their MAC to a random address. '
+    'Use "set" only when the user provides a specific MAC address. '
     "Output only valid JSON, no explanation."
 )
 
 _FALLBACK_MSG = (
     "[network]\nCouldn't parse that request. "
-    "Try: 'show my MAC', 'randomize MAC on wlan0', "
+    "Try: 'show my MAC', 'change MAC on wlan0', "
     "'set MAC to AA:BB:CC:DD:EE:FF', 'restore original MAC'."
 )
 
-_ACTIONS = {"show", "randomize", "set", "restore"}
+_ACTIONS = {"show", "randomize", "change", "set", "restore"}
 
 
 async def network_node(state: "AgentState") -> dict:
@@ -58,7 +60,7 @@ async def network_node(state: "AgentState") -> dict:
     try:
         if action == "show":
             result = await asyncio.to_thread(list_macs) if not interface else await asyncio.to_thread(show_mac, interface)
-        elif action == "randomize":
+        elif action in ("randomize", "change"):
             result = await asyncio.to_thread(randomize_mac, interface)
         elif action == "set":
             result = await asyncio.to_thread(set_mac, interface, mac)
