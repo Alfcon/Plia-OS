@@ -83,7 +83,6 @@ class VoicePipeline:
         logger.info("Announcing: %s", message)
         self._wake_muted_until = time.monotonic() + 4.0  # minimum mute even if synthesis fails
         try:
-            await events.emit("transcript", {"role": "assistant", "text": message})
             audio_out = self._tts.synthesise(strip_markdown(message))
             self._set_wake_mute(audio_out)
             sd.play(audio_out, samplerate=24000, blocking=True)

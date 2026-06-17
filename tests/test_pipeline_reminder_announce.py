@@ -43,7 +43,7 @@ async def test_reminder_fired_prefixes_reminder():
     assert "Stand up" in msg
 
 
-async def test_speak_announcement_calls_tts_and_emits_transcript():
+async def test_speak_announcement_calls_tts_and_plays_audio():
     p = _pipeline()
     transcripts = []
     events.subscribe(lambda payload: transcripts.append(payload) if payload.get("type") == "transcript" else None)
@@ -54,7 +54,7 @@ async def test_speak_announcement_calls_tts_and_emits_transcript():
 
     p._tts.synthesise.assert_called_once_with("Reminder: Take medication")
     mock_sd.play.assert_called_once()
-    assert any("Take medication" in t.get("text", "") for t in transcripts)
+    assert transcripts == []  # reminder_fired handler displays in chat; no duplicate transcript
 
 
 async def test_speak_announcement_sets_wake_mute():
