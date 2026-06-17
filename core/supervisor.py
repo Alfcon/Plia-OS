@@ -15,21 +15,18 @@ from agents.code import code_node
 from agents.calendar import calendar_node
 from agents.home import home_node
 from agents.reminder import reminder_node
-from agents.network import network_node
-
 logger = logging.getLogger(__name__)
 
-_KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder", "network"}
+_KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder"}
 _HOP_LIMIT = 5
 _TOOL_CALL_LIMIT = 10
 
 _CLASSIFY_SYSTEM = (
     "You are a router. Given the conversation, output exactly one word — "
-    "the specialist to handle the request: memory, web, code, calendar, home, reminder, network. "
+    "the specialist to handle the request: memory, web, code, calendar, home, reminder. "
     "Use 'reminder' for announcements at a specific future time ('remind me at 3pm', 'notify me in 2 hours'). "
     "Use 'home' only for Home Assistant device control (lights, switches, sensors). "
-    "Use 'network' for MAC address operations (show, change, randomize, spoof, restore MAC address). "
-    "Use 'respond' for countdown timers, volume, system info, calculations, or anything answerable with tools directly."
+    "Use 'respond' for MAC address operations, countdown timers, volume, system info, calculations, or anything answerable with tools directly."
 )
 
 _KEYWORD_ROUTES: dict[str, list[str]] = {
@@ -43,8 +40,6 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
     "calendar": ["add to calendar", "schedule a", "create an event", "calendar event", "add an appointment", "add event"],
     "home": ["turn on the", "turn off the", "lights on", "lights off", "home automation", "smart home"],
     "reminder": ["set a reminder", "set reminder", "don't let me forget", "notify me when", "remind me to"],
-    "network": ["mac address", "change mac", "spoof mac", "mask mac", "randomize mac",
-                "restore mac", "show mac", "fake mac"],
     "respond": ["set a timer", "set timer", "start a timer", "start timer", "timer for",
                 "set the volume", "volume up", "volume down", "mute", "unmute",
                 "system info", "how much ram", "cpu usage", "disk space",
@@ -111,6 +106,8 @@ async def _respond_node(state: AgentState) -> dict:
     if state["tool_results"]:
         combined = "\n".join(state["tool_results"])
         history.append({"role": "system", "content": f"Agent results:\n{combined}"})
+        # Specialist already handled this — don't offer tools or LLM re-invokes them
+        tools = []
 
     for _ in range(_TOOL_CALL_LIMIT):
         payload_msg = await call_llm(history, tools=tools or None)
@@ -155,7 +152,6 @@ def _build_graph():
     g.add_node("calendar", calendar_node)
     g.add_node("home", home_node)
     g.add_node("reminder", reminder_node)
-    g.add_node("network", network_node)
     g.add_node("respond", _respond_node)
 
     g.set_entry_point("supervisor")
@@ -166,10 +162,9 @@ def _build_graph():
         "calendar": "calendar",
         "home": "home",
         "reminder": "reminder",
-        "network": "network",
         "respond": "respond",
     })
-    for agent in ("memory", "web", "code", "calendar", "home", "reminder", "network"):
+    for agent in ("memory", "web", "code", "calendar", "home", "reminder"):
         g.add_edge(agent, "supervisor")
     g.add_edge("respond", END)
     return g.compile()
