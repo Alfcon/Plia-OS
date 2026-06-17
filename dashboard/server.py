@@ -152,10 +152,15 @@ async def get_config_route():
 @router.post("/api/config")
 async def post_config(updates: dict):
     updates.pop("system_prompt_backup", None)  # internal field — not settable via public API
+    old_engine = get_config().tts_engine
     try:
         config = update_config(**updates)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    if config.tts_engine != old_engine:
+        svc = get_tts_service()
+        if svc is not None:
+            await asyncio.to_thread(svc.switch_engine, config.tts_engine)
     return dataclasses.asdict(config)
 
 

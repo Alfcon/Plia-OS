@@ -149,6 +149,18 @@ class TTSService:
         ))
         broker.request("dramabox")
 
+    def switch_engine(self, new_engine: str) -> None:
+        broker = get_vram_broker()
+        for name in ("kokoro", "chatterbox", "dramabox"):
+            if name != new_engine:
+                broker.release(name)
+        if new_engine == "kokoro":
+            self._load_kokoro(get_config())
+        elif new_engine == "chatterbox":
+            self._load_chatterbox(get_config())
+        elif new_engine == "dramabox":
+            self._load_dramabox(get_config())
+
     def synthesise(self, text: str) -> np.ndarray:
         if not self._loaded:
             raise RuntimeError("Call load() before synthesise()")
