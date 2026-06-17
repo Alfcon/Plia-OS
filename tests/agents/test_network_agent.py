@@ -35,12 +35,13 @@ async def test_missing_action_field_returns_fallback():
 
 
 @pytest.mark.asyncio
-async def test_action_show_no_interface_calls_show_mac_with_empty_string():
+async def test_action_show_no_interface_calls_list_macs():
+    table = "| Interface | MAC Address | Type |\n|-----------|-------------|------|\n| eth0 | aa:bb:cc:dd:ee:ff | Ethernet |"
     with patch("agents.network.call_llm", new_callable=AsyncMock) as mock_llm, \
-         patch("agents.network.show_mac", return_value="eth0: aa:bb:cc:dd:ee:ff") as mock_show:
+         patch("agents.network.list_macs", return_value=table) as mock_list:
         mock_llm.return_value = {"content": '{"action":"show","interface":null,"mac":null}'}
         update = await network_node(_state("show my mac address"))
-    mock_show.assert_called_once_with("")
+    mock_list.assert_called_once_with()
     assert update["active_agent"] == "network"
     result = "\n".join(update["tool_results"])
     assert "eth0" in result

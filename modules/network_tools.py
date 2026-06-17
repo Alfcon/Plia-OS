@@ -64,6 +64,28 @@ def _save_original_if_new(ifname: str, current_mac: str) -> None:
         store.remember(f"original_mac_{ifname}", current_mac)
 
 
+@tool(description="List all network interfaces with their MAC addresses and type (Ethernet/WiFi).")
+def list_macs() -> str:
+    ifaces = _get_interfaces()
+    rows = []
+    for iface in ifaces:
+        if iface.get("link_type") != "ether":
+            continue
+        name = iface["ifname"]
+        mac = iface.get("address", "unknown")
+        if name.startswith("wl"):
+            itype = "WiFi"
+        elif name.startswith(("en", "eth")):
+            itype = "Ethernet"
+        else:
+            itype = "Other"
+        rows.append(f"| {name} | {mac} | {itype} |")
+    if not rows:
+        return "No network interfaces found."
+    table = "| Interface | MAC Address | Type |\n|-----------|-------------|------|\n" + "\n".join(rows)
+    return table + "\n\nOptions: **mask MAC** · **change MAC** · **restore MAC**"
+
+
 @tool(description="Show the current MAC address of a network interface. Leave interface empty to auto-detect.")
 def show_mac(interface: str = "") -> str:
     try:

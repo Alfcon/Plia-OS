@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from agents.llm import call_llm, parse_llm_json
-from modules.network_tools import show_mac, randomize_mac, set_mac, restore_mac
+from modules.network_tools import list_macs, show_mac, randomize_mac, set_mac, restore_mac
 
 if TYPE_CHECKING:
     from core.supervisor import AgentState
@@ -57,7 +57,7 @@ async def network_node(state: "AgentState") -> dict:
 
     try:
         if action == "show":
-            result = await asyncio.to_thread(show_mac, interface)
+            result = await asyncio.to_thread(list_macs) if not interface else await asyncio.to_thread(show_mac, interface)
         elif action == "randomize":
             result = await asyncio.to_thread(randomize_mac, interface)
         elif action == "set":
