@@ -1,5 +1,6 @@
 import importlib.util
 import logging
+import sys
 from pathlib import Path
 from core.registry import set_loading_module
 
@@ -19,6 +20,7 @@ def load_modules(directory: Path | None = None) -> None:
         set_loading_module(path.stem)
         try:
             spec.loader.exec_module(module)
+            sys.modules[f"modules.{path.stem}"] = module
         except Exception:
             logger.warning("Failed to load module %s", path.name, exc_info=True)
         finally:
