@@ -2,7 +2,10 @@ from __future__ import annotations
 import os
 import sqlite3
 import time
+import logging
 from datetime import datetime, timezone, timedelta
+
+logger = logging.getLogger(__name__)
 
 _HISTORY_CAP = 500
 
