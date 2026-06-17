@@ -5,6 +5,7 @@
   <title>Plia-OS</title>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <style>
+    html { font-size: 160%; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: monospace; background: #0d0d0d; color: #e0e0e0; display: flex; flex-direction: column; height: 100vh; }
     #top-bar { flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 6px 14px; background: #111; border-bottom: 1px solid #2a2a2a; font-size: 0.75rem; overflow-x: auto; white-space: nowrap; }
@@ -61,13 +62,13 @@
     #google-fields { margin-top: 4px; }
     #menu-overlay { position: fixed; inset: 0; z-index: 100; display: none; }
     #menu-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.75); }
-    #menu-panel { position: absolute; left: 0; top: 0; bottom: 0; width: 280px; background: #111; border-right: 1px solid #2a2a2a; display: flex; flex-direction: column; }
+    #menu-panel { position: absolute; left: 0; top: 0; bottom: 0; width: 633px; background: #111; border-right: 1px solid #2a2a2a; display: flex; flex-direction: column; }
     #menu-header { padding: 20px 16px 14px; border-bottom: 1px solid #1e1e1e; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
     #menu-header .menu-title { font-size: 1rem; color: #e0e0e0; letter-spacing: 0.08em; text-transform: uppercase; }
     #menu-header .menu-close { background: none; border: none; color: #555; font-size: 1rem; cursor: pointer; width: auto; padding: 2px 6px; }
     #menu-header .menu-close:hover { color: #e0e0e0; background: #1a1a1a; }
     #menu-settings { flex: 1; overflow: hidden; display: flex; flex-direction: row; min-height: 0; }
-    #m-nav { width: 72px; border-right: 1px solid #1e1e1e; padding: 10px 0; display: flex; flex-direction: column; flex-shrink: 0; }
+    #m-nav { width: 122px; border-right: 1px solid #1e1e1e; padding: 10px 0; display: flex; flex-direction: column; flex-shrink: 0; }
     .m-nav-btn { background: none; border: none; border-left: 2px solid transparent; border-radius: 0; color: #555; font-size: 0.72rem; padding: 10px 0; cursor: pointer; width: 100%; text-align: center; }
     .m-nav-btn:hover { color: #ccc; background: #181818; }
     .m-nav-btn.active { color: #4fc3f7; border-left-color: #4fc3f7; background: #0d1b2a; }
@@ -497,7 +498,7 @@
     <button id="mic-btn" onclick="toggleMicRecording()" title="Voice input" style="background:#1e1e1e;border:1px solid #333;border-radius:4px;color:#aaa;font-size:1rem;padding:6px 10px;cursor:pointer;">🎤</button>
     <button id="chat-send-btn" onclick="sendChat()">Send</button>
     <button onclick="downloadHistory()" title="Export chat history" style="width:auto;padding:6px 10px;background:#0d1b0d;color:#81c784;border:1px solid #1b5e20;flex-shrink:0;">↓</button>
-    <button id="chat-clear-btn" onclick="clearHistory()" title="Clear history">✕</button>
+    <button id="chat-clear-btn" onclick="clearHistory()">Clear Chat</button>
   </div>
 </div>
 </div><!-- #app-body -->
