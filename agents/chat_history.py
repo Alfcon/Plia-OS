@@ -6,6 +6,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+_HISTORY_PRELOAD = 20  # turns loaded into context on startup / per chat request
+
 _DB_PATH = Path(__file__).parent.parent / "data" / "chat_history.db"
 _DB_PATH.parent.mkdir(exist_ok=True)
 

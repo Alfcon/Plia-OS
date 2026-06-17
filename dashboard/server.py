@@ -572,11 +572,11 @@ async def create_reminder(body: dict):
 @router.post("/api/chat")
 async def chat(body: dict):
     from core.supervisor import run_turn
-    from agents.chat_history import get_recent
+    from agents.chat_history import get_recent, _HISTORY_PRELOAD
     text = (body.get("text") or "").strip()
     if not text:
         raise HTTPException(status_code=422, detail="text required")
-    rows = await asyncio.to_thread(get_recent, 20)
+    rows = await asyncio.to_thread(get_recent, _HISTORY_PRELOAD)
     history = [{"role": m["role"], "content": m["content"]} for m in rows]
     history.append({"role": "user", "content": text})
     response, _ = await run_turn(history)

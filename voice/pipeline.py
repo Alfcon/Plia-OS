@@ -21,7 +21,7 @@ _SAMPLE_RATE = 16000
 _BLOCK_SIZE = 1280  # ~80ms per chunk at 16kHz
 _ENERGY_FLOOR = 0.03  # RMS below this = silence (normalised to [-1,1])
 _INT16_MAX = 32768.0  # used to normalise int16 → float for RMS and STT
-_HISTORY_PRELOAD = 20  # number of recent messages to preload on startup
+from agents.chat_history import _HISTORY_PRELOAD  # canonical source; also used by /api/chat
 _CONVERSATION_CAP = 40  # max non-system messages kept in-memory (20 pairs)
 _TTS_SAMPLE_RATE = 24000
 
