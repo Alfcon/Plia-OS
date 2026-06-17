@@ -49,7 +49,10 @@ def _apply_mac(ifname: str, mac: str) -> str | None:
         ["ip", "link", "set", "dev", ifname, "address", mac],
         ["ip", "link", "set", "dev", ifname, "up"],
     ):
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        except subprocess.TimeoutExpired:
+            return f"timed out running: {' '.join(cmd)}"
         if r.returncode != 0:
             return r.stderr.strip() or "unknown error"
     return None
@@ -85,7 +88,9 @@ def randomize_mac(interface: str = "") -> str:
 
 
 @tool(description="Set the MAC address of a network interface to a specific value. Format: XX:XX:XX:XX:XX:XX. Leave interface empty to auto-detect.")
-def set_mac(interface: str, mac_address: str) -> str:
+def set_mac(interface: str = "", mac_address: str = "") -> str:
+    if not mac_address:
+        return "MAC address is required."
     if not _MAC_RE.match(mac_address):
         return "Invalid MAC address format. Expected XX:XX:XX:XX:XX:XX."
     try:

@@ -44,7 +44,7 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
     "home": ["turn on the", "turn off the", "lights on", "lights off", "home automation", "smart home"],
     "reminder": ["set a reminder", "set reminder", "don't let me forget", "notify me when", "remind me to"],
     "network": ["mac address", "change mac", "spoof mac", "mask mac", "randomize mac",
-                "restore mac", "show mac", "my mac", "fake mac", "network address"],
+                "restore mac", "show mac", "fake mac"],
     "respond": ["set a timer", "set timer", "start a timer", "start timer", "timer for",
                 "set the volume", "volume up", "volume down", "mute", "unmute",
                 "system info", "how much ram", "cpu usage", "disk space",
