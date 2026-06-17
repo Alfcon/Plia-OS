@@ -289,6 +289,19 @@
           </label>
           <button class="apply-btn" onclick="applyFallbackConfig()">Apply</button>
           <hr style="border:none;border-top:1px solid #222;margin:10px 0;">
+          <div style="font-size:0.78rem;color:#aaa;margin-bottom:6px;">AirLLM <span style="font-size:0.7rem;color:#555;">— large models via layer sharding</span></div>
+          <label>Model <span style="font-size:0.7rem;color:#555;">— HuggingFace ID or local path</span>
+            <input type="text" id="airllm-model" placeholder="e.g. meta-llama/Llama-3-70B-Instruct" />
+          </label>
+          <label>Compression
+            <select id="airllm-compression">
+              <option value="4bit">4-bit (fastest, least VRAM)</option>
+              <option value="8bit">8-bit</option>
+              <option value="none">None (full precision)</option>
+            </select>
+          </label>
+          <button class="apply-btn" onclick="applyAirLLMConfig()">Apply</button>
+          <hr style="border:none;border-top:1px solid #222;margin:10px 0;">
           <label style="font-size:0.78rem;color:#aaa;display:block;margin-bottom:4px;">System Prompt</label>
           <textarea id="system-prompt" rows="5" style="width:100%;box-sizing:border-box;background:#1e1e1e;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:0.75rem;padding:6px 8px;resize:vertical;font-family:inherit;"></textarea>
           <span id="system-prompt-status" style="font-size:0.72rem;color:#888;min-height:1em;display:block;margin:3px 0;"></span>
@@ -842,6 +855,8 @@
       document.getElementById('fallback-model').value = cfg.fallback_model || '';
       if (cfg.fallback_api_key)
         document.getElementById('fallback-api-key').value = cfg.fallback_api_key;
+      document.getElementById('airllm-model').value = cfg.airllm_model || '';
+      document.getElementById('airllm-compression').value = cfg.airllm_compression || '4bit';
       document.getElementById('web-provider').value = cfg.web_search_default || 'ddg';
       if (cfg.google_search_api_key)
         document.getElementById('google-api-key').value = cfg.google_search_api_key;
@@ -1928,6 +1943,17 @@
         fallback_provider: document.getElementById('fallback-provider').value,
         fallback_model: document.getElementById('fallback-model').value,
         fallback_api_key: document.getElementById('fallback-api-key').value,
+      }),
+    });
+  }
+
+  function applyAirLLMConfig() {
+    fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        airllm_model: document.getElementById('airllm-model').value,
+        airllm_compression: document.getElementById('airllm-compression').value,
       }),
     });
   }
