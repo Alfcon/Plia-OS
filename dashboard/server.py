@@ -34,6 +34,7 @@ class _Recorder:
 
 
 _recorder = _Recorder()
+_engine_switch_lock = asyncio.Lock()
 
 UPLOADS_DIR = Path(__file__).parent.parent / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
@@ -160,7 +161,16 @@ async def post_config(updates: dict):
     if config.tts_engine != old_engine:
         svc = get_tts_service()
         if svc is not None:
-            await asyncio.to_thread(svc.switch_engine, config.tts_engine)
+            new_engine = config.tts_engine
+            async def _switch_and_broadcast():
+                async with _engine_switch_lock:
+                    try:
+                        await asyncio.to_thread(svc.switch_engine, new_engine)
+                    except Exception:
+                        logger.exception("TTS engine switch to %r failed", new_engine)
+                        return
+                await _broadcast({"type": "vram_status", **get_vram_broker().status()})
+            asyncio.create_task(_switch_and_broadcast())
     return dataclasses.asdict(config)
 
 
@@ -658,6 +668,13 @@ async def vram_release(body: dict):
         raise HTTPException(status_code=422, detail="name required")
     get_vram_broker().release(name)
     update_config(tts_engine="kokoro")
+    svc = get_tts_service()
+    if svc is not None:
+        async with _engine_switch_lock:
+            try:
+                await asyncio.to_thread(svc.switch_engine, "kokoro")
+            except Exception:
+                logger.exception("TTS engine switch to 'kokoro' after VRAM release failed")
     await _broadcast({"type": "vram_status", **get_vram_broker().status()})
     return get_vram_broker().status()
 
