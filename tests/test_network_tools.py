@@ -82,7 +82,7 @@ def test_random_mac_locally_administered_unicast():
 def test_randomize_mac_saves_original_and_shows_old_mac():
     from modules.network_tools import randomize_mac
     mock_store = MagicMock()
-    mock_store.recall_fact.return_value = None
+    mock_store.get_fact.return_value = None
     # 4 calls: 1 resolve + 3 ip link (down/address/up)
     with patch("subprocess.run", side_effect=[_ifaces_mock(IFACES), _run_ok(), _run_ok(), _run_ok()]), \
          patch("modules.network_tools.get_memory_store", return_value=mock_store):
@@ -95,7 +95,7 @@ def test_randomize_mac_saves_original_and_shows_old_mac():
 def test_randomize_mac_does_not_overwrite_stored_original():
     from modules.network_tools import randomize_mac
     mock_store = MagicMock()
-    mock_store.recall_fact.return_value = "original:was:here"
+    mock_store.get_fact.return_value = "original:was:here"
     with patch("subprocess.run", side_effect=[_ifaces_mock(IFACES), _run_ok(), _run_ok(), _run_ok()]), \
          patch("modules.network_tools.get_memory_store", return_value=mock_store):
         randomize_mac("")
@@ -105,7 +105,7 @@ def test_randomize_mac_does_not_overwrite_stored_original():
 def test_randomize_mac_ip_fail_returns_error():
     from modules.network_tools import randomize_mac
     mock_store = MagicMock()
-    mock_store.recall_fact.return_value = None
+    mock_store.get_fact.return_value = None
     with patch("subprocess.run", side_effect=[_ifaces_mock(IFACES), _run_fail("SIOCSIFHWADDR: Operation not permitted")]), \
          patch("modules.network_tools.get_memory_store", return_value=mock_store):
         result = randomize_mac("")
@@ -117,7 +117,7 @@ def test_randomize_mac_ip_fail_returns_error():
 def test_set_mac_valid_saves_original_and_succeeds():
     from modules.network_tools import set_mac
     mock_store = MagicMock()
-    mock_store.recall_fact.return_value = None
+    mock_store.get_fact.return_value = None
     with patch("subprocess.run", side_effect=[_ifaces_mock(IFACES), _run_ok(), _run_ok(), _run_ok()]), \
          patch("modules.network_tools.get_memory_store", return_value=mock_store):
         result = set_mac("eth0", "AA:BB:CC:DD:EE:FF")
@@ -136,7 +136,7 @@ def test_set_mac_invalid_format_no_subprocess_call():
 def test_set_mac_does_not_overwrite_original_if_already_stored():
     from modules.network_tools import set_mac
     mock_store = MagicMock()
-    mock_store.recall_fact.return_value = "already:stored:original"
+    mock_store.get_fact.return_value = "already:stored:original"
     with patch("subprocess.run", side_effect=[_ifaces_mock(IFACES), _run_ok(), _run_ok(), _run_ok()]), \
          patch("modules.network_tools.get_memory_store", return_value=mock_store):
         set_mac("eth0", "DE:AD:BE:EF:00:01")
@@ -148,7 +148,7 @@ def test_set_mac_does_not_overwrite_original_if_already_stored():
 def test_restore_mac_applies_stored_original():
     from modules.network_tools import restore_mac
     mock_store = MagicMock()
-    mock_store.recall_fact.return_value = "aa:bb:cc:dd:ee:ff"
+    mock_store.get_fact.return_value = "aa:bb:cc:dd:ee:ff"
     with patch("subprocess.run", side_effect=[_ifaces_mock(IFACES), _run_ok(), _run_ok(), _run_ok()]), \
          patch("modules.network_tools.get_memory_store", return_value=mock_store):
         result = restore_mac("")
@@ -159,7 +159,7 @@ def test_restore_mac_applies_stored_original():
 def test_restore_mac_no_original_returns_error_without_ip_call():
     from modules.network_tools import restore_mac
     mock_store = MagicMock()
-    mock_store.recall_fact.return_value = None
+    mock_store.get_fact.return_value = None
     # only 1 subprocess call (interface resolution) — no ip link cmds
     with patch("subprocess.run", side_effect=[_ifaces_mock(IFACES)]), \
          patch("modules.network_tools.get_memory_store", return_value=mock_store):

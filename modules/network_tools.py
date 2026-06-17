@@ -42,25 +42,32 @@ def _random_mac() -> str:
     return ":".join(f"{o:02x}" for o in octets)
 
 
+def _run_ip(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["ip", *args], capture_output=True, text=True, timeout=5)
+
+
 def _apply_mac(ifname: str, mac: str) -> str | None:
     """Run ip link down/address/up. Returns error string on failure, None on success."""
-    for cmd in (
-        ["ip", "link", "set", "dev", ifname, "down"],
-        ["ip", "link", "set", "dev", ifname, "address", mac],
-        ["ip", "link", "set", "dev", ifname, "up"],
-    ):
-        try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        except subprocess.TimeoutExpired:
-            return f"timed out running: {' '.join(cmd)}"
+    try:
+        r = _run_ip("link", "set", "dev", ifname, "down")
         if r.returncode != 0:
             return r.stderr.strip() or "unknown error"
+        r = _run_ip("link", "set", "dev", ifname, "address", mac)
+        if r.returncode != 0:
+            # Restore interface even if address change failed
+            _run_ip("link", "set", "dev", ifname, "up")
+            return r.stderr.strip() or "unknown error"
+        r = _run_ip("link", "set", "dev", ifname, "up")
+        if r.returncode != 0:
+            return r.stderr.strip() or "unknown error"
+    except subprocess.TimeoutExpired:
+        return f"timed out on {ifname}"
     return None
 
 
 def _save_original_if_new(ifname: str, current_mac: str) -> None:
     store = get_memory_store()
-    if store.recall_fact(f"original_mac_{ifname}") is None:
+    if store.get_fact(f"original_mac_{ifname}") is None:
         store.remember(f"original_mac_{ifname}", current_mac)
 
 
@@ -132,7 +139,7 @@ def restore_mac(interface: str = "") -> str:
         ifname, _ = _resolve_and_get_mac(interface)
     except ValueError as exc:
         return str(exc)
-    original = get_memory_store().recall_fact(f"original_mac_{ifname}")
+    original = get_memory_store().get_fact(f"original_mac_{ifname}")
     if original is None:
         return f"No original MAC stored for {ifname}. Randomize first to save it."
     err = _apply_mac(ifname, original)
