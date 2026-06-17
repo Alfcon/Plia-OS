@@ -57,6 +57,10 @@ class PliaConfig:
     silence_timeout_seconds: float = 8.0
     silence_chunks_threshold: int = 10  # consecutive ~80ms chunks below energy floor
 
+    # AirLLM — large model inference via layer sharding (empty = disabled)
+    airllm_model: str = ""
+    airllm_compression: str = "4bit"  # 4bit | 8bit | none
+
     # Multiagent LLM fallback
     fallback_provider: str = ""
     fallback_model: str = ""
@@ -87,6 +91,7 @@ _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
     "tts_engine": ("kokoro", "chatterbox", "dramabox"),
     "studio_pipeline_mode": ("cpu_stt", "pause"),
     "stt_model_size": ("tiny", "base", "small", "medium", "large"),
+    "airllm_compression": ("4bit", "8bit", "none"),
 }
 
 
@@ -139,6 +144,12 @@ def get_config() -> PliaConfig:
 
 
 def update_config(**kwargs) -> PliaConfig:
+    if "airllm_model" in kwargs and kwargs["airllm_model"] != _config.airllm_model:
+        try:
+            from agents.airllm_backend import unload
+            unload()
+        except Exception:
+            pass
     # Auto-backup system_prompt before loop so order of kwargs doesn't matter (V9 fix)
     if "system_prompt" in kwargs and kwargs["system_prompt"] != _config.system_prompt:
         _config.system_prompt_backup = _config.system_prompt

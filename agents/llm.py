@@ -32,6 +32,9 @@ _OLLAMA_TIMEOUT = 30.0
 
 async def call_llm(messages: list[dict], tools: list | None = None) -> dict:
     config = get_config()
+    if config.airllm_model:
+        from agents.airllm_backend import call_llm_airllm
+        return await call_llm_airllm(messages, tools)
     try:
         async with httpx.AsyncClient(timeout=_OLLAMA_TIMEOUT) as client:
             payload: dict = {
