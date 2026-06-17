@@ -644,17 +644,6 @@
     if (scroll) div.scrollIntoView({ behavior: 'smooth' });
   }
 
-  // Load chat history on page load
-  fetch('/api/history?n=100')
-    .then(r => r.json())
-    .then(msgs => {
-      msgs.forEach(m => _appendMsg(m.role, m.content, false));
-      const conv = document.getElementById('conversation');
-      if (conv.lastElementChild) conv.lastElementChild.scrollIntoView();
-    }).catch(err => {
-      console.error('History load failed:', err);
-      _appendMsg('system', '[History unavailable — could not load previous messages]', false);
-    });
 
   function _showThinking() {
     const existing = document.getElementById('thinking-indicator');
