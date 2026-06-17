@@ -835,7 +835,8 @@
 
   async function clearHistory() {
     if (!confirm('Clear all chat history?')) return;
-    await fetch('/api/history', { method: 'DELETE' });
+    const r = await fetch('/api/history', { method: 'DELETE' });
+    if (!r.ok) { alert('Clear failed — see server logs'); return; }
     document.getElementById('conversation').innerHTML = '';
   }
 

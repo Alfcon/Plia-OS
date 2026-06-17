@@ -1,7 +1,10 @@
 from __future__ import annotations
+import logging
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 _DB_PATH = Path(__file__).parent.parent / "data" / "chat_history.db"
 _DB_PATH.parent.mkdir(exist_ok=True)
@@ -49,11 +52,13 @@ def get_recent(n: int = 100) -> list[dict]:
 def clear() -> None:
     rows = get_recent(n=10000)
     if rows:
-        from datetime import datetime, timezone
-        from agents.memory_store import get_memory_store
-        now = datetime.now(timezone.utc).isoformat()
-        text = "\n".join(f"[{m['ts']}] {m['role']}: {m['content']}" for m in rows)
-        get_memory_store().remember(f"chat_archive_{now}", text)
+        try:
+            from agents.memory_store import get_memory_store
+            now = datetime.now(timezone.utc).isoformat()
+            text = "\n".join(f"[{m['ts']}] {m['role']}: {m['content']}" for m in rows)
+            get_memory_store().remember(f"chat_archive_{now}", text)
+        except Exception:
+            logger.warning("Chat archive failed; proceeding with delete", exc_info=True)
     with _conn() as con:
         con.execute("DELETE FROM messages")
         con.execute("DELETE FROM sqlite_sequence WHERE name='messages'")
