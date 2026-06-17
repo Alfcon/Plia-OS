@@ -47,6 +47,13 @@ def get_recent(n: int = 100) -> list[dict]:
 
 
 def clear() -> None:
+    rows = get_recent(n=10000)
+    if rows:
+        from datetime import datetime, timezone
+        from agents.memory_store import get_memory_store
+        now = datetime.now(timezone.utc).isoformat()
+        text = "\n".join(f"[{m['ts']}] {m['role']}: {m['content']}" for m in rows)
+        get_memory_store().remember(f"chat_archive_{now}", text)
     with _conn() as con:
         con.execute("DELETE FROM messages")
         con.execute("DELETE FROM sqlite_sequence WHERE name='messages'")
