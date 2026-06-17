@@ -6,3 +6,5 @@ dist/
 .env
 *.wav
 *.mp3
+data/
+.superpowers/
