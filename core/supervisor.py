@@ -74,7 +74,14 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
                 "system info", "how much ram", "cpu usage", "disk space",
                 "make a note", "don't forget", "add a note", "my notes", "list notes",
                 "show notes", "delete note", "clear notes",
-                "dim the", "set brightness", "set the brightness", "lights to "],
+                "dim the", "set brightness", "set the brightness", "lights to ",
+                "play music", "play the music", "resume music", "resume playback",
+                "pause music", "pause the music", "pause playback",
+                "next track", "skip track", "next song", "skip song",
+                "previous track", "go back a track", "previous song", "last song",
+                "stop music", "stop the music", "stop playback",
+                "what's playing", "what is playing", "now playing",
+                "what song", "current song", "current track"],
 }
 
 
