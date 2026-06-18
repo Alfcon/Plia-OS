@@ -26,7 +26,7 @@ _TOOL_CALL_LIMIT = 10
 
 _CLASSIFY_SYSTEM = (
     "You are a router. Given the conversation, output exactly one word — "
-    "the specialist to handle the request: memory, web, code, calendar, home, reminder, network, file. "
+    "the specialist to handle the request: memory, web, code, calendar, home, reminder, network, wifi, file. "
     "Use 'reminder' for announcements at a specific future time ('remind me at 3pm', 'notify me in 2 hours'). "
     "Use 'home' only for Home Assistant device control (lights, switches, sensors). "
     "Use 'network' for MAC address operations (show, change, randomize, spoof, restore MAC address). "
