@@ -86,11 +86,11 @@ def list_macs() -> str:
             itype = "Ethernet"
         else:
             itype = "Other"
-        rows.append(f"| {name} | {mac} | {itype} |")
+        rows.append((name, mac, itype))
     if not rows:
         return "No network interfaces found."
-    table = "| Interface | MAC Address | Type |\n|-----------|-------------|------|\n" + "\n".join(rows)
-    return table + "\n\nOptions: **mask MAC** · **change MAC** · **restore MAC**"
+    w = max(len(r[0]) for r in rows)
+    return "\n".join(f"{name:<{w}}  {mac}  {itype}" for name, mac, itype in rows)
 
 
 @tool(description="Show the current MAC address of a network interface. Leave interface empty to auto-detect.")
