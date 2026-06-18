@@ -16,9 +16,10 @@ from agents.calendar import calendar_node
 from agents.home import home_node
 from agents.reminder import reminder_node
 from agents.network import network_node
+from agents.wifi import wifi_node
 logger = logging.getLogger(__name__)
 
-_KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder", "network"}
+_KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder", "network", "wifi"}
 _HOP_LIMIT = 5
 _TOOL_CALL_LIMIT = 10
 
@@ -28,6 +29,7 @@ _CLASSIFY_SYSTEM = (
     "Use 'reminder' for announcements at a specific future time ('remind me at 3pm', 'notify me in 2 hours'). "
     "Use 'home' only for Home Assistant device control (lights, switches, sensors). "
     "Use 'network' for MAC address operations (show, change, randomize, spoof, restore MAC address). "
+    "Use 'wifi' for WiFi status, scanning nearby networks, or listing WiFi interfaces. "
     "Use 'respond' for countdown timers, volume, system info, calculations, or anything answerable with tools directly."
 )
 
@@ -44,6 +46,10 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
     "reminder": ["set a reminder", "set reminder", "don't let me forget", "notify me when", "remind me to"],
     "network": ["mac address", "change mac", "spoof mac", "mask mac", "randomize mac",
                 "restore mac", "show mac", "my mac", "fake mac", "network address"],
+    "wifi": ["wifi status", "wi-fi status", "wifi network", "wi-fi network",
+             "scan for wifi", "scan wifi", "nearby wifi", "nearby networks",
+             "wifi interfaces", "wireless interfaces", "am i connected to wifi",
+             "wifi signal", "wifi strength", "wifi channel"],
     "respond": ["set a timer", "set timer", "start a timer", "start timer", "timer for",
                 "set the volume", "volume up", "volume down", "mute", "unmute",
                 "system info", "how much ram", "cpu usage", "disk space",
@@ -157,6 +163,7 @@ def _build_graph():
     g.add_node("home", home_node)
     g.add_node("reminder", reminder_node)
     g.add_node("network", network_node)
+    g.add_node("wifi", wifi_node)
     g.add_node("respond", _respond_node)
 
     g.set_entry_point("supervisor")
@@ -168,9 +175,10 @@ def _build_graph():
         "home": "home",
         "reminder": "reminder",
         "network": "network",
+        "wifi": "wifi",
         "respond": "respond",
     })
-    for agent in ("memory", "web", "code", "calendar", "home", "reminder", "network"):
+    for agent in ("memory", "web", "code", "calendar", "home", "reminder", "network", "wifi"):
         g.add_edge(agent, "supervisor")
     g.add_edge("respond", END)
     return g.compile()
