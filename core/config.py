@@ -92,6 +92,9 @@ class PliaConfig:
     # Notifications
     desktop_notifications: bool = True
 
+    # Weather
+    weather_location: str = ""
+
 
 _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
     "tts_engine": ("kokoro", "chatterbox", "dramabox"),

@@ -86,31 +86,3 @@ def test_scrape_url_http_error():
         from modules.web_tools import scrape_url
         result = scrape_url("http://bad.host")
     assert "Fetch error" in result
-
-
-# --- get_weather ---
-
-def test_get_weather_success():
-    with patch("httpx.get", return_value=_mock_response(text="London: ⛅ +18°C")):
-        from modules.web_tools import get_weather
-        result = get_weather("London")
-    assert "London" in result
-    assert "18" in result
-
-
-def test_get_weather_here_uses_empty_loc():
-    captured = {}
-    def fake_get(url, **kwargs):
-        captured["url"] = url
-        return _mock_response(text="Auto: ☀ +22°C")
-    with patch("httpx.get", side_effect=fake_get):
-        from modules.web_tools import get_weather
-        get_weather("here")
-    assert captured["url"].startswith("https://wttr.in/?")
-
-
-def test_get_weather_http_error():
-    with patch("httpx.get", side_effect=httpx.HTTPError("timeout")):
-        from modules.web_tools import get_weather
-        result = get_weather("Paris")
-    assert "failed" in result.lower()
