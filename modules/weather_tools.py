@@ -143,7 +143,7 @@ def get_forecast(location: str = "", days: int = 7) -> str:
     if not times:
         return "Weather data unavailable."
 
-    lines = [f"7-day forecast for {name}:"]
+    lines = [f"{days}-day forecast for {name}:"]
     for i, date_str in enumerate(times):
         try:
             day_name = datetime.fromisoformat(date_str).strftime("%a")
