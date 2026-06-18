@@ -149,6 +149,7 @@
     <button class="docs-nav-btn" data-doc="modules" onclick="showDocSection('modules')">Modules</button>
     <button class="docs-nav-btn" data-doc="home" onclick="showDocSection('home')">Home</button>
     <button class="docs-nav-btn" data-doc="tools" onclick="showDocSection('tools');loadDocTools()">Tools</button>
+    <button class="docs-nav-btn" data-doc="commands" onclick="showDocSection('commands')">Commands</button>
   </div>
   <div id="docs-content">
 
@@ -468,6 +469,87 @@
         <li>Sensors (<code>sensor.*</code>) — read current values</li>
         <li>Scripts &amp; automations — trigger by name</li>
       </ul>
+    </div>
+
+    <!-- Commands -->
+    <div id="docs-section-commands" class="docs-pane">
+      <h3>Chat Commands</h3>
+      <p>Type or speak these phrases to trigger specific agents. Matching is case-insensitive and checks if the phrase appears anywhere in your message.</p>
+
+      <h4>Memory</h4>
+      <p>Stores or retrieves facts from long-term memory.</p>
+      <ul>
+        <li>"<strong>Remember that</strong> my dog's name is Rex."</li>
+        <li>"<strong>Remember this</strong> — my password hint is…"</li>
+        <li>"<strong>Recall what</strong> you know about my schedule."</li>
+        <li>"<strong>What did I tell you</strong> about the project?"</li>
+        <li>"<strong>Store that</strong> / <strong>Save that</strong> / <strong>Memorize</strong> this."</li>
+        <li>"<strong>I want you to remember</strong> that…"</li>
+      </ul>
+
+      <h4>Web Search</h4>
+      <p>Searches the internet using your configured provider.</p>
+      <ul>
+        <li>"<strong>Search for</strong> the latest AI news."</li>
+        <li>"<strong>Look up</strong> how to fix a segfault in Python."</li>
+        <li>"<strong>Look it up</strong> / <strong>Find online</strong> / <strong>Look online</strong>."</li>
+        <li>"<strong>Google</strong> the price of a RTX 5090."</li>
+        <li>"<strong>Browse to</strong> / <strong>Visit http</strong> / <strong>Read http</strong>…"</li>
+        <li>"<strong>Read this article</strong> / <strong>Summarize this URL</strong>…"</li>
+        <li>"<strong>What does this page</strong> say about…"</li>
+      </ul>
+
+      <h4>Code Execution</h4>
+      <p>Runs Python or shell code in a sandboxed subprocess.</p>
+      <ul>
+        <li>"<strong>Run this code</strong>: <code>print('hello')</code>"</li>
+        <li>"<strong>Execute this</strong> / <strong>Run the code</strong>."</li>
+        <li>"<strong>Run python</strong> / <strong>Run shell</strong>…"</li>
+        <li>Paste a fenced code block: <code>```python</code> or <code>```sh</code></li>
+      </ul>
+
+      <h4>Calendar</h4>
+      <p>Creates events on your calendar (Google Calendar if connected).</p>
+      <ul>
+        <li>"<strong>Add to calendar</strong>: team sync Friday at 2pm."</li>
+        <li>"<strong>Schedule a</strong> dentist appointment Monday at 9am."</li>
+        <li>"<strong>Create an event</strong> / <strong>Calendar event</strong>…"</li>
+        <li>"<strong>Add an appointment</strong> / <strong>Add event</strong>…"</li>
+      </ul>
+
+      <h4>Home Automation</h4>
+      <p>Controls Home Assistant entities (requires HASS configured).</p>
+      <ul>
+        <li>"<strong>Turn on the</strong> living room lights."</li>
+        <li>"<strong>Turn off the</strong> TV."</li>
+        <li>"<strong>Lights on</strong> / <strong>Lights off</strong>."</li>
+        <li>"<strong>Dim the</strong> bedroom lights to 40%."</li>
+        <li>"<strong>Set brightness</strong> / <strong>Lights to</strong> 50%."</li>
+        <li>"<strong>Home automation</strong> / <strong>Smart home</strong>…"</li>
+      </ul>
+
+      <h4>Reminders</h4>
+      <p>Sets a reminder that fires at a specific date/time.</p>
+      <ul>
+        <li>"<strong>Remind me to</strong> take my meds at 8pm."</li>
+        <li>"<strong>Set a reminder</strong> for Monday morning."</li>
+        <li>"<strong>Don't let me forget</strong> to call Alex tomorrow."</li>
+        <li>"<strong>Notify me when</strong> it's 3pm."</li>
+      </ul>
+
+      <h4>Timers &amp; Quick Actions</h4>
+      <p>Handled directly without an agent — fast, no LLM classification step.</p>
+      <ul>
+        <li>"<strong>Set a timer</strong> for 10 minutes." / "<strong>Timer for</strong> 25 minutes."</li>
+        <li>"<strong>Set the volume</strong> to 60." / "<strong>Volume up</strong> / <strong>Volume down</strong>."</li>
+        <li>"<strong>Mute</strong> / <strong>Unmute</strong>."</li>
+        <li>"<strong>System info</strong>" / "<strong>CPU usage</strong>" / "<strong>How much RAM</strong>" / "<strong>Disk space</strong>."</li>
+        <li>"<strong>Make a note</strong>…" / "<strong>Add a note</strong>…" / "<strong>My notes</strong>" / "<strong>List notes</strong>."</li>
+        <li>"<strong>Don't forget</strong>…" (note, not reminder)</li>
+      </ul>
+
+      <h4>General Conversation</h4>
+      <p>Anything that doesn't match the above phrases is classified by the LLM and routed to the best agent, or answered directly if no specialist is needed.</p>
     </div>
 
     <!-- Tools -->
