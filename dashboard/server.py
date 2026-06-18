@@ -674,6 +674,21 @@ _OS_PERMISSION_GROUPS = [
         ),
         "revoke_cmd": "sudo rm /etc/sudoers.d/plia-mac",
     },
+    {
+        "id": "wireless_tools",
+        "name": "Wireless Tools",
+        "description": "Allows airmon-ng, airodump-ng, aireplay-ng, reaver and wash to run with sudo for monitor mode and packet capture.",
+        "tools": ["start_monitor_mode", "stop_monitor_mode", "capture_handshake", "attack_wps", "scan_wps_networks"],
+        "sudoers_file": "/etc/sudoers.d/plia-wireless",
+        "grant_cmd": (
+            "echo 'alfcon ALL=(ALL) NOPASSWD:"
+            " /usr/sbin/airmon-ng, /usr/sbin/airodump-ng, /usr/sbin/aireplay-ng,"
+            " /usr/sbin/reaver, /usr/bin/wash, /usr/sbin/wash,"
+            " /usr/sbin/service, /usr/bin/service'"
+            " | sudo tee /etc/sudoers.d/plia-wireless && sudo chmod 440 /etc/sudoers.d/plia-wireless"
+        ),
+        "revoke_cmd": "sudo rm /etc/sudoers.d/plia-wireless",
+    },
 ]
 
 
