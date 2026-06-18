@@ -90,7 +90,7 @@ def get_current_weather(location: str = "") -> str:
     except httpx.HTTPError as exc:
         return f"Weather service unavailable: {exc}"
 
-    c = data.get("current", {})
+    c = data.get("current") or {}
     temp = c.get("temperature_2m", "?")
     feels = c.get("apparent_temperature", "?")
     humidity = c.get("relative_humidity_2m", "?")
@@ -133,7 +133,7 @@ def get_forecast(location: str = "", days: int = 7) -> str:
     except httpx.HTTPError as exc:
         return f"Weather service unavailable: {exc}"
 
-    daily = data.get("daily", {})
+    daily = data.get("daily") or {}
     times = daily.get("time", [])
     maxs = daily.get("temperature_2m_max", [])
     mins = daily.get("temperature_2m_min", [])
@@ -143,7 +143,7 @@ def get_forecast(location: str = "", days: int = 7) -> str:
     if not times:
         return "Weather data unavailable."
 
-    lines = [f"{days}-day forecast for {name}:"]
+    lines = [f"{len(times)}-day forecast for {name}:"]
     for i, date_str in enumerate(times):
         try:
             day_name = datetime.fromisoformat(date_str).strftime("%a")
@@ -185,11 +185,12 @@ def get_uv_index(location: str = "") -> str:
     except httpx.HTTPError as exc:
         return f"Weather service unavailable: {exc}"
 
-    uv_list = data.get("hourly", {}).get("uv_index", [])
+    uv_list = (data.get("hourly") or {}).get("uv_index") or []
     hour = datetime.now(timezone.utc).hour
-    if hour >= len(uv_list):
+    if hour >= len(uv_list) or uv_list[hour] is None:
         return "UV data unavailable."
     uv = float(uv_list[hour])
-    label = _uv_label(uv)
-    advice = " — wear sunscreen" if uv >= 3 else ""
-    return f"{name} UV index: {uv:.0f} ({label}){advice}"
+    uv_rounded = round(uv)
+    label = _uv_label(uv_rounded)
+    advice = " — wear sunscreen" if uv_rounded >= 3 else ""
+    return f"{name} UV index: {uv_rounded} ({label}){advice}"

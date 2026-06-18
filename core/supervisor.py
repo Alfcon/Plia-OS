@@ -51,9 +51,9 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
         "run the file", "run the script", "execute the file",
     ],
     "weather": [
-        "weather", "forecast", "temperature outside", "will it rain",
+        "forecast", "temperature outside", "will it rain",
         "is it raining", "rain today", "rain tomorrow", "snow today",
-        "how hot", "how cold", "uv index", "sun protection",
+        "how hot outside", "how cold outside", "uv index", "sun protection",
         "what's the weather", "how's the weather",
     ],
     "web": ["search for", "search the web", "look it up", "look up", "google ", "find online",
