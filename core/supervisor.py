@@ -17,19 +17,21 @@ from agents.home import home_node
 from agents.reminder import reminder_node
 from agents.network import network_node
 from agents.wifi import wifi_node
+from agents.file import file_node
 logger = logging.getLogger(__name__)
 
-_KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder", "network", "wifi"}
+_KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder", "network", "wifi", "file"}
 _HOP_LIMIT = 5
 _TOOL_CALL_LIMIT = 10
 
 _CLASSIFY_SYSTEM = (
     "You are a router. Given the conversation, output exactly one word — "
-    "the specialist to handle the request: memory, web, code, calendar, home, reminder, network. "
+    "the specialist to handle the request: memory, web, code, calendar, home, reminder, network, file. "
     "Use 'reminder' for announcements at a specific future time ('remind me at 3pm', 'notify me in 2 hours'). "
     "Use 'home' only for Home Assistant device control (lights, switches, sensors). "
     "Use 'network' for MAC address operations (show, change, randomize, spoof, restore MAC address). "
     "Use 'wifi' for WiFi status, scanning nearby networks, or listing WiFi interfaces. "
+    "Use 'file' for reading, writing, finding, searching, or running files and directories. "
     "Use 'respond' for countdown timers, volume, system info, calculations, or anything answerable with tools directly."
 )
 
@@ -50,6 +52,15 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
              "scan for wifi", "scan wifi", "nearby wifi", "nearby networks",
              "wifi interfaces", "wireless interfaces", "am i connected to wifi",
              "wifi signal", "wifi strength", "wifi channel"],
+    "file": [
+        "read the file", "show me the file", "open the file", "what's in",
+        "contents of", "list files", "list directory", "what files",
+        "show files in", "find files", "find the file", "search in file",
+        "grep ", "create a file", "write to file", "make a file",
+        "save to file", "delete the file", "remove the file",
+        "move the file", "rename the file", "copy the file",
+        "run the file", "run the script", "execute the file",
+    ],
     "respond": ["set a timer", "set timer", "start a timer", "start timer", "timer for",
                 "set the volume", "volume up", "volume down", "mute", "unmute",
                 "system info", "how much ram", "cpu usage", "disk space",
@@ -164,6 +175,7 @@ def _build_graph():
     g.add_node("reminder", reminder_node)
     g.add_node("network", network_node)
     g.add_node("wifi", wifi_node)
+    g.add_node("file", file_node)
     g.add_node("respond", _respond_node)
 
     g.set_entry_point("supervisor")
@@ -176,9 +188,10 @@ def _build_graph():
         "reminder": "reminder",
         "network": "network",
         "wifi": "wifi",
+        "file": "file",
         "respond": "respond",
     })
-    for agent in ("memory", "web", "code", "calendar", "home", "reminder", "network", "wifi"):
+    for agent in ("memory", "web", "code", "calendar", "home", "reminder", "network", "wifi", "file"):
         g.add_edge(agent, "supervisor")
     g.add_edge("respond", END)
     return g.compile()
