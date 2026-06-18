@@ -76,9 +76,14 @@
     #left-sidebar .sb-settings-btn.active { background: #1e3a5f; color: #fff; }
     #docs-panel { width: 0; overflow: hidden; transition: width 0.2s ease; display: flex; flex-direction: row; background: #111; border-right: 1px solid #2a2a2a; flex-shrink: 0; min-height: 0; }
     #docs-panel.open { width: 750px; }
+    #tools-panel { width: 0; overflow: hidden; transition: width 0.2s ease; display: flex; flex-direction: column; background: #111; border-right: 1px solid #2a2a2a; flex-shrink: 0; min-height: 0; }
+    #tools-panel.open { width: 360px; }
     #left-sidebar .sb-docs-btn { background: #0d2a1a; color: #81c784; border: 1px solid #2a5f3a; border-radius: 4px; padding: 8px 10px; font-size: 0.8rem; cursor: pointer; width: 100%; }
     #left-sidebar .sb-docs-btn:hover { background: #2a5f3a; }
     #left-sidebar .sb-docs-btn.active { background: #2a5f3a; color: #fff; }
+    #left-sidebar .sb-tools-btn { background: #1a1a0d; color: #ffd54f; border: 1px solid #5f5a1e; border-radius: 4px; padding: 8px 10px; font-size: 0.8rem; cursor: pointer; width: 100%; }
+    #left-sidebar .sb-tools-btn:hover { background: #3a3510; }
+    #left-sidebar .sb-tools-btn.active { background: #3a3510; color: #fff; }
     #docs-nav { width: 122px; border-right: 1px solid #1e1e1e; padding: 10px 0; display: flex; flex-direction: column; flex-shrink: 0; }
     .docs-nav-btn { background: none; border: none; border-left: 2px solid transparent; border-radius: 0; color: #555; font-size: 0.72rem; padding: 10px 0; cursor: pointer; width: 100%; text-align: center; }
     .docs-nav-btn:hover { color: #ccc; background: #181818; }
@@ -134,6 +139,7 @@
 <div id="app-body">
 <div id="left-sidebar">
   <button class="sb-docs-btn" onclick="openDocs()">📖 Docs</button>
+  <button class="sb-tools-btn" onclick="openTools()">🔧 Tools</button>
   <button class="sb-settings-btn" onclick="openSettings()">⚙ Settings</button>
   <button class="sb-exit-btn" onclick="exitApp()">⏻ Exit</button>
 </div>
@@ -150,9 +156,9 @@
     <button class="docs-nav-btn" data-doc="memory" onclick="showDocSection('memory')">Memory</button>
     <button class="docs-nav-btn" data-doc="modules" onclick="showDocSection('modules')">Modules</button>
     <button class="docs-nav-btn" data-doc="home" onclick="showDocSection('home')">Home</button>
-    <button class="docs-nav-btn" data-doc="tools" onclick="showDocSection('tools');loadDocTools()">Tools</button>
     <button class="docs-nav-btn" data-doc="commands" onclick="showDocSection('commands')">Commands</button>
     <button class="docs-nav-btn" data-doc="faq" onclick="showDocSection('faq')">FAQ</button>
+    <button class="docs-nav-btn" data-doc="toolref" onclick="showDocSection('toolref');loadDocToolRef()">Tools</button>
   </div>
   <div id="docs-content">
 
@@ -660,20 +666,27 @@
       <p>Go to <strong>Settings → System → Config Backup</strong>. Click <strong>Export</strong> to download a JSON file. Click <strong>Import</strong> to restore from a previously exported file. Takes effect immediately.</p>
     </div>
 
-    <!-- Tools -->
-    <div id="docs-section-tools" class="docs-pane">
-      <h3>Tools — Available LLM Tools</h3>
-      <p>These tools are registered and available for the LLM to call during conversation. Each tool corresponds to a function in a module file under <code>modules/</code>.</p>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px;">
-        <span style="font-size:0.75rem;color:#555;" id="docs-tools-count"></span>
-        <button onclick="loadDocTools()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
+    <!-- Tool Reference -->
+    <div id="docs-section-toolref" class="docs-pane">
+      <h3>Tools Reference</h3>
+      <p>All registered tools available to the LLM and the Run Tools panel. Click a tool to see its parameters.</p>
+      <div style="display:flex;align-items:center;gap:8px;margin:8px 0;">
+        <input id="toolref-search" type="text" placeholder="Filter tools…" oninput="filterToolRef(this.value)"
+          style="flex:1;background:#1a1a1a;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:4px;padding:4px 6px;font-size:0.75rem;" />
+        <span id="toolref-count" style="font-size:0.72rem;color:#555;white-space:nowrap;"></span>
       </div>
-      <ul id="docs-tools-list" style="list-style:none;padding:0;margin:0;font-size:0.78rem;">
-        <li style="color:#555;">Loading…</li>
-      </ul>
+      <div id="toolref-list"></div>
     </div>
 
   </div>
+</div>
+<div id="tools-panel">
+  <div style="padding:10px 14px 6px;border-bottom:1px solid #1a1a1a;flex-shrink:0;">
+    <div style="font-size:0.78rem;color:#ffd54f;margin-bottom:6px;">Run Tools</div>
+    <input id="tool-search" type="text" placeholder="Search tools…" oninput="filterTools(this.value)"
+      style="width:100%;background:#1a1a1a;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:4px;padding:4px 6px;font-size:0.75rem;box-sizing:border-box;" />
+  </div>
+  <div id="tool-list" style="flex:1;overflow-y:auto;padding:8px 0;"></div>
 </div>
 <div id="settings-panel">
       <div id="m-nav">
@@ -688,7 +701,6 @@
         <button class="m-nav-btn" data-section="modules" onclick="showMenuSection('modules');loadModules()">Modules</button>
         <button class="m-nav-btn" data-section="home" onclick="showMenuSection('home');loadHassEntities()">Home</button>
         <button class="m-nav-btn" data-section="permissions" onclick="showMenuSection('permissions');loadPermissions()">Permissions</button>
-        <button class="m-nav-btn" data-section="tools" onclick="showMenuSection('tools');loadToolPanel()">Tools</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1090,16 +1102,6 @@
           </div>
         </div>
 
-        <!-- Tools panel -->
-        <div id="m-section-tools" class="m-pane" style="display:none;flex-direction:column;padding:0;">
-          <div style="padding:10px 14px 6px;border-bottom:1px solid #1a1a1a;flex-shrink:0;">
-            <div style="font-size:0.78rem;color:#aaa;margin-bottom:6px;">Run Tools</div>
-            <input id="tool-search" type="text" placeholder="Search tools…" oninput="filterTools(this.value)"
-              style="width:100%;background:#1a1a1a;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:4px;padding:4px 6px;font-size:0.75rem;box-sizing:border-box;" />
-          </div>
-          <div id="tool-list" style="flex:1;overflow-y:auto;min-height:0;padding:8px 0;"></div>
-          <!-- Run result -->
-        </div>
 
       </div>
 </div>
@@ -2282,14 +2284,89 @@
         return;
       }
       status.textContent = '';
-      // Close settings so chat is visible — result already broadcast to chat via WebSocket
-      document.getElementById('settings-panel').classList.remove('open');
     } catch(e) {
       status.style.color = '#ef9a9a';
       status.textContent = e.message;
     }
   }
   // ---- End tools panel ----
+
+  // ---- Tool reference docs ----
+  let _toolRefData = null;
+
+  async function loadDocToolRef() {
+    if (_toolRefData) { renderToolRef(''); return; }
+    const [toolDict, schemaList, modules] = await Promise.all([
+      fetch('/api/tools').then(r => r.json()).catch(() => ({})),
+      fetch('/api/tools/schemas').then(r => r.json()).catch(() => []),
+      fetch('/api/modules').then(r => r.json()).catch(() => []),
+    ]);
+    const schemaMap = {};
+    schemaList.forEach(t => { schemaMap[t.function.name] = t.function; });
+    _toolRefData = Object.keys(toolDict).map(name => ({
+      name,
+      desc: toolDict[name] || '',
+      schema: schemaMap[name] || null,
+      module: (modules.find(m => m.tools.includes(name)) || {name: 'other'}).name,
+      enabled: (modules.find(m => m.tools.includes(name)) || {enabled: true}).enabled,
+    }));
+    renderToolRef('');
+  }
+
+  function filterToolRef(q) { renderToolRef(q.toLowerCase()); }
+
+  function renderToolRef(q) {
+    const container = document.getElementById('toolref-list');
+    const count = document.getElementById('toolref-count');
+    if (!_toolRefData) return;
+    const filtered = q
+      ? _toolRefData.filter(t => t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q))
+      : _toolRefData;
+    count.textContent = `${filtered.length} tool${filtered.length !== 1 ? 's' : ''}`;
+    const label = n => n.replace(/_tools$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const grouped = {};
+    filtered.forEach(t => (grouped[t.module] = grouped[t.module] || []).push(t));
+    container.innerHTML = Object.entries(grouped).map(([mod, tools], i) => {
+      const id = `tref-${i}`;
+      const disabledBadge = !tools[0].enabled ? ' <span style="color:#ef9a9a;font-size:0.68rem;">(disabled)</span>' : '';
+      const rows = tools.map(t => {
+        const params = t.schema && t.schema.parameters && t.schema.parameters.properties
+          ? Object.entries(t.schema.parameters.properties) : [];
+        const paramHtml = params.length ? params.map(([pname, def]) => {
+          const req = t.schema.parameters.required && t.schema.parameters.required.includes(pname);
+          const typ = def.type || 'string';
+          return `<div style="display:flex;gap:6px;padding:2px 0;">
+            <code style="color:#ffd54f;min-width:120px;">${_esc(pname)}${req ? ' <span style=\'color:#ef9a9a;\'>*</span>' : ''}</code>
+            <span style="color:#555;">${_esc(typ)}</span>
+            ${def.description ? `<span style="color:#888;">— ${_esc(def.description)}</span>` : ''}
+          </div>`;
+        }).join('') : '<div style="color:#555;font-size:0.72rem;">No parameters</div>';
+        return `<div style="border-bottom:1px solid #111;">
+          <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.tref-chv').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼';"
+            style="width:100%;background:none;border:none;padding:6px 14px 6px 18px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <span>
+              <span style="color:#4fc3f7;font-family:monospace;font-size:0.78rem;">${_esc(t.name)}</span>
+              <span style="display:block;color:#888;font-size:0.72rem;margin-top:2px;">${_esc(t.desc)}</span>
+            </span>
+            <span class="tref-chv" style="color:#555;font-size:0.65rem;flex-shrink:0;margin-top:2px;">▶</span>
+          </button>
+          <div style="display:none;padding:4px 18px 10px 18px;background:#0d0d0d;font-size:0.73rem;">
+            <div style="color:#888;font-size:0.7rem;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em;">Parameters</div>
+            ${paramHtml}
+          </div>
+        </div>`;
+      }).join('');
+      return `<div style="margin-top:10px;">
+        <button onclick="const el=document.getElementById('${id}');const ch=this.querySelector('.tref-gchv');const h=el.style.display!=='none';el.style.display=h?'none':'';ch.textContent=h?'▼':'▲';"
+          style="width:100%;background:#0d0d0d;border:none;border-bottom:1px solid #1a1a1a;padding:5px 14px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:#81c784;">${_esc(label(mod))}${disabledBadge}</span>
+          <span class="tref-gchv" style="color:#555;font-size:0.65rem;">▲</span>
+        </button>
+        <div id="${id}">${rows}</div>
+      </div>`;
+    }).join('');
+  }
+  // ---- End tool reference docs ----
 
   function loadSystemInfo() {
     fetch('/api/system/info').then(r => r.json()).then(info => {
@@ -2894,49 +2971,30 @@
     }
   }
   function _docsKeyHandler(e) { if (e.key === 'Escape') closeDocs(); }
+  function closeTools() {
+    document.getElementById('tools-panel').classList.remove('open');
+    document.querySelector('.sb-tools-btn').classList.remove('active');
+    document.removeEventListener('keydown', _toolsKeyHandler);
+  }
+  function openTools() {
+    const panel = document.getElementById('tools-panel');
+    if (panel.classList.contains('open')) {
+      closeTools();
+    } else {
+      closeDocs();
+      closeSettings();
+      panel.classList.add('open');
+      document.querySelector('.sb-tools-btn').classList.add('active');
+      loadToolPanel();
+      document.addEventListener('keydown', _toolsKeyHandler);
+    }
+  }
+  function _toolsKeyHandler(e) { if (e.key === 'Escape') closeTools(); }
   function showDocSection(name) {
     document.querySelectorAll('.docs-nav-btn').forEach(b => b.classList.remove('active'));
     document.querySelector(`.docs-nav-btn[data-doc="${name}"]`).classList.add('active');
     document.querySelectorAll('.docs-pane').forEach(p => p.style.display = 'none');
     document.getElementById(`docs-section-${name}`).style.display = 'block';
-  }
-
-  function loadDocTools() {
-    const list = document.getElementById('docs-tools-list');
-    const count = document.getElementById('docs-tools-count');
-    list.innerHTML = '<li style="color:#555;">Loading…</li>';
-    Promise.all([fetch('/api/tools').then(r => r.json()), fetch('/api/modules').then(r => r.json())])
-      .then(([tools, modules]) => {
-        const total = Object.keys(tools).length;
-        count.textContent = `${total} tool${total !== 1 ? 's' : ''} in ${modules.length} module${modules.length !== 1 ? 's' : ''}`;
-        const label = name => name.replace(/_tools$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        list.innerHTML = modules.map((mod, i) => {
-          const id = `dtcat-${i}`;
-          const items = mod.tools.map(t =>
-            `<li style="border-bottom:1px solid #151515;padding:6px 0 6px 8px;">
-              <span style="color:#4fc3f7;font-family:monospace;font-size:0.78rem;">${_esc(t)}</span><br>
-              <span style="color:#888;font-size:0.75rem;">${_esc(tools[t] || '')}</span>
-            </li>`
-          ).join('');
-          const badge = mod.enabled ? '' : ' <span style="color:#ef9a9a;font-size:0.68rem;">(disabled)</span>';
-          return `<li style="list-style:none;margin-top:12px;">
-            <button onclick="toggleDocCat('${id}')" style="width:100%;background:none;border:none;border-bottom:1px solid #2a2a2a;padding:0 0 3px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:#81c784;">${_esc(label(mod.name))}${badge}</span>
-              <span id="${id}-chevron" style="color:#555;font-size:0.65rem;">▲</span>
-            </button>
-            <ul id="${id}" style="list-style:none;padding:0;margin:0;">${items}</ul>
-          </li>`;
-        }).join('');
-      })
-      .catch(() => { list.innerHTML = '<li style="color:#ef9a9a;">Failed to load tools.</li>'; });
-  }
-
-  function toggleDocCat(id) {
-    const ul = document.getElementById(id);
-    const ch = document.getElementById(id + '-chevron');
-    const collapsed = ul.style.display === 'none';
-    ul.style.display = collapsed ? '' : 'none';
-    ch.textContent = collapsed ? '▲' : '▼';
   }
 
   function showMenuSection(name) {
