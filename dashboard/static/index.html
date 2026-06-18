@@ -88,15 +88,37 @@
 </head>
 <body>
 
-<div id="menu-overlay">
-  <div id="menu-backdrop" onclick="closeMenu()"></div>
-  <div id="menu-panel">
-    <div id="menu-header">
-      <span class="menu-title">Plia-OS</span>
-      <button class="menu-close" onclick="closeMenu()">✕</button>
-    </div>
 
-    <div id="menu-settings" style="display:none">
+<header id="top-bar">
+  <span id="status-badge">armed</span>
+  <span class="tb-sep">|</span>
+  <span class="tb-chip"><span class="tb-label">OS</span><span id="tb-os">—</span></span>
+  <span class="tb-chip"><span class="tb-label">CPU</span><span id="tb-cpu">—</span></span>
+  <span class="tb-chip"><span class="tb-label">RAM</span><span id="tb-ram">—</span></span>
+  <div id="vram-bar" onclick="toggleVramDetail()">
+    <div class="vram-row">
+      <span id="vram-dot" style="font-size:0.9rem;">●</span>
+      <span id="vram-label" style="color:#888;font-size:0.7rem;text-transform:uppercase;">VRAM</span>
+      <div class="vram-track">
+        <div id="vram-fill" class="vram-fill normal" style="width:0%"></div>
+      </div>
+      <span id="vram-text" style="color:#aaa;">— GB</span>
+      <span id="vram-chevron" style="color:#555;">▼</span>
+    </div>
+    <div id="vram-bar-detail">
+      <div id="vram-model-list"></div>
+      <button id="vram-done-btn" style="display:none" onclick="releaseStudioModel(event)">✓ Done</button>
+    </div>
+  </div>
+  <span class="tb-chip"><span class="tb-label">Disk</span><span id="tb-disk">—</span></span>
+</header>
+
+<div id="app-body">
+<div id="left-sidebar">
+  <button class="sb-settings-btn" onclick="openSettings()">⚙ Settings</button>
+  <button class="sb-exit-btn" onclick="exitApp()">⏻ Exit</button>
+</div>
+<div id="settings-panel">
       <div id="m-nav">
         <button class="m-nav-btn active" data-section="voice" onclick="showMenuSection('voice')">Voice</button>
         <button class="m-nav-btn" data-section="web" onclick="showMenuSection('web')">Web</button>
@@ -483,43 +505,6 @@
           <ul id="hass-entities-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
         </div>
       </div>
-    </div>
-
-    <div id="menu-footer">
-      <button class="settings-btn" onclick="toggleMenuSettings()">⚙ Settings</button>
-      <button class="exit-btn" onclick="exitApp()">⏻ Exit</button>
-    </div>
-  </div>
-</div>
-
-<header id="top-bar">
-  <span id="status-badge">armed</span>
-  <span class="tb-sep">|</span>
-  <span class="tb-chip"><span class="tb-label">OS</span><span id="tb-os">—</span></span>
-  <span class="tb-chip"><span class="tb-label">CPU</span><span id="tb-cpu">—</span></span>
-  <span class="tb-chip"><span class="tb-label">RAM</span><span id="tb-ram">—</span></span>
-  <div id="vram-bar" onclick="toggleVramDetail()">
-    <div class="vram-row">
-      <span id="vram-dot" style="font-size:0.9rem;">●</span>
-      <span id="vram-label" style="color:#888;font-size:0.7rem;text-transform:uppercase;">VRAM</span>
-      <div class="vram-track">
-        <div id="vram-fill" class="vram-fill normal" style="width:0%"></div>
-      </div>
-      <span id="vram-text" style="color:#aaa;">— GB</span>
-      <span id="vram-chevron" style="color:#555;">▼</span>
-    </div>
-    <div id="vram-bar-detail">
-      <div id="vram-model-list"></div>
-      <button id="vram-done-btn" style="display:none" onclick="releaseStudioModel(event)">✓ Done</button>
-    </div>
-  </div>
-  <span class="tb-chip"><span class="tb-label">Disk</span><span id="tb-disk">—</span></span>
-</header>
-
-<div id="app-body">
-<div id="left-sidebar">
-  <button class="sb-settings-btn" onclick="openSettings()">⚙ Settings</button>
-  <button class="sb-exit-btn" onclick="exitApp()">⏻ Exit</button>
 </div>
 <div id="chat-wrap">
   <main id="conversation">
@@ -2036,7 +2021,6 @@
   }
 
   function openMenu() {
-    document.getElementById('menu-overlay').style.display = 'block';
     _syncMenuInputs();
     document.addEventListener('keydown', _menuKeyHandler);
   }
@@ -2046,7 +2030,6 @@
     showMenuSection('voice');
   }
   function closeMenu() {
-    document.getElementById('menu-overlay').style.display = 'none';
     document.removeEventListener('keydown', _menuKeyHandler);
   }
   function _menuKeyHandler(e) { if (e.key === 'Escape') closeMenu(); }
