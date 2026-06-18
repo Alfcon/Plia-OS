@@ -151,6 +151,7 @@
     <button class="docs-nav-btn" data-doc="home" onclick="showDocSection('home')">Home</button>
     <button class="docs-nav-btn" data-doc="tools" onclick="showDocSection('tools');loadDocTools()">Tools</button>
     <button class="docs-nav-btn" data-doc="commands" onclick="showDocSection('commands')">Commands</button>
+    <button class="docs-nav-btn" data-doc="faq" onclick="showDocSection('faq')">FAQ</button>
   </div>
   <div id="docs-content">
 
@@ -598,6 +599,64 @@
 
       <h4>General Conversation</h4>
       <p>Anything that doesn't match the above phrases is classified by the LLM and routed to the best agent, or answered directly if no specialist is needed.</p>
+    </div>
+
+    <!-- FAQ -->
+    <div id="docs-section-faq" class="docs-pane">
+      <h3>FAQ</h3>
+
+      <h4>The top bar shows "error" — what's wrong?</h4>
+      <p>The status badge shows the voice pipeline state. "error" means the pipeline failed to start — usually no microphone detected, a missing audio dependency, or an STT model that couldn't load. Text chat still works normally. Check <strong>Settings → System → Pipeline Status</strong> and the terminal log for details.</p>
+
+      <h4>Voice isn't working — no response after wake word.</h4>
+      <p>Check in order: (1) pipeline is running — <strong>Settings → System</strong> dot should be green; (2) wake word threshold isn't too high — lower it in <strong>Settings → Voice</strong>; (3) STT model loaded — terminal log will show errors; (4) microphone permissions — Plia needs access to the default input device.</p>
+
+      <h4>How do I change the wake word?</h4>
+      <p>Go to <strong>Settings → Voice → Wake Word Model</strong>. Select a different openwakeword model from the dropdown and click Apply. The pipeline reloads the detector automatically.</p>
+
+      <h4>Responses are slow. How do I speed things up?</h4>
+      <ul>
+        <li>Switch to a smaller STT model (<code>tiny</code> or <code>base</code>) in <strong>Settings → Voice</strong>.</li>
+        <li>Use a faster/smaller Ollama model — edit <code>ollama_model</code> in <code>~/.plia/config.json</code>.</li>
+        <li>Switch TTS to <strong>Kokoro</strong> (lightest engine) in <strong>Settings → Voice</strong>.</li>
+        <li>If using AirLLM, switch compression to <strong>4-bit</strong> in <strong>Settings → LLM</strong>.</li>
+      </ul>
+
+      <h4>Can I run Plia-OS without a GPU?</h4>
+      <p>Yes. Kokoro TTS and Whisper STT both run on CPU. Ollama also runs CPU-only (slower). AirLLM requires a GPU. Set a small Ollama model (e.g. <code>llama3.2:3b</code>) for best CPU performance.</p>
+
+      <h4>What's the difference between Notes and Memories?</h4>
+      <ul>
+        <li><strong>Notes</strong> — freeform text you add manually. Not used by the LLM during conversation.</li>
+        <li><strong>Memories (facts)</strong> — key/value pairs the LLM can recall mid-conversation. Say "remember that…" or add via <strong>Settings → Memory</strong>.</li>
+      </ul>
+
+      <h4>How do I reset the system prompt to default?</h4>
+      <p>Go to <strong>Settings → LLM → System Prompt</strong> and click <strong>Reset</strong>. To undo a single change without full reset, click <strong>Undo</strong> instead.</p>
+
+      <h4>How do I add a new tool or capability?</h4>
+      <p>Create a <code>.py</code> file in <code>modules/</code>, decorate a function with <code>@tool("description")</code> from <code>core.registry</code>, and restart Plia-OS. The tool appears automatically. See <strong>Docs → Modules</strong> for details.</p>
+
+      <h4>How do I disable a module without deleting it?</h4>
+      <p>Go to <strong>Settings → Modules</strong>, find the module, and click <strong>Disable</strong>. It's added to <code>disabled_modules</code> in config and skipped on next restart. Re-enable the same way.</p>
+
+      <h4>Where is my data stored?</h4>
+      <ul>
+        <li><strong>Config</strong> — <code>~/.plia/config.json</code></li>
+        <li><strong>Facts &amp; memories</strong> — <code>~/.plia/memory.db</code></li>
+        <li><strong>Active chat history</strong> — <code>data/chat_history.db</code> (project directory)</li>
+        <li><strong>Reminders</strong> — <code>~/.plia/memory.db</code> (reminders table)</li>
+      </ul>
+      <p>Back up via <strong>Settings → System → Export Config</strong>, or copy the files above directly.</p>
+
+      <h4>How do I clear the conversation history?</h4>
+      <p>Click <strong>Clear Chat</strong> in the bottom bar. This archives the current session to memory (as a timestamped key) and starts fresh. The voice pipeline's in-memory context also resets.</p>
+
+      <h4>Can I use a cloud LLM instead of Ollama?</h4>
+      <p>Yes. Install the extra (<code>pip install -e ".[fallback-openai]"</code> or <code>".[fallback-anthropic]"</code>), then set Provider, Model, and API Key in <strong>Settings → LLM → Fallback Provider</strong> and click Apply.</p>
+
+      <h4>How do I back up and restore my full config?</h4>
+      <p>Go to <strong>Settings → System → Config Backup</strong>. Click <strong>Export</strong> to download a JSON file. Click <strong>Import</strong> to restore from a previously exported file. Takes effect immediately.</p>
     </div>
 
     <!-- Tools -->
