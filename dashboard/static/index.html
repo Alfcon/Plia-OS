@@ -148,6 +148,7 @@
     <button class="docs-nav-btn" data-doc="memory" onclick="showDocSection('memory')">Memory</button>
     <button class="docs-nav-btn" data-doc="modules" onclick="showDocSection('modules')">Modules</button>
     <button class="docs-nav-btn" data-doc="home" onclick="showDocSection('home')">Home</button>
+    <button class="docs-nav-btn" data-doc="tools" onclick="showDocSection('tools');loadDocTools()">Tools</button>
   </div>
   <div id="docs-content">
 
@@ -466,6 +467,19 @@
         <li>Climate (<code>climate.*</code>) — temperature, mode</li>
         <li>Sensors (<code>sensor.*</code>) — read current values</li>
         <li>Scripts &amp; automations — trigger by name</li>
+      </ul>
+    </div>
+
+    <!-- Tools -->
+    <div id="docs-section-tools" class="docs-pane">
+      <h3>Tools — Available LLM Tools</h3>
+      <p>These tools are registered and available for the LLM to call during conversation. Each tool corresponds to a function in a module file under <code>modules/</code>.</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px;">
+        <span style="font-size:0.75rem;color:#555;" id="docs-tools-count"></span>
+        <button onclick="loadDocTools()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
+      </div>
+      <ul id="docs-tools-list" style="list-style:none;padding:0;margin:0;font-size:0.78rem;">
+        <li style="color:#555;">Loading…</li>
       </ul>
     </div>
 
@@ -2411,6 +2425,22 @@
     document.querySelector(`.docs-nav-btn[data-doc="${name}"]`).classList.add('active');
     document.querySelectorAll('.docs-pane').forEach(p => p.style.display = 'none');
     document.getElementById(`docs-section-${name}`).style.display = 'block';
+  }
+
+  function loadDocTools() {
+    const list = document.getElementById('docs-tools-list');
+    const count = document.getElementById('docs-tools-count');
+    list.innerHTML = '<li style="color:#555;">Loading…</li>';
+    fetch('/api/tools').then(r => r.json()).then(tools => {
+      const names = Object.keys(tools).sort();
+      count.textContent = `${names.length} tool${names.length !== 1 ? 's' : ''} registered`;
+      list.innerHTML = names.map(name =>
+        `<li style="border-bottom:1px solid #1a1a1a;padding:7px 0;">
+          <span style="color:#4fc3f7;font-family:monospace;font-size:0.78rem;">${_esc(name)}</span><br>
+          <span style="color:#888;font-size:0.75rem;">${_esc(tools[name])}</span>
+        </li>`
+      ).join('');
+    }).catch(() => { list.innerHTML = '<li style="color:#ef9a9a;">Failed to load tools.</li>'; });
   }
 
   function showMenuSection(name) {
