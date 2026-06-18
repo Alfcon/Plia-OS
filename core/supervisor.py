@@ -18,20 +18,22 @@ from agents.reminder import reminder_node
 from agents.network import network_node
 from agents.wifi import wifi_node
 from agents.file import file_node
+from agents.weather import weather_node
 logger = logging.getLogger(__name__)
 
-_KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder", "network", "wifi", "file"}
+_KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder", "network", "wifi", "file", "weather"}
 _HOP_LIMIT = 5
 _TOOL_CALL_LIMIT = 10
 
 _CLASSIFY_SYSTEM = (
     "You are a router. Given the conversation, output exactly one word — "
-    "the specialist to handle the request: memory, web, code, calendar, home, reminder, network, wifi, file. "
+    "the specialist to handle the request: memory, web, code, calendar, home, reminder, network, wifi, file, weather. "
     "Use 'reminder' for announcements at a specific future time ('remind me at 3pm', 'notify me in 2 hours'). "
     "Use 'home' only for Home Assistant device control (lights, switches, sensors). "
     "Use 'network' for MAC address operations (show, change, randomize, spoof, restore MAC address). "
     "Use 'wifi' for WiFi status, scanning nearby networks, or listing WiFi interfaces. "
     "Use 'file' for reading, writing, finding, searching, or running files and directories. "
+    "Use 'weather' for weather conditions, forecasts, temperature, rain, UV index, or climate queries. "
     "Use 'respond' for countdown timers, volume, system info, calculations, or anything answerable with tools directly."
 )
 
@@ -47,6 +49,12 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
         "save to file", "delete the file", "remove the file",
         "move the file", "rename the file", "copy the file",
         "run the file", "run the script", "execute the file",
+    ],
+    "weather": [
+        "weather", "forecast", "temperature outside", "will it rain",
+        "is it raining", "rain today", "rain tomorrow", "snow today",
+        "how hot", "how cold", "uv index", "sun protection",
+        "what's the weather", "how's the weather",
     ],
     "web": ["search for", "search the web", "look it up", "look up", "google ", "find online",
             "look online", "browse to", "visit http", "read this article", "read the page",
@@ -176,6 +184,7 @@ def _build_graph():
     g.add_node("network", network_node)
     g.add_node("wifi", wifi_node)
     g.add_node("file", file_node)
+    g.add_node("weather", weather_node)
     g.add_node("respond", _respond_node)
 
     g.set_entry_point("supervisor")
@@ -189,9 +198,10 @@ def _build_graph():
         "network": "network",
         "wifi": "wifi",
         "file": "file",
+        "weather": "weather",
         "respond": "respond",
     })
-    for agent in ("memory", "web", "code", "calendar", "home", "reminder", "network", "wifi", "file"):
+    for agent in ("memory", "web", "code", "calendar", "home", "reminder", "network", "wifi", "file", "weather"):
         g.add_edge(agent, "supervisor")
     g.add_edge("respond", END)
     return g.compile()
