@@ -22,6 +22,8 @@ def create_app() -> FastAPI:
     # fires (e.g. during testing with httpx ASGITransport).
     load_modules()
     setup_event_forwarding()
+    from core.notifier import setup_notifier
+    setup_notifier()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

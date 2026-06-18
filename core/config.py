@@ -89,6 +89,9 @@ class PliaConfig:
     # Permissions — maps tool name → "admin" | "user"
     tool_permissions: dict = field(default_factory=dict)
 
+    # Notifications
+    desktop_notifications: bool = True
+
 
 _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
     "tts_engine": ("kokoro", "chatterbox", "dramabox"),
