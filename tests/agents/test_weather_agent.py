@@ -21,7 +21,7 @@ async def test_invalid_json_returns_fallback():
         update = await weather_node(_state("what's the weather"))
     assert update["active_agent"] == "weather"
     result = "\n".join(update["tool_results"])
-    assert "weather" in result.lower()
+    assert result.startswith("[weather]")
 
 
 @pytest.mark.asyncio
