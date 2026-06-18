@@ -1099,13 +1099,6 @@
           </div>
           <div id="tool-list" style="flex:1;overflow-y:auto;min-height:0;padding:8px 0;"></div>
           <!-- Run result -->
-          <div id="tool-result-box" style="display:none;flex-shrink:0;border-top:1px solid #1a1a1a;padding:10px 14px;max-height:200px;overflow-y:auto;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-              <span id="tool-result-label" style="font-size:0.72rem;color:#888;"></span>
-              <button onclick="document.getElementById('tool-result-box').style.display='none'" style="background:none;border:none;color:#555;font-size:0.85rem;cursor:pointer;">✕</button>
-            </div>
-            <pre id="tool-result-text" style="margin:0;font-size:0.72rem;color:#a5d6a7;white-space:pre-wrap;word-break:break-all;"></pre>
-          </div>
         </div>
 
       </div>
@@ -2289,10 +2282,8 @@
         return;
       }
       status.textContent = '';
-      const box = document.getElementById('tool-result-box');
-      document.getElementById('tool-result-label').textContent = name;
-      document.getElementById('tool-result-text').textContent = data.result;
-      box.style.display = 'block';
+      // Close settings so chat is visible — result already broadcast to chat via WebSocket
+      document.getElementById('settings-panel').classList.remove('open');
     } catch(e) {
       status.style.color = '#ef9a9a';
       status.textContent = e.message;

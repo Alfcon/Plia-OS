@@ -746,7 +746,7 @@ async def run_tool(body: dict):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
     result_str = str(result)
-    await _broadcast({"type": "transcript", "data": {"role": "tool", "text": f"[{tool_name}]\n{result_str}"}})
+    await _broadcast({"type": "transcript", "role": "tool", "text": f"[{tool_name}]\n{result_str}"})
     return {"tool": tool_name, "result": result_str}
 
 
