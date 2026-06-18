@@ -2620,16 +2620,26 @@
     const list = document.getElementById('docs-tools-list');
     const count = document.getElementById('docs-tools-count');
     list.innerHTML = '<li style="color:#555;">Loading…</li>';
-    fetch('/api/tools').then(r => r.json()).then(tools => {
-      const names = Object.keys(tools).sort();
-      count.textContent = `${names.length} tool${names.length !== 1 ? 's' : ''} registered`;
-      list.innerHTML = names.map(name =>
-        `<li style="border-bottom:1px solid #1a1a1a;padding:7px 0;">
-          <span style="color:#4fc3f7;font-family:monospace;font-size:0.78rem;">${_esc(name)}</span><br>
-          <span style="color:#888;font-size:0.75rem;">${_esc(tools[name])}</span>
-        </li>`
-      ).join('');
-    }).catch(() => { list.innerHTML = '<li style="color:#ef9a9a;">Failed to load tools.</li>'; });
+    Promise.all([fetch('/api/tools').then(r => r.json()), fetch('/api/modules').then(r => r.json())])
+      .then(([tools, modules]) => {
+        const total = Object.keys(tools).length;
+        count.textContent = `${total} tool${total !== 1 ? 's' : ''} in ${modules.length} module${modules.length !== 1 ? 's' : ''}`;
+        const label = name => name.replace(/_tools$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        list.innerHTML = modules.map(mod => {
+          const items = mod.tools.map(t =>
+            `<li style="border-bottom:1px solid #151515;padding:6px 0 6px 8px;">
+              <span style="color:#4fc3f7;font-family:monospace;font-size:0.78rem;">${_esc(t)}</span><br>
+              <span style="color:#888;font-size:0.75rem;">${_esc(tools[t] || '')}</span>
+            </li>`
+          ).join('');
+          const badge = mod.enabled ? '' : ' <span style="color:#ef9a9a;font-size:0.68rem;">(disabled)</span>';
+          return `<li style="list-style:none;margin-top:12px;">
+            <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:#81c784;border-bottom:1px solid #2a2a2a;padding-bottom:3px;margin-bottom:2px;">${_esc(label(mod.name))}${badge}</div>
+            <ul style="list-style:none;padding:0;margin:0;">${items}</ul>
+          </li>`;
+        }).join('');
+      })
+      .catch(() => { list.innerHTML = '<li style="color:#ef9a9a;">Failed to load tools.</li>'; });
   }
 
   function showMenuSection(name) {
