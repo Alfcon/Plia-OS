@@ -959,6 +959,13 @@
             </label>
           </div>
           <div id="config-import-status" style="font-size:0.72rem;color:#888;margin-top:4px;min-height:1em;"></div>
+          <hr style="border-color:#222;margin:10px 0;" />
+          <div style="font-size:0.78rem;color:#aaa;margin-bottom:8px;">Notifications</div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:#999;cursor:pointer;">
+            <input type="checkbox" id="cfg-desktop-notifications"
+              onchange="fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({desktop_notifications:this.checked})})">
+            Desktop notifications for reminders
+          </label>
         </div>
         <div id="m-section-reminders" class="m-pane" style="display:none">
           <div style="margin-bottom:10px;">
@@ -1471,6 +1478,7 @@
         document.getElementById('db-duration-mult').value = cfg.dramabox_duration_multiplier;
         document.getElementById('db-duration-mult-val').textContent = parseFloat(cfg.dramabox_duration_multiplier).toFixed(2);
       }
+      document.getElementById('cfg-desktop-notifications').checked = cfg.desktop_notifications !== false;
       onWebProviderChange();
       onEngineChange();
       startVramPolling();
