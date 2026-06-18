@@ -224,10 +224,5 @@ async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
     if response:
         await asyncio.to_thread(add_message, "assistant", response)
 
-    # If respond node called tools directly, tool output was already broadcast
-    # via transcript events — suppress the LLM's redundant text summary.
-    prev = final_messages[-2] if len(final_messages) >= 2 else {}
-    if prev.get("role") == "tool":
-        response = ""
 
     return response, final_messages

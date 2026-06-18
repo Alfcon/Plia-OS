@@ -85,7 +85,8 @@ def test_randomize_mac_saves_original_and_shows_old_mac():
     mock_store.get_fact.return_value = None
     # 4 calls: 1 resolve + 3 ip link (down/address/up)
     with patch("subprocess.run", side_effect=[_ifaces_mock(IFACES), _run_ok(), _run_ok(), _run_ok()]), \
-         patch("modules.network_tools.get_memory_store", return_value=mock_store):
+         patch("modules.network_tools.get_memory_store", return_value=mock_store), \
+         patch("modules.network_tools._has_mac_admin", return_value=True):
         result = randomize_mac("")
     mock_store.remember.assert_called_once_with("original_mac_eth0", "aa:bb:cc:dd:ee:ff")
     assert "eth0" in result
@@ -119,7 +120,8 @@ def test_set_mac_valid_saves_original_and_succeeds():
     mock_store = MagicMock()
     mock_store.get_fact.return_value = None
     with patch("subprocess.run", side_effect=[_ifaces_mock(IFACES), _run_ok(), _run_ok(), _run_ok()]), \
-         patch("modules.network_tools.get_memory_store", return_value=mock_store):
+         patch("modules.network_tools.get_memory_store", return_value=mock_store), \
+         patch("modules.network_tools._has_mac_admin", return_value=True):
         result = set_mac("eth0", "AA:BB:CC:DD:EE:FF")
     assert "AA:BB:CC:DD:EE:FF" in result
     mock_store.remember.assert_called_once_with("original_mac_eth0", "aa:bb:cc:dd:ee:ff")
@@ -150,7 +152,8 @@ def test_restore_mac_applies_stored_original():
     mock_store = MagicMock()
     mock_store.get_fact.return_value = "aa:bb:cc:dd:ee:ff"
     with patch("subprocess.run", side_effect=[_ifaces_mock(IFACES), _run_ok(), _run_ok(), _run_ok()]), \
-         patch("modules.network_tools.get_memory_store", return_value=mock_store):
+         patch("modules.network_tools.get_memory_store", return_value=mock_store), \
+         patch("modules.network_tools._has_mac_admin", return_value=True):
         result = restore_mac("")
     assert "aa:bb:cc:dd:ee:ff" in result
     assert "restored" in result.lower()
