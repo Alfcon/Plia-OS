@@ -720,12 +720,6 @@ async def set_tool_permissions(body: dict):
     return {"tool_permissions": perms}
 
 
-@router.get("/api/tools")
-async def list_tools():
-    from core.registry import get_tool_schemas
-    return {"tools": [s["function"]["name"] for s in get_tool_schemas()]}
-
-
 @router.get("/api/tools/schemas")
 async def tool_schemas():
     from core.registry import get_tool_schemas

@@ -2175,16 +2175,14 @@
 
   async function loadToolPanel() {
     if (_toolSchemas.length) { renderToolList(''); return; }
-    const data = await fetch('/api/tools').then(r => r.json()).catch(() => ({tools: []}));
-    const schemas = await fetch('/api/permissions').then(r => r.json()).catch(() => ({}));
-    const modules = await fetch('/api/modules').then(r => r.json()).catch(() => []);
-    // build schema map from /api/chat tool schemas
+    const [toolDict, schemaList, modules] = await Promise.all([
+      fetch('/api/tools').then(r => r.json()).catch(() => ({})),
+      fetch('/api/tools/schemas').then(r => r.json()).catch(() => []),
+      fetch('/api/modules').then(r => r.json()).catch(() => []),
+    ]);
     const schemaMap = {};
-    try {
-      const s = await fetch('/api/tools/schemas').then(r => r.json()).catch(() => null);
-      if (s) s.forEach(t => { schemaMap[t.function.name] = t.function; });
-    } catch(_) {}
-    _toolSchemas = data.tools.map(name => ({
+    schemaList.forEach(t => { schemaMap[t.function.name] = t.function; });
+    _toolSchemas = Object.keys(toolDict).map(name => ({
       name,
       schema: schemaMap[name] || null,
       module: (modules.find(m => m.tools.includes(name)) || {name: 'other'}).name,
