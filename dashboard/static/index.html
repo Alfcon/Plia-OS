@@ -688,6 +688,7 @@
         <button class="m-nav-btn" data-section="modules" onclick="showMenuSection('modules');loadModules()">Modules</button>
         <button class="m-nav-btn" data-section="home" onclick="showMenuSection('home');loadHassEntities()">Home</button>
         <button class="m-nav-btn" data-section="permissions" onclick="showMenuSection('permissions');loadPermissions()">Permissions</button>
+        <button class="m-nav-btn" data-section="tools" onclick="showMenuSection('tools');loadToolPanel()">Tools</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1088,6 +1089,25 @@
             </div>
           </div>
         </div>
+
+        <!-- Tools panel -->
+        <div id="m-section-tools" class="m-pane" style="display:none;flex-direction:column;padding:0;">
+          <div style="padding:10px 14px 6px;border-bottom:1px solid #1a1a1a;flex-shrink:0;">
+            <div style="font-size:0.78rem;color:#aaa;margin-bottom:6px;">Run Tools</div>
+            <input id="tool-search" type="text" placeholder="Search tools…" oninput="filterTools(this.value)"
+              style="width:100%;background:#1a1a1a;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:4px;padding:4px 6px;font-size:0.75rem;box-sizing:border-box;" />
+          </div>
+          <div id="tool-list" style="flex:1;overflow-y:auto;min-height:0;padding:8px 0;"></div>
+          <!-- Run result -->
+          <div id="tool-result-box" style="display:none;flex-shrink:0;border-top:1px solid #1a1a1a;padding:10px 14px;max-height:200px;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span id="tool-result-label" style="font-size:0.72rem;color:#888;"></span>
+              <button onclick="document.getElementById('tool-result-box').style.display='none'" style="background:none;border:none;color:#555;font-size:0.85rem;cursor:pointer;">✕</button>
+            </div>
+            <pre id="tool-result-text" style="margin:0;font-size:0.72rem;color:#a5d6a7;white-space:pre-wrap;word-break:break-all;"></pre>
+          </div>
+        </div>
+
       </div>
 </div>
 <div id="chat-wrap">
@@ -2149,6 +2169,138 @@
       status.textContent = 'Save failed: ' + e.message;
     }
   }
+
+  // ---- Tools panel ----
+  let _toolSchemas = [];
+
+  async function loadToolPanel() {
+    if (_toolSchemas.length) { renderToolList(''); return; }
+    const data = await fetch('/api/tools').then(r => r.json()).catch(() => ({tools: []}));
+    const schemas = await fetch('/api/permissions').then(r => r.json()).catch(() => ({}));
+    const modules = await fetch('/api/modules').then(r => r.json()).catch(() => []);
+    // build schema map from /api/chat tool schemas
+    const schemaMap = {};
+    try {
+      const s = await fetch('/api/tools/schemas').then(r => r.json()).catch(() => null);
+      if (s) s.forEach(t => { schemaMap[t.function.name] = t.function; });
+    } catch(_) {}
+    _toolSchemas = data.tools.map(name => ({
+      name,
+      schema: schemaMap[name] || null,
+      module: (modules.find(m => m.tools.includes(name)) || {name: 'other'}).name,
+    }));
+    renderToolList('');
+  }
+
+  function filterTools(q) { renderToolList(q.toLowerCase()); }
+
+  function renderToolList(q) {
+    const list = document.getElementById('tool-list');
+    const grouped = {};
+    _toolSchemas.forEach(t => {
+      if (q && !t.name.toLowerCase().includes(q)) return;
+      (grouped[t.module] = grouped[t.module] || []).push(t);
+    });
+    if (!Object.keys(grouped).length) {
+      list.innerHTML = '<div style="padding:8px 14px;color:#555;font-size:0.75rem;">No tools found.</div>';
+      return;
+    }
+    const label = n => n.replace(/_tools$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    list.innerHTML = Object.entries(grouped).map(([mod, tools], i) => {
+      const id = `tcat-${i}`;
+      const rows = tools.map(t => `
+        <div id="tool-row-${_esc(t.name)}" style="border-bottom:1px solid #111;">
+          <button onclick="toggleToolForm('${_esc(t.name)}')"
+            style="width:100%;background:none;border:none;color:#ccc;font-family:monospace;font-size:0.73rem;padding:5px 14px 5px 22px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+            <span>${_esc(t.name)}</span>
+            <span id="tool-chv-${_esc(t.name)}" style="color:#555;font-size:0.65rem;">▶</span>
+          </button>
+          <div id="tool-form-${_esc(t.name)}" style="display:none;padding:6px 14px 10px 22px;background:#0d0d0d;">
+            ${buildToolForm(t)}
+            <button onclick="runTool('${_esc(t.name)}')"
+              style="margin-top:6px;background:#1565c0;border:none;color:#eee;padding:4px 12px;border-radius:3px;font-size:0.73rem;cursor:pointer;width:100%;">
+              ▶ Run
+            </button>
+            <div id="tool-inline-${_esc(t.name)}" style="margin-top:6px;font-size:0.7rem;color:#888;"></div>
+          </div>
+        </div>`).join('');
+      return `<div>
+        <button onclick="toggleToolCat('${id}')"
+          style="width:100%;background:#0d0d0d;border:none;border-bottom:1px solid #1a1a1a;padding:5px 14px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:#4fc3f7;">${_esc(label(mod))}</span>
+          <span id="${id}-chv" style="color:#555;font-size:0.65rem;">▲</span>
+        </button>
+        <div id="${id}">${rows}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function buildToolForm(t) {
+    const params = t.schema && t.schema.parameters && t.schema.parameters.properties
+      ? Object.entries(t.schema.parameters.properties)
+      : [];
+    if (!params.length) return '<div style="color:#555;font-size:0.7rem;margin-bottom:2px;">No parameters</div>';
+    return params.map(([name, def]) => {
+      const req = t.schema.parameters.required && t.schema.parameters.required.includes(name);
+      return `<div style="margin-bottom:4px;">
+        <label style="color:#888;font-size:0.68rem;display:block;">${_esc(name)}${req ? ' *' : ''}</label>
+        <input id="tool-param-${_esc(t.name)}-${_esc(name)}" type="text" placeholder="${_esc(def.type || 'string')}"
+          style="width:100%;background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:3px 5px;font-size:0.72rem;box-sizing:border-box;" />
+      </div>`;
+    }).join('');
+  }
+
+  function toggleToolCat(id) {
+    const el = document.getElementById(id);
+    const ch = document.getElementById(id + '-chv');
+    const hide = el.style.display !== 'none';
+    el.style.display = hide ? 'none' : '';
+    ch.textContent = hide ? '▼' : '▲';
+  }
+
+  function toggleToolForm(name) {
+    const form = document.getElementById(`tool-form-${name}`);
+    const ch = document.getElementById(`tool-chv-${name}`);
+    const open = form.style.display !== 'none';
+    form.style.display = open ? 'none' : 'block';
+    ch.textContent = open ? '▶' : '▼';
+  }
+
+  async function runTool(name) {
+    const t = _toolSchemas.find(t => t.name === name);
+    const params = {};
+    if (t && t.schema && t.schema.parameters && t.schema.parameters.properties) {
+      Object.keys(t.schema.parameters.properties).forEach(p => {
+        const el = document.getElementById(`tool-param-${name}-${p}`);
+        if (el && el.value !== '') params[p] = el.value;
+      });
+    }
+    const status = document.getElementById(`tool-inline-${name}`);
+    status.style.color = '#888';
+    status.textContent = 'Running…';
+    try {
+      const r = await fetch('/api/tools/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tool: name, params}),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        status.style.color = '#ef9a9a';
+        status.textContent = data.detail || 'Error';
+        return;
+      }
+      status.textContent = '';
+      const box = document.getElementById('tool-result-box');
+      document.getElementById('tool-result-label').textContent = name;
+      document.getElementById('tool-result-text').textContent = data.result;
+      box.style.display = 'block';
+    } catch(e) {
+      status.style.color = '#ef9a9a';
+      status.textContent = e.message;
+    }
+  }
+  // ---- End tools panel ----
 
   function loadSystemInfo() {
     fetch('/api/system/info').then(r => r.json()).then(info => {

@@ -726,6 +726,12 @@ async def list_tools():
     return {"tools": [s["function"]["name"] for s in get_tool_schemas()]}
 
 
+@router.get("/api/tools/schemas")
+async def tool_schemas():
+    from core.registry import get_tool_schemas
+    return get_tool_schemas()
+
+
 @router.post("/api/tools/run")
 async def run_tool(body: dict):
     """Call any registered tool directly — no LLM involved.
