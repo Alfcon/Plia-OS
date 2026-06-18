@@ -69,10 +69,18 @@ def find_files(pattern: str, directory: str = "") -> str:
     except Exception as exc:
         return f"Error searching: {exc}"
 
+    _LIMIT = 100
+    total = len(matches)
+    truncated = total > _LIMIT
+    matches = matches[:_LIMIT]
+
     if not matches:
         return f"No files found matching '{pattern}' in {base}."
 
-    return "\n".join(str(m) for m in matches)
+    result = "\n".join(str(m) for m in matches)
+    if truncated:
+        result += f"\n(showing first {_LIMIT} of {total}+ results)"
+    return result
 
 
 @tool("Search for text within a file. Returns matching lines with 1-based line numbers (case-insensitive).")
