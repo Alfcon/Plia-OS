@@ -164,3 +164,103 @@ def restore_mac(interface: str = "") -> str:
     if err:
         return f"MAC change failed: {err}"
     return f"{ifname}: restored to {original}"
+
+
+@tool(description="List all WiFi interfaces on this system with their current state and connection.")
+def list_wifi_interfaces() -> str:
+    result = subprocess.run(
+        ["nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "--escape", "no", "dev", "status"],
+        capture_output=True, text=True, timeout=5,
+    )
+    if result.returncode != 0:
+        return "nmcli not available."
+    rows = []
+    for line in result.stdout.splitlines():
+        parts = line.split(":")
+        if len(parts) >= 4 and parts[1] in ("wifi", "wifi-p2p"):
+            rows.append((parts[0], parts[1], parts[2], parts[3] or "—"))
+    if not rows:
+        return "No WiFi interfaces found."
+    w = max(len(r[0]) for r in rows)
+    return "\n".join(f"{dev:<{w}}  {itype:<10}  {state:<20}  {conn}" for dev, itype, state, conn in rows)
+
+
+@tool(description="Scan for nearby WiFi networks and show SSID, signal strength, security type, and channel.")
+def scan_wifi() -> str:
+    result = subprocess.run(
+        ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY,CHAN", "--escape", "no", "dev", "wifi", "list"],
+        capture_output=True, text=True, timeout=15,
+    )
+    if result.returncode != 0:
+        return f"Scan failed: {result.stderr.strip() or 'nmcli not available'}"
+    rows = []
+    seen: set = set()
+    for line in result.stdout.strip().splitlines():
+        if not line:
+            continue
+        parts = line.rsplit(":", 3)
+        if len(parts) < 4:
+            continue
+        ssid, signal, security, chan = parts
+        ssid = ssid or "<hidden>"
+        key = (ssid, chan)
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append((ssid, signal, security or "open", chan))
+    if not rows:
+        return "No networks found."
+    rows.sort(key=lambda r: -int(r[1]) if r[1].isdigit() else 0)
+    w = max(len(r[0]) for r in rows)
+    return "\n".join(f"{ssid:<{w}}  {sig:>3}%  {sec:<12}  ch{chan}" for ssid, sig, sec, chan in rows)
+
+
+@tool(description="Show current WiFi connection status including SSID, signal strength, interface, and IP address.")
+def wifi_status() -> str:
+    dev_result = subprocess.run(
+        ["nmcli", "-t", "-f", "TYPE,STATE,CONNECTION,DEVICE", "--escape", "no", "dev", "status"],
+        capture_output=True, text=True, timeout=5,
+    )
+    if dev_result.returncode != 0:
+        return "nmcli not available."
+    connected = None
+    for line in dev_result.stdout.splitlines():
+        parts = line.split(":")
+        if len(parts) >= 4 and parts[0] == "wifi" and "connected" in parts[1] and parts[2]:
+            connected = {"ssid": parts[2], "device": parts[3]}
+            break
+    if not connected:
+        return "Not connected to any WiFi network."
+    iface = connected["device"]
+    signal_result = subprocess.run(
+        ["nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL,SECURITY,CHAN", "--escape", "no", "dev", "wifi", "list"],
+        capture_output=True, text=True, timeout=5,
+    )
+    signal = "?"
+    chan = "?"
+    security = "?"
+    for line in signal_result.stdout.splitlines():
+        parts = line.rsplit(":", 4)
+        if len(parts) >= 5 and parts[0] == "yes":
+            signal = parts[2]
+            security = parts[3]
+            chan = parts[4]
+            break
+    ip_result = subprocess.run(
+        ["ip", "-4", "addr", "show", iface],
+        capture_output=True, text=True, timeout=5,
+    )
+    ip = "?"
+    for line in ip_result.stdout.splitlines():
+        line = line.strip()
+        if line.startswith("inet "):
+            ip = line.split()[1]
+            break
+    return (
+        f"Interface  {iface}\n"
+        f"SSID       {connected['ssid']}\n"
+        f"Signal     {signal}%\n"
+        f"Security   {security}\n"
+        f"Channel    {chan}\n"
+        f"IP         {ip}"
+    )
