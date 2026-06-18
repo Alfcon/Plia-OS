@@ -2020,29 +2020,24 @@
     });
   }
 
-  function openMenu() {
-    _syncMenuInputs();
-    document.addEventListener('keydown', _menuKeyHandler);
-  }
-  function openSettings() {
-    openMenu();
-    document.getElementById('menu-settings').style.display = 'flex';
-    showMenuSection('voice');
-  }
-  function closeMenu() {
+  function closeSettings() {
+    document.getElementById('settings-panel').classList.remove('open');
+    document.querySelector('.sb-settings-btn').classList.remove('active');
     document.removeEventListener('keydown', _menuKeyHandler);
   }
-  function _menuKeyHandler(e) { if (e.key === 'Escape') closeMenu(); }
-
-  function toggleMenuSettings() {
-    const s = document.getElementById('menu-settings');
-    if (s.style.display === 'none') {
-      s.style.display = 'flex';
-      showMenuSection('voice');
+  function openSettings() {
+    const panel = document.getElementById('settings-panel');
+    if (panel.classList.contains('open')) {
+      closeSettings();
     } else {
-      s.style.display = 'none';
+      panel.classList.add('open');
+      document.querySelector('.sb-settings-btn').classList.add('active');
+      showMenuSection('voice');
+      _syncMenuInputs();
+      document.addEventListener('keydown', _menuKeyHandler);
     }
   }
+  function _menuKeyHandler(e) { if (e.key === 'Escape') closeSettings(); }
 
   function showMenuSection(name) {
     document.querySelectorAll('.m-nav-btn').forEach(b => b.classList.remove('active'));
