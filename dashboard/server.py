@@ -720,6 +720,36 @@ async def set_tool_permissions(body: dict):
     return {"tool_permissions": perms}
 
 
+@router.get("/api/tools")
+async def list_tools():
+    from core.registry import get_tool_schemas
+    return {"tools": [s["function"]["name"] for s in get_tool_schemas()]}
+
+
+@router.post("/api/tools/run")
+async def run_tool(body: dict):
+    """Call any registered tool directly — no LLM involved.
+    Body: {"tool": "tool_name", "params": {...}}
+    """
+    from core.registry import call_tool
+    tool_name = body.get("tool")
+    params = body.get("params", {})
+    if not tool_name:
+        raise HTTPException(status_code=400, detail="'tool' is required")
+    try:
+        import asyncio
+        result = await asyncio.to_thread(call_tool, tool_name, params)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except TypeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    result_str = str(result)
+    await _broadcast({"type": "transcript", "data": {"role": "tool", "text": f"[{tool_name}]\n{result_str}"}})
+    return {"tool": tool_name, "result": result_str}
+
+
 @router.get("/api/vram/status")
 async def vram_status():
     return get_vram_broker().status()
