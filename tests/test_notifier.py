@@ -9,6 +9,7 @@ async def test_notification_sent_when_enabled():
     mock_cfg.desktop_notifications = True
     with patch("core.notifier.get_config", return_value=mock_cfg), \
          patch("subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
         await _on_reminder_fired({"type": "reminder_fired", "message": "take meds"})
     mock_run.assert_called_once()
     cmd = mock_run.call_args[0][0]
