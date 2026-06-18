@@ -74,6 +74,23 @@
     #settings-panel { width: 0; overflow: hidden; transition: width 0.2s ease; display: flex; flex-direction: row; background: #111; border-right: 1px solid #2a2a2a; flex-shrink: 0; min-height: 0; }
     #settings-panel.open { width: 750px; }
     #left-sidebar .sb-settings-btn.active { background: #1e3a5f; color: #fff; }
+    #docs-panel { width: 0; overflow: hidden; transition: width 0.2s ease; display: flex; flex-direction: row; background: #111; border-right: 1px solid #2a2a2a; flex-shrink: 0; min-height: 0; }
+    #docs-panel.open { width: 750px; }
+    #left-sidebar .sb-docs-btn { background: #0d2a1a; color: #81c784; border: 1px solid #2a5f3a; border-radius: 4px; padding: 8px 10px; font-size: 0.8rem; cursor: pointer; width: 100%; }
+    #left-sidebar .sb-docs-btn:hover { background: #2a5f3a; }
+    #left-sidebar .sb-docs-btn.active { background: #2a5f3a; color: #fff; }
+    #docs-nav { width: 122px; border-right: 1px solid #1e1e1e; padding: 10px 0; display: flex; flex-direction: column; flex-shrink: 0; }
+    .docs-nav-btn { background: none; border: none; border-left: 2px solid transparent; border-radius: 0; color: #555; font-size: 0.72rem; padding: 10px 0; cursor: pointer; width: 100%; text-align: center; }
+    .docs-nav-btn:hover { color: #ccc; background: #181818; }
+    .docs-nav-btn.active { color: #81c784; border-left-color: #81c784; background: #0d2a1a; }
+    #docs-content { flex: 1; overflow-y: auto; padding: 12px 14px; }
+    .docs-pane { display: none; color: #ccc; font-size: 0.8rem; line-height: 1.6; }
+    .docs-pane h3 { color: #81c784; font-size: 0.85rem; margin: 16px 0 6px; border-bottom: 1px solid #2a2a2a; padding-bottom: 4px; }
+    .docs-pane h4 { color: #4fc3f7; font-size: 0.78rem; margin: 10px 0 3px; }
+    .docs-pane p { margin: 0 0 7px; }
+    .docs-pane ul { margin: 0 0 8px; padding-left: 16px; }
+    .docs-pane li { margin-bottom: 3px; }
+    .docs-pane code { background: #1a1a1a; border: 1px solid #333; border-radius: 3px; padding: 1px 4px; font-size: 0.75rem; color: #e0e0e0; }
     #m-nav { width: 122px; border-right: 1px solid #1e1e1e; padding: 10px 0; display: flex; flex-direction: column; flex-shrink: 0; }
     .m-nav-btn { background: none; border: none; border-left: 2px solid transparent; border-radius: 0; color: #555; font-size: 0.72rem; padding: 10px 0; cursor: pointer; width: 100%; text-align: center; }
     .m-nav-btn:hover { color: #ccc; background: #181818; }
@@ -115,8 +132,66 @@
 
 <div id="app-body">
 <div id="left-sidebar">
+  <button class="sb-docs-btn" onclick="openDocs()">📖 Docs</button>
   <button class="sb-settings-btn" onclick="openSettings()">⚙ Settings</button>
   <button class="sb-exit-btn" onclick="exitApp()">⏻ Exit</button>
+</div>
+<div id="docs-panel">
+  <div id="docs-nav">
+    <button class="docs-nav-btn active" data-doc="voice" onclick="showDocSection('voice')">Voice</button>
+  </div>
+  <div id="docs-content">
+    <div id="docs-section-voice" class="docs-pane" style="display:block">
+      <h3>Voice — Setup &amp; Usage</h3>
+
+      <h4>Wake Word</h4>
+      <p>Plia-OS listens for a wake word before activating the microphone.</p>
+      <ul>
+        <li>Go to <strong>Settings → Voice</strong> to select a wake word model and adjust the detection threshold.</li>
+        <li>Lower threshold = more sensitive (more false triggers). Higher = less sensitive.</li>
+        <li>After TTS playback, the wake word is muted for ~4 seconds to prevent echo false-triggers.</li>
+      </ul>
+
+      <h4>Speech-to-Text (STT)</h4>
+      <p>Powered by <strong>Whisper</strong>. Choose a model size in <strong>Settings → Voice → STT Model</strong>.</p>
+      <ul>
+        <li><code>tiny</code> — fastest, least accurate. Good for low-power hardware.</li>
+        <li><code>base</code> — solid balance for English. Recommended starting point.</li>
+        <li><code>small</code> — better accuracy, moderate CPU/RAM use.</li>
+        <li><code>medium</code> / <code>large</code> — highest accuracy, slowest. GPU recommended.</li>
+      </ul>
+      <p>Set <strong>Language</strong> to your language code (e.g. <code>en</code>, <code>fr</code>) or leave blank for auto-detect. Auto-detect adds a small delay per turn.</p>
+
+      <h4>Text-to-Speech (TTS)</h4>
+      <p>Choose an engine in <strong>Settings → Voice → TTS Engine</strong>. Hot-swap without restart.</p>
+      <ul>
+        <li><strong>Kokoro</strong> — default, CPU-friendly, good quality. No extras needed.</li>
+        <li><strong>Chatterbox</strong> — higher quality, more resource-intensive.</li>
+        <li><strong>Dramabox</strong> — premium option. Requires: <code>pip install -e ".[dramabox]"</code></li>
+      </ul>
+
+      <h4>Pipeline Modes (Studio)</h4>
+      <p>Studio mode adjusts how the pipeline handles resources when you're recording or mixing.</p>
+      <ul>
+        <li><strong>cpu_stt</strong> — forces STT onto CPU, freeing the GPU for LLM/TTS during studio sessions.</li>
+        <li><strong>pause</strong> — pauses the voice pipeline entirely during studio recording.</li>
+      </ul>
+      <p>Configure in <strong>Settings → Voice → Studio Mode</strong>.</p>
+
+      <h4>Silence &amp; Timing</h4>
+      <ul>
+        <li><strong>Silence Timeout</strong> — seconds of silence before the pipeline considers speech done and starts processing.</li>
+        <li><strong>Silence Chunks Threshold</strong> — number of silent audio chunks before cutting off. Increase if responses get cut off mid-sentence.</li>
+      </ul>
+
+      <h4>Microphone Tips</h4>
+      <ul>
+        <li>Audio is captured as <code>int16</code> (avoids PipeWire float32 normalization issues on Linux).</li>
+        <li>If the mic isn't detected on startup, the dashboard and text chat still work — voice is optional.</li>
+        <li>Check <strong>Settings → System → Pipeline Status</strong> to confirm voice pipeline state.</li>
+      </ul>
+    </div>
+  </div>
 </div>
 <div id="settings-panel">
       <div id="m-nav">
@@ -2025,6 +2100,7 @@
     if (panel.classList.contains('open')) {
       closeSettings();
     } else {
+      closeDocs();
       panel.classList.add('open');
       document.querySelector('.sb-settings-btn').classList.add('active');
       showMenuSection('voice');
@@ -2033,6 +2109,31 @@
     }
   }
   function _menuKeyHandler(e) { if (e.key === 'Escape') closeSettings(); }
+
+  function closeDocs() {
+    document.getElementById('docs-panel').classList.remove('open');
+    document.querySelector('.sb-docs-btn').classList.remove('active');
+    document.removeEventListener('keydown', _docsKeyHandler);
+  }
+  function openDocs() {
+    const panel = document.getElementById('docs-panel');
+    if (panel.classList.contains('open')) {
+      closeDocs();
+    } else {
+      closeSettings();
+      panel.classList.add('open');
+      document.querySelector('.sb-docs-btn').classList.add('active');
+      showDocSection('voice');
+      document.addEventListener('keydown', _docsKeyHandler);
+    }
+  }
+  function _docsKeyHandler(e) { if (e.key === 'Escape') closeDocs(); }
+  function showDocSection(name) {
+    document.querySelectorAll('.docs-nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.docs-nav-btn[data-doc="${name}"]`).classList.add('active');
+    document.querySelectorAll('.docs-pane').forEach(p => p.style.display = 'none');
+    document.getElementById(`docs-section-${name}`).style.display = 'block';
+  }
 
   function showMenuSection(name) {
     document.querySelectorAll('.m-nav-btn').forEach(b => b.classList.remove('active'));
