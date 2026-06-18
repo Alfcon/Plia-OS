@@ -72,7 +72,7 @@
     .config-row button { flex: 0 0 auto; width: auto; padding: 6px 10px; }
     #google-fields { margin-top: 4px; }
     #settings-panel { width: 0; overflow: hidden; transition: width 0.2s ease; display: flex; flex-direction: row; background: #111; border-right: 1px solid #2a2a2a; flex-shrink: 0; min-height: 0; }
-    #settings-panel.open { width: 500px; }
+    #settings-panel.open { width: 750px; }
     #left-sidebar .sb-settings-btn.active { background: #1e3a5f; color: #fff; }
     #m-nav { width: 122px; border-right: 1px solid #1e1e1e; padding: 10px 0; display: flex; flex-direction: column; flex-shrink: 0; }
     .m-nav-btn { background: none; border: none; border-left: 2px solid transparent; border-radius: 0; color: #555; font-size: 0.72rem; padding: 10px 0; cursor: pointer; width: 100%; text-align: center; }
@@ -458,7 +458,7 @@
             <input id="note-input" type="text" placeholder="Add a note…"
               style="flex:1;background:#111;border:1px solid #333;color:#eee;padding:4px 6px;border-radius:3px;font-size:0.75rem;"
               onkeydown="if(event.key==='Enter')addNote()">
-            <button onclick="addNote()" style="background:#2a2a2a;border:1px solid #555;border-radius:3px;color:#a5d6a7;font-size:0.75rem;padding:4px 8px;cursor:pointer;">+</button>
+            <button onclick="addNote()" style="background:#2a2a2a;border:1px solid #555;border-radius:3px;color:#a5d6a7;font-size:0.75rem;padding:4px 8px;cursor:pointer;width:auto;flex-shrink:0;">+</button>
           </div>
           <ul id="notes-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0 0 14px;"></ul>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
@@ -475,7 +475,7 @@
             <input id="mem-val-input" type="text" placeholder="Value"
               style="flex:2;background:#111;border:1px solid #333;color:#eee;padding:4px 6px;border-radius:3px;font-size:0.75rem;"
               onkeydown="if(event.key==='Enter')addMemory()">
-            <button onclick="addMemory()" style="background:#2a2a2a;border:1px solid #555;border-radius:3px;color:#a5d6a7;font-size:0.75rem;padding:4px 8px;cursor:pointer;">+</button>
+            <button onclick="addMemory()" style="background:#2a2a2a;border:1px solid #555;border-radius:3px;color:#a5d6a7;font-size:0.75rem;padding:4px 8px;cursor:pointer;width:auto;flex-shrink:0;">+</button>
           </div>
           <p style="font-size:0.72rem;color:#555;margin:0 0 8px;">Facts Plia learned from conversation. Say "remember that…" to add.</p>
           <ul id="memory-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
@@ -1106,11 +1106,11 @@
       _allNotes = notes;
       memList.innerHTML = !mems.length
         ? '<li style="color:#555;font-size:0.75rem;">No memories stored</li>'
-        : mems.map(m => `<li style="padding:4px 0;border-bottom:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
-          <span style="word-break:break-word;flex:1;"><strong style="color:#e0e0e0;">${_esc(m.key)}</strong><br>
+        : mems.map(m => `<li style="padding:4px 0;border-bottom:1px solid #1a1a1a;display:grid;grid-template-columns:1fr auto;gap:6px;align-items:start;">
+          <span style="overflow-wrap:anywhere;min-width:0;"><strong style="color:#e0e0e0;">${_esc(m.key)}</strong><br>
             <span class="mem-val" data-key="${_esc(m.key)}" onclick="editMemoryValue(this)" style="color:#888;cursor:pointer;" title="Click to edit">${_esc(m.value)}</span>
           </span>
-          <button onclick="deleteMemory(this.dataset.key)" data-key="${_esc(m.key)}" style="background:none;border:none;color:#ef9a9a;font-size:0.9rem;cursor:pointer;padding:2px 6px;flex-shrink:0;" title="Forget">✕</button>
+          <button onclick="deleteMemory(this.dataset.key)" data-key="${_esc(m.key)}" style="background:none;border:none;color:#ef9a9a;font-size:0.9rem;cursor:pointer;padding:2px 6px;" title="Forget">✕</button>
         </li>`).join('');
     } catch(e) {
       notesList.innerHTML = '<li style="color:#ef9a9a;font-size:0.75rem;">Failed to load</li>';
@@ -1150,9 +1150,9 @@
         const items = await r.json();
         list.innerHTML = !items.length
           ? '<li style="color:#555;font-size:0.75rem;">No results</li>'
-          : items.map(m => `<li style="padding:4px 0;border-bottom:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
-              <span style="word-break:break-word;">${m.key ? `<strong style="color:#e0e0e0;">${_esc(m.key)}</strong><br>` : ''}<span style="color:#888;">${_esc(m.value)}</span></span>
-              ${m.key ? `<button onclick="deleteMemory(this.dataset.key)" data-key="${_esc(m.key)}" style="background:none;border:none;color:#ef9a9a;font-size:0.9rem;cursor:pointer;padding:2px 6px;flex-shrink:0;" title="Forget">✕</button>` : ''}
+          : items.map(m => `<li style="padding:4px 0;border-bottom:1px solid #1a1a1a;display:grid;grid-template-columns:1fr auto;gap:6px;align-items:start;">
+              <span style="overflow-wrap:anywhere;min-width:0;">${m.key ? `<strong style="color:#e0e0e0;">${_esc(m.key)}</strong><br>` : ''}<span style="color:#888;">${_esc(m.value)}</span></span>
+              ${m.key ? `<button onclick="deleteMemory(this.dataset.key)" data-key="${_esc(m.key)}" style="background:none;border:none;color:#ef9a9a;font-size:0.9rem;cursor:pointer;padding:2px 6px;" title="Forget">✕</button>` : ''}
             </li>`).join('');
       } catch(e) {}
     }, 300);
@@ -1226,16 +1226,16 @@
         const label = m.enabled ? 'Enabled' : 'Disabled';
         const action = m.enabled ? 'disable' : 'enable';
         const actionLabel = m.enabled ? 'Disable' : 'Enable';
-        return `<li style="padding:6px 0;border-bottom:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:flex-start;">
+        return `<li style="padding:6px 0;border-bottom:1px solid #1a1a1a;display:flex;align-items:flex-start;gap:14px;">
+          <button onclick="toggleModule('${_esc(m.name)}','${action}')"
+            style="background:#1e1e1e;border:1px solid #333;border-radius:3px;color:#aaa;font-size:0.7rem;padding:2px 6px;cursor:pointer;flex-shrink:0;width:60px;">
+            ${actionLabel}
+          </button>
           <div>
             <strong style="color:#e0e0e0;font-size:0.78rem;">${_esc(m.name)}</strong>
             <span style="color:${color};font-size:0.7rem;margin-left:6px;">${label}</span><br>
             <span style="color:#666;font-size:0.7rem;">${m.tools.length} tool${m.tools.length !== 1 ? 's' : ''}: ${m.tools.map(_esc).join(', ')}</span>
           </div>
-          <button onclick="toggleModule('${_esc(m.name)}','${action}')"
-            style="background:#1e1e1e;border:1px solid #333;border-radius:3px;color:#aaa;font-size:0.7rem;padding:2px 8px;cursor:pointer;flex-shrink:0;margin-left:8px;">
-            ${actionLabel}
-          </button>
         </li>`;
       }).join('');
     } catch(e) {
@@ -1866,11 +1866,6 @@
       bar.classList.add('studio-mode');
       doneBtn.style.display = 'block';
       doneBtn.textContent = `✓ Done — Release ${(_activeHeavyModel || 'engine').charAt(0).toUpperCase() + (_activeHeavyModel || 'engine').slice(1)}`;
-      if (!_vramDetailOpen) {
-        _vramDetailOpen = true;
-        document.getElementById('vram-bar-detail').style.display = 'block';
-        document.getElementById('vram-chevron').textContent = '▲';
-      }
     } else {
       fill.className = 'vram-fill normal';
       dot.style.color = '#4ade80';
