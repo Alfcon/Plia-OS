@@ -139,8 +139,19 @@
 <div id="docs-panel">
   <div id="docs-nav">
     <button class="docs-nav-btn active" data-doc="voice" onclick="showDocSection('voice')">Voice</button>
+    <button class="docs-nav-btn" data-doc="web" onclick="showDocSection('web')">Web</button>
+    <button class="docs-nav-btn" data-doc="llm" onclick="showDocSection('llm')">LLM</button>
+    <button class="docs-nav-btn" data-doc="agents" onclick="showDocSection('agents')">Agents</button>
+    <button class="docs-nav-btn" data-doc="system" onclick="showDocSection('system')">System</button>
+    <button class="docs-nav-btn" data-doc="reminders" onclick="showDocSection('reminders')">Reminders</button>
+    <button class="docs-nav-btn" data-doc="calendar" onclick="showDocSection('calendar')">Calendar</button>
+    <button class="docs-nav-btn" data-doc="memory" onclick="showDocSection('memory')">Memory</button>
+    <button class="docs-nav-btn" data-doc="modules" onclick="showDocSection('modules')">Modules</button>
+    <button class="docs-nav-btn" data-doc="home" onclick="showDocSection('home')">Home</button>
   </div>
   <div id="docs-content">
+
+    <!-- Voice -->
     <div id="docs-section-voice" class="docs-pane" style="display:block">
       <h3>Voice — Setup &amp; Usage</h3>
 
@@ -191,6 +202,273 @@
         <li>Check <strong>Settings → System → Pipeline Status</strong> to confirm voice pipeline state.</li>
       </ul>
     </div>
+
+    <!-- Web -->
+    <div id="docs-section-web" class="docs-pane">
+      <h3>Web — Search Setup &amp; Usage</h3>
+
+      <h4>Choosing a Provider</h4>
+      <p>Configure in <strong>Settings → Web → Provider</strong>. Three options:</p>
+      <ul>
+        <li><strong>DuckDuckGo</strong> — default. No API key needed. Uses DuckDuckGo Instant Answers. Best for quick lookups with no setup.</li>
+        <li><strong>Google</strong> — requires a Google Custom Search API key and a Search Engine ID (CX). More comprehensive results for research queries.</li>
+        <li><strong>Playwright</strong> — headless browser scraping. Useful for pages that block simple HTTP requests. Requires: <code>pip install -e ".[playwright]"</code></li>
+      </ul>
+
+      <h4>Setting Up Google Search</h4>
+      <ol style="padding-left:16px;margin:0 0 8px;">
+        <li>Create a project in <strong>Google Cloud Console</strong> and enable the <em>Custom Search API</em>.</li>
+        <li>Generate an API key and paste it into <strong>Settings → Web → API Key</strong>.</li>
+        <li>Create a Programmable Search Engine at <em>programmablesearchengine.google.com</em>. Copy the CX (Search Engine ID) into <strong>Settings → Web → CX</strong>.</li>
+        <li>Click <strong>Apply</strong>. Plia will use Google for all web searches.</li>
+      </ol>
+
+      <h4>Triggering Web Search in Chat</h4>
+      <p>Say or type phrases like:</p>
+      <ul>
+        <li>"Search for the latest news on…"</li>
+        <li>"Look up how to…"</li>
+        <li>"Find information about…"</li>
+      </ul>
+      <p>The web agent runs, fetches results, and includes them in the response.</p>
+
+      <h4>Max Results</h4>
+      <p>Controls how many search results are passed to the LLM per query. More results = better coverage but longer processing. Default is 3. Adjust in config if needed.</p>
+    </div>
+
+    <!-- LLM -->
+    <div id="docs-section-llm" class="docs-pane">
+      <h3>LLM — Language Model Configuration</h3>
+
+      <h4>Local Model (Ollama)</h4>
+      <p>Plia-OS uses <strong>Ollama</strong> as its primary LLM backend by default. No configuration needed here — set the Ollama URL and model name in the main config file (<code>~/.plia/config.json</code>) or via the API. Ollama must be running before starting Plia.</p>
+
+      <h4>Fallback Provider</h4>
+      <p>Configure in <strong>Settings → LLM → Provider</strong>. Used when the local model is unavailable or you want cloud inference.</p>
+      <ul>
+        <li><strong>None</strong> — local only (default). No cloud calls.</li>
+        <li><strong>OpenAI</strong> — requires an OpenAI API key (<code>sk-…</code>). Set Model (e.g. <code>gpt-4o</code>). Requires: <code>pip install -e ".[fallback-openai]"</code></li>
+        <li><strong>Anthropic</strong> — requires an Anthropic API key. Set Model (e.g. <code>claude-sonnet-4-6</code>). Requires: <code>pip install -e ".[fallback-anthropic]"</code></li>
+      </ul>
+
+      <h4>AirLLM — Large Models on Limited VRAM</h4>
+      <p>AirLLM runs huge models (70B+) by loading one layer at a time, requiring only ~4 GB VRAM instead of the full model size.</p>
+      <ul>
+        <li><strong>Model</strong> — HuggingFace repo ID (e.g. <code>meta-llama/Llama-3-70B-Instruct</code>) or local path.</li>
+        <li><strong>Compression</strong>:
+          <ul>
+            <li><span style="color:#4ade80;">●</span> <strong>4-bit</strong> — least VRAM, fastest load, slight quality loss.</li>
+            <li><span style="color:#f59e0b;">●</span> <strong>8-bit</strong> — balanced quality and VRAM use.</li>
+            <li><span style="color:#ef4444;">●</span> <strong>None</strong> — full precision, highest quality, most VRAM.</li>
+          </ul>
+        </li>
+      </ul>
+      <p>Click <strong>Apply</strong> after setting the model. AirLLM takes priority over Ollama when configured.</p>
+
+      <h4>System Prompt</h4>
+      <p>The system prompt defines Plia's personality and behavior rules. Edit it directly in <strong>Settings → LLM → System Prompt</strong>.</p>
+      <ul>
+        <li><strong>Save</strong> — applies the new prompt immediately.</li>
+        <li><strong>Undo</strong> — reverts to the previous prompt (one level of history).</li>
+        <li><strong>Reset</strong> — restores the factory default prompt.</li>
+      </ul>
+    </div>
+
+    <!-- Agents -->
+    <div id="docs-section-agents" class="docs-pane">
+      <h3>Agents — How Routing Works</h3>
+
+      <p>Plia-OS uses a <strong>supervisor + specialist</strong> architecture. Every message goes through the supervisor, which routes to one specialist agent, then back to the supervisor to form the final response.</p>
+
+      <h4>Routing Logic</h4>
+      <p>The supervisor first tries a fast keyword match. If no keyword matches, it asks the LLM to classify the intent into one of:</p>
+      <ul>
+        <li><strong>memory</strong> — storing or recalling facts ("remember that…", "what do you know about…")</li>
+        <li><strong>web</strong> — searching the internet ("search for…", "look it up…")</li>
+        <li><strong>code</strong> — running Python code ("run this code…", or a fenced code block)</li>
+        <li><strong>calendar</strong> — scheduling ("add to calendar…", "schedule a…")</li>
+        <li><strong>home</strong> — Home Assistant control ("turn on the lights…", "set thermostat…")</li>
+        <li><strong>reminder</strong> — setting reminders or timers ("remind me…", "set a timer for…")</li>
+        <li><strong>respond</strong> — general conversation; no specialist needed</li>
+      </ul>
+
+      <h4>Agent Badges</h4>
+      <p>The badges in <strong>Settings → Agents</strong> show which specialist handled the last turn. The top-bar badge also shows the active agent during processing. A badge lights up blue when active.</p>
+
+      <h4>Agent Log</h4>
+      <p>The log below the badges shows recent routing decisions — useful for debugging unexpected responses. If a message went to the wrong agent, rephrase using the trigger keywords above.</p>
+    </div>
+
+    <!-- System -->
+    <div id="docs-section-system" class="docs-pane">
+      <h3>System — Pipeline &amp; Diagnostics</h3>
+
+      <h4>Voice Pipeline States</h4>
+      <p>The pipeline cycles through these states automatically:</p>
+      <ul>
+        <li><strong>armed</strong> — waiting for the wake word. Dot is dim.</li>
+        <li><strong>listening</strong> — wake word detected, recording speech.</li>
+        <li><strong>processing</strong> — transcribing and sending to LLM.</li>
+        <li><strong>speaking</strong> — TTS is playing the response.</li>
+      </ul>
+      <p>Use the <strong>Stop / Start</strong> button to pause the pipeline without shutting down Plia-OS. Useful when you need silence without closing the app.</p>
+
+      <h4>System Stats</h4>
+      <p>Shows live CPU, RAM, GPU, and disk usage. Click <strong>↻ Refresh</strong> to update. Stats also appear in the top bar and update automatically every few seconds.</p>
+
+      <h4>VRAM Bar (Top Bar)</h4>
+      <p>The VRAM indicator shows GPU memory usage. Click it to expand and see which models are loaded. The <strong>Done</strong> button releases the studio model from VRAM when you're finished recording.</p>
+
+      <h4>Config Backup</h4>
+      <ul>
+        <li><strong>Export</strong> — downloads your current config as a JSON file. Back up before changing models or system prompts.</li>
+        <li><strong>Import</strong> — restores config from a previously exported JSON file. Takes effect immediately.</li>
+      </ul>
+      <p>Config is stored at <code>~/.plia/config.json</code>. The <code>PLIA_CONFIG_FILE</code> environment variable overrides this path.</p>
+    </div>
+
+    <!-- Reminders -->
+    <div id="docs-section-reminders" class="docs-pane">
+      <h3>Reminders &amp; Timers</h3>
+
+      <h4>Creating a Reminder</h4>
+      <p>Two ways to create reminders:</p>
+      <ul>
+        <li><strong>Via chat</strong> — say "Remind me to take my meds at 8pm" or "Set a timer for 20 minutes." The reminder agent parses the time via the LLM and schedules it automatically.</li>
+        <li><strong>Via Settings → Reminders</strong> — type the message and pick a date/time with the datetime picker, then click <strong>Add Reminder</strong>.</li>
+      </ul>
+
+      <h4>How Reminders Fire</h4>
+      <p>A background loop checks for overdue reminders every <strong>30 seconds</strong>. When a reminder fires:</p>
+      <ul>
+        <li>It appears in the chat as a system message.</li>
+        <li>Plia announces it via TTS (queued between conversation turns).</li>
+        <li>It's marked done automatically and pruned after 7 days.</li>
+      </ul>
+
+      <h4>Timers vs Reminders</h4>
+      <ul>
+        <li><strong>Reminders</strong> — tied to a specific date and time. "Remind me on Friday at 3pm…"</li>
+        <li><strong>Timers</strong> — relative duration from now. "Set a timer for 10 minutes." Shown separately in the Timers list.</li>
+      </ul>
+
+      <h4>Managing Pending Items</h4>
+      <p>The <strong>Pending reminders</strong> and <strong>Active timers</strong> lists show items that haven't fired yet. Click <strong>↻ Refresh</strong> to reload. Items disappear from the list once they fire.</p>
+    </div>
+
+    <!-- Calendar -->
+    <div id="docs-section-calendar" class="docs-pane">
+      <h3>Calendar — Events &amp; Google Calendar</h3>
+
+      <h4>Creating an Event</h4>
+      <p>Two ways:</p>
+      <ul>
+        <li><strong>Via chat</strong> — "Add a meeting called Team Sync on Thursday at 2pm for 1 hour."</li>
+        <li><strong>Via Settings → Calendar</strong> — fill in the title, date, time, and duration (minutes), then click <strong>Add Event</strong>.</li>
+      </ul>
+
+      <h4>Connecting Google Calendar</h4>
+      <ol style="padding-left:16px;margin:0 0 8px;">
+        <li>Go to <strong>Google Cloud Console</strong> → APIs &amp; Services → Credentials.</li>
+        <li>Create an <em>OAuth 2.0 Client ID</em> for a Desktop app. Download the <code>credentials.json</code> file.</li>
+        <li>In <strong>Settings → Calendar → Google Calendar</strong>, paste the full path to your <code>credentials.json</code> file.</li>
+        <li>Click <strong>Connect Google Calendar</strong>. A browser window will open for OAuth authorization. Approve access.</li>
+        <li>Once connected, the status badge shows <em>Connected</em>. Events created via chat or the form are synced to your Google Calendar.</li>
+      </ol>
+
+      <h4>Calendar ID</h4>
+      <p>By default, events go to your primary calendar. To target a specific calendar, set <code>gcal_calendar_id</code> in <code>~/.plia/config.json</code> to the calendar's ID (visible in Google Calendar settings).</p>
+
+      <h4>Upcoming Events</h4>
+      <p>The events list shows your next upcoming Google Calendar events. Click <strong>↻ Refresh</strong> to reload. Events are read-only in this view — edit them directly in Google Calendar.</p>
+    </div>
+
+    <!-- Memory -->
+    <div id="docs-section-memory" class="docs-pane">
+      <h3>Memory — Notes &amp; Stored Facts</h3>
+
+      <h4>Notes</h4>
+      <p>Notes are quick freeform text entries stored locally. Add them via the input field or by saying "Make a note that…" in chat. Filter with the search box. Delete individual notes with the ✕ button.</p>
+
+      <h4>Stored Memories (Facts)</h4>
+      <p>Facts are key-value pairs the LLM can recall during conversation.</p>
+      <ul>
+        <li><strong>Via chat</strong> — say "Remember that my cat's name is Luna." Plia stores <code>cat_name → Luna</code> automatically.</li>
+        <li><strong>Via Settings → Memory</strong> — enter a Key and Value manually, then click <strong>+</strong>.</li>
+        <li>Recall by asking "What's my cat's name?" or "What do you know about my cat?"</li>
+      </ul>
+
+      <h4>Chat Archive</h4>
+      <p>When chat history is cleared, it's archived as a snapshot in memory under a timestamped key (e.g. <code>chat-archive-2026-06-17T…</code>). These appear in the Stored Memories list and can be deleted individually.</p>
+
+      <h4>Storage Locations</h4>
+      <ul>
+        <li><strong>Facts &amp; chat history</strong> — SQLite at <code>~/.plia/memory.db</code></li>
+        <li><strong>Semantic recall</strong> — ChromaDB (optional). If not installed, semantic search returns empty but fact storage still works.</li>
+        <li><strong>Active chat history</strong> — separate SQLite at <code>data/chat_history.db</code> (project-local). Preloads last 20 turns on startup.</li>
+      </ul>
+
+      <h4>Memory Directory</h4>
+      <p>Default: <code>~/.plia/</code>. Override by setting <code>memory_dir</code> in <code>~/.plia/config.json</code>.</p>
+    </div>
+
+    <!-- Modules -->
+    <div id="docs-section-modules" class="docs-pane">
+      <h3>Modules — Tools &amp; Extensions</h3>
+
+      <h4>What Modules Are</h4>
+      <p>Modules are Python files in the <code>modules/</code> directory. Each file registers one or more <strong>tools</strong> the LLM can call during a conversation turn. Tools are auto-discovered at startup — no manual registration needed.</p>
+
+      <h4>Adding a Custom Tool</h4>
+      <ol style="padding-left:16px;margin:0 0 8px;">
+        <li>Create a <code>.py</code> file in the <code>modules/</code> directory.</li>
+        <li>Import the tool decorator: <code>from core.registry import tool</code></li>
+        <li>Decorate your function: <code>@tool("Description of what this tool does")</code></li>
+        <li>Add type hints — the decorator auto-generates the JSON schema for the LLM from them.</li>
+        <li>Restart Plia-OS. The new tool appears in <strong>Settings → Modules</strong>.</li>
+      </ol>
+
+      <h4>Disabling a Module</h4>
+      <p>Click <strong>Disable</strong> next to a module in <strong>Settings → Modules</strong>. The module is added to the <code>disabled_modules</code> list in config and will be skipped on next startup. Click <strong>Enable</strong> to re-enable it. Changes take effect after restart.</p>
+
+      <h4>Module List</h4>
+      <p>The list shows all currently loaded modules with their filenames and registered tool names. Click <strong>↻ Refresh</strong> to reload the list. A module showing as loaded means all its tools are available to the LLM right now.</p>
+    </div>
+
+    <!-- Home -->
+    <div id="docs-section-home" class="docs-pane">
+      <h3>Home — Home Assistant Integration</h3>
+
+      <h4>Setup</h4>
+      <ol style="padding-left:16px;margin:0 0 8px;">
+        <li>In Home Assistant, go to <strong>Profile → Long-Lived Access Tokens</strong> and create a new token.</li>
+        <li>In <strong>Settings → Home</strong>, enter your Home Assistant URL (e.g. <code>http://homeassistant.local:8123</code>) and paste the token.</li>
+        <li>Click <strong>Save</strong>. Plia connects immediately — no restart needed.</li>
+      </ol>
+
+      <h4>Controlling Devices via Chat</h4>
+      <p>Use natural language to control entities:</p>
+      <ul>
+        <li>"Turn on the living room lights."</li>
+        <li>"Set the thermostat to 22 degrees."</li>
+        <li>"Turn off all the lights."</li>
+        <li>"What's the temperature in the bedroom?"</li>
+      </ul>
+      <p>The home agent translates your request into Home Assistant service calls using the entity list it fetches from your HA instance.</p>
+
+      <h4>Entity Discovery</h4>
+      <p>Plia fetches your Home Assistant entities automatically when the home agent is triggered. The <strong>Settings → Home</strong> panel shows a list of discovered entities for reference. Click <strong>↻ Refresh</strong> to reload after adding new devices to HA.</p>
+
+      <h4>Supported Entity Types</h4>
+      <ul>
+        <li>Lights (<code>light.*</code>) — on/off, brightness, color</li>
+        <li>Switches (<code>switch.*</code>) — on/off</li>
+        <li>Climate (<code>climate.*</code>) — temperature, mode</li>
+        <li>Sensors (<code>sensor.*</code>) — read current values</li>
+        <li>Scripts &amp; automations — trigger by name</li>
+      </ul>
+    </div>
+
   </div>
 </div>
 <div id="settings-panel">
