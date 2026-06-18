@@ -63,7 +63,7 @@ def start_monitor_mode(interface: str = "wlan0") -> str:
     miss = _bin_missing("airmon-ng")
     if miss:
         return "airmon-ng not found. Run: install_wireless_tools"
-    _sudo("airmon-ng", "check", "kill", timeout=10)
+    # Skip 'airmon-ng check kill' — it would kill NetworkManager and crash this server
     r = _sudo("airmon-ng", "start", interface, timeout=15)
     out = (r.stdout + r.stderr).strip()
     if r.returncode != 0:
