@@ -657,6 +657,53 @@ async def system_capabilities():
     return capabilities()
 
 
+# --- Permissions ---
+
+_OS_PERMISSION_GROUPS = [
+    {
+        "id": "network_mac",
+        "name": "Network Interface Control",
+        "description": "Allows tools to change MAC addresses using ip link set (requires sudo).",
+        "tools": ["randomize_mac", "set_mac", "restore_mac"],
+        "sudoers_file": "/etc/sudoers.d/plia-mac",
+        "grant_cmd": (
+            "echo 'alfcon ALL=(ALL) NOPASSWD: /usr/sbin/ip link set dev * down,"
+            " /usr/sbin/ip link set dev * address *,"
+            " /usr/sbin/ip link set dev * up'"
+            " | sudo tee /etc/sudoers.d/plia-mac && sudo chmod 440 /etc/sudoers.d/plia-mac"
+        ),
+        "revoke_cmd": "sudo rm /etc/sudoers.d/plia-mac",
+    },
+]
+
+
+@router.get("/api/permissions")
+async def get_permissions():
+    import pathlib
+    cfg = get_config()
+    os_groups = []
+    for g in _OS_PERMISSION_GROUPS:
+        granted = pathlib.Path(g["sudoers_file"]).exists()
+        os_groups.append({**g, "granted": granted})
+    from core.registry import get_tool_schemas
+    tool_names = [s["function"]["name"] for s in get_tool_schemas()]
+    tools = {name: cfg.tool_permissions.get(name, "user") for name in sorted(tool_names)}
+    return {"os_groups": os_groups, "tool_permissions": tools}
+
+
+@router.post("/api/permissions/tools")
+async def set_tool_permissions(body: dict):
+    # body: {"tool_name": "admin"|"user", ...}
+    cfg = get_config()
+    perms = dict(cfg.tool_permissions)
+    for tool, level in body.items():
+        if level not in ("admin", "user"):
+            raise HTTPException(status_code=422, detail=f"Invalid level {level!r} for {tool!r}")
+        perms[tool] = level
+    update_config(tool_permissions=perms)
+    return {"tool_permissions": perms}
+
+
 @router.get("/api/vram/status")
 async def vram_status():
     return get_vram_broker().status()

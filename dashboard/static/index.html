@@ -686,6 +686,7 @@
         <button class="m-nav-btn" data-section="memory" onclick="showMenuSection('memory');loadMemory()">Memory</button>
         <button class="m-nav-btn" data-section="modules" onclick="showMenuSection('modules');loadModules()">Modules</button>
         <button class="m-nav-btn" data-section="home" onclick="showMenuSection('home');loadHassEntities()">Home</button>
+        <button class="m-nav-btn" data-section="permissions" onclick="showMenuSection('permissions');loadPermissions()">Perms</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1059,6 +1060,32 @@
             <button onclick="loadHassEntities()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
           </div>
           <ul id="hass-entities-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
+        </div>
+
+        <div id="m-section-permissions" class="m-pane" style="display:none">
+          <div style="font-size:0.78rem;color:#aaa;margin-bottom:10px;">Permissions</div>
+
+          <!-- OS-level permissions -->
+          <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:6px;">System Access</div>
+          <ul id="perm-os-list" style="list-style:none;padding:0;margin:0 0 16px;"></ul>
+
+          <!-- Per-tool permission levels -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:#666;">Tool Permissions</span>
+            <button onclick="saveToolPermissions()" style="background:#1565c0;border:none;color:#eee;padding:3px 8px;border-radius:3px;font-size:0.72rem;cursor:pointer;">Save</button>
+          </div>
+          <ul id="perm-tools-list" style="list-style:none;padding:0;margin:0;font-size:0.75rem;max-height:280px;overflow-y:auto;"></ul>
+          <div id="perm-tools-status" style="font-size:0.72rem;color:#888;margin-top:6px;"></div>
+
+          <!-- Grant command modal -->
+          <div id="perm-cmd-modal" style="display:none;margin-top:12px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:4px;padding:10px;">
+            <div style="font-size:0.72rem;color:#aaa;margin-bottom:6px;" id="perm-cmd-label"></div>
+            <code id="perm-cmd-text" style="display:block;font-size:0.7rem;color:#a5d6a7;word-break:break-all;white-space:pre-wrap;margin-bottom:8px;"></code>
+            <div style="display:flex;gap:6px;">
+              <button onclick="copyPermCmd()" style="background:#1a2e1a;border:1px solid #2e4d2e;color:#a5d6a7;padding:3px 10px;border-radius:3px;font-size:0.72rem;cursor:pointer;">Copy</button>
+              <button onclick="document.getElementById('perm-cmd-modal').style.display='none'" style="background:none;border:1px solid #333;color:#666;padding:3px 8px;border-radius:3px;font-size:0.72rem;cursor:pointer;">Close</button>
+            </div>
+          </div>
         </div>
       </div>
 </div>
@@ -2000,6 +2027,86 @@
       });
       status.style.color = '#81c784';
       status.textContent = 'Saved.';
+    } catch(e) {
+      status.style.color = '#ef9a9a';
+      status.textContent = 'Save failed: ' + e.message;
+    }
+  }
+
+  let _permData = {os_groups: [], tool_permissions: {}};
+
+  async function loadPermissions() {
+    const osList = document.getElementById('perm-os-list');
+    const toolsList = document.getElementById('perm-tools-list');
+    osList.innerHTML = '<li style="color:#555;font-size:0.75rem;">Loading…</li>';
+    toolsList.innerHTML = '<li style="color:#555;font-size:0.75rem;">Loading…</li>';
+    try {
+      const data = await fetch('/api/permissions').then(r => r.json());
+      _permData = data;
+
+      // OS permission groups
+      osList.innerHTML = data.os_groups.map(g => {
+        const badge = g.granted
+          ? '<span style="color:#81c784;font-size:0.68rem;font-weight:600;">● Granted</span>'
+          : '<span style="color:#ef9a9a;font-size:0.68rem;font-weight:600;">● Not Granted</span>';
+        const tools = g.tools.map(t => `<code style="font-size:0.68rem;color:#4fc3f7;">${_esc(t)}</code>`).join(', ');
+        return `<li style="border:1px solid #2a2a2a;border-radius:4px;padding:8px 10px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+            <span style="color:#e0e0e0;font-size:0.78rem;font-weight:600;">${_esc(g.name)}</span>
+            ${badge}
+          </div>
+          <div style="color:#888;font-size:0.72rem;margin-bottom:6px;">${_esc(g.description)}</div>
+          <div style="color:#666;font-size:0.7rem;margin-bottom:6px;">Tools: ${tools}</div>
+          <div style="display:flex;gap:6px;">
+            <button onclick="showPermCmd('Grant','${_esc(g.grant_cmd)}')" style="background:#0d2a1a;border:1px solid #2a5f3a;color:#81c784;padding:3px 8px;border-radius:3px;font-size:0.72rem;cursor:pointer;">How to Grant</button>
+            <button onclick="showPermCmd('Revoke','${_esc(g.revoke_cmd)}')" style="background:#2a0d0d;border:1px solid #5f2a2a;color:#ef9a9a;padding:3px 8px;border-radius:3px;font-size:0.72rem;cursor:pointer;">How to Revoke</button>
+          </div>
+        </li>`;
+      }).join('') || '<li style="color:#555;font-size:0.75rem;">No system permissions defined.</li>';
+
+      // Tool permission levels
+      toolsList.innerHTML = Object.entries(data.tool_permissions).sort().map(([name, level]) =>
+        `<li style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1a1a1a;">
+          <span style="color:#ccc;font-family:monospace;font-size:0.73rem;">${_esc(name)}</span>
+          <select id="tperm-${_esc(name)}" style="background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:3px;padding:2px 4px;font-size:0.72rem;width:80px;">
+            <option value="user" ${level === 'user' ? 'selected' : ''}>User</option>
+            <option value="admin" ${level === 'admin' ? 'selected' : ''}>Admin</option>
+          </select>
+        </li>`
+      ).join('') || '<li style="color:#555;font-size:0.75rem;">No tools loaded.</li>';
+    } catch(e) {
+      osList.innerHTML = '<li style="color:#ef9a9a;">Failed to load.</li>';
+      toolsList.innerHTML = '';
+    }
+  }
+
+  function showPermCmd(label, cmd) {
+    document.getElementById('perm-cmd-label').textContent = label + ' command — run in a terminal:';
+    document.getElementById('perm-cmd-text').textContent = cmd;
+    document.getElementById('perm-cmd-modal').style.display = 'block';
+  }
+
+  function copyPermCmd() {
+    const text = document.getElementById('perm-cmd-text').textContent;
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+
+  async function saveToolPermissions() {
+    const status = document.getElementById('perm-tools-status');
+    const updates = {};
+    document.querySelectorAll('[id^="tperm-"]').forEach(sel => {
+      const name = sel.id.replace('tperm-', '');
+      updates[name] = sel.value;
+    });
+    try {
+      await fetch('/api/permissions/tools', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(updates),
+      });
+      status.style.color = '#81c784';
+      status.textContent = 'Saved.';
+      setTimeout(() => { status.textContent = ''; }, 3000);
     } catch(e) {
       status.style.color = '#ef9a9a';
       status.textContent = 'Save failed: ' + e.message;

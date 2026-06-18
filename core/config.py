@@ -86,6 +86,9 @@ class PliaConfig:
     # Module manager
     disabled_modules: list = field(default_factory=list)
 
+    # Permissions — maps tool name → "admin" | "user"
+    tool_permissions: dict = field(default_factory=dict)
+
 
 _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
     "tts_engine": ("kokoro", "chatterbox", "dramabox"),

@@ -42,12 +42,30 @@ def _random_mac() -> str:
     return ":".join(f"{o:02x}" for o in octets)
 
 
+def _has_mac_admin() -> bool:
+    import pathlib
+    from core.config import get_config
+    cfg = get_config()
+    sudoers_ok = pathlib.Path("/etc/sudoers.d/plia-mac").exists()
+    any_tool_admin = any(
+        cfg.tool_permissions.get(t) == "admin"
+        for t in ("randomize_mac", "set_mac", "restore_mac")
+    )
+    return sudoers_ok and any_tool_admin
+
+
 def _run_ip(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["ip", *args], capture_output=True, text=True, timeout=5)
+    cmd = ["sudo", "ip", *args] if _has_mac_admin() else ["ip", *args]
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=5)
 
 
 def _apply_mac(ifname: str, mac: str) -> str | None:
     """Run ip link down/address/up. Returns error string on failure, None on success."""
+    if not _has_mac_admin():
+        return (
+            "Permission denied. Enable 'Network Interface Control' and set these tools to Admin "
+            "in Settings → Permissions, then run the grant command shown there."
+        )
     try:
         r = _run_ip("link", "set", "dev", ifname, "down")
         if r.returncode != 0:
