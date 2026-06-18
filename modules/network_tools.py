@@ -186,7 +186,7 @@ def list_wifi_interfaces() -> str:
 
 
 @tool(description="Scan for nearby WiFi networks and show SSID, signal strength, security type, and channel.")
-def scan_wifi() -> str:
+def scan_wifi(interface: str = "") -> str:
     result = subprocess.run(
         ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY,CHAN", "--escape", "no", "dev", "wifi", "list"],
         capture_output=True, text=True, timeout=15,
