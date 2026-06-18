@@ -138,7 +138,8 @@
 </div>
 <div id="docs-panel">
   <div id="docs-nav">
-    <button class="docs-nav-btn active" data-doc="voice" onclick="showDocSection('voice')">Voice</button>
+    <button class="docs-nav-btn active" data-doc="start" onclick="showDocSection('start')">Start</button>
+    <button class="docs-nav-btn" data-doc="voice" onclick="showDocSection('voice')">Voice</button>
     <button class="docs-nav-btn" data-doc="web" onclick="showDocSection('web')">Web</button>
     <button class="docs-nav-btn" data-doc="llm" onclick="showDocSection('llm')">LLM</button>
     <button class="docs-nav-btn" data-doc="agents" onclick="showDocSection('agents')">Agents</button>
@@ -153,8 +154,55 @@
   </div>
   <div id="docs-content">
 
+    <!-- Getting Started -->
+    <div id="docs-section-start" class="docs-pane" style="display:block">
+      <h3>Getting Started</h3>
+      <p>Plia-OS is a local AI assistant with voice, memory, web search, calendar, home automation, and more — all running on your own hardware.</p>
+
+      <h4>1. Install</h4>
+      <p>Run once after cloning the repo:</p>
+      <ul>
+        <li><code>python -m venv .venv &amp;&amp; source .venv/bin/activate</code></li>
+        <li><code>pip install -r requirements.txt &amp;&amp; pip install -e . --no-deps</code></li>
+      </ul>
+
+      <h4>2. Start</h4>
+      <ul>
+        <li><code>source .venv/bin/activate</code></li>
+        <li><code>python core/main.py</code></li>
+        <li>Dashboard opens at <code>http://localhost:8000</code></li>
+      </ul>
+
+      <h4>3. First Steps</h4>
+      <ul>
+        <li><strong>Text chat</strong> — type in the box at the bottom and press Send. Works immediately, no setup needed.</li>
+        <li><strong>Voice</strong> — requires a microphone. Go to <strong>Settings → Voice</strong> to pick a wake word model and TTS engine. Say the wake word to start listening.</li>
+        <li><strong>Memory</strong> — say "Remember that…" and Plia stores the fact for future conversations.</li>
+        <li><strong>Web search</strong> — say "Search for…" and Plia fetches results via DuckDuckGo by default (no key needed).</li>
+      </ul>
+
+      <h4>4. Optional Extras</h4>
+      <ul>
+        <li><strong>Google Search</strong> — <strong>Docs → Web</strong> for setup.</li>
+        <li><strong>Google Calendar</strong> — <strong>Docs → Calendar</strong> for setup.</li>
+        <li><strong>Home Assistant</strong> — <strong>Docs → Home</strong> for setup.</li>
+        <li><strong>Cloud LLM fallback</strong> — <code>pip install -e ".[fallback-openai]"</code> or <code>".[fallback-anthropic]"</code>, then configure in <strong>Settings → LLM</strong>.</li>
+        <li><strong>Dramabox TTS</strong> — <code>pip install -e ".[dramabox]"</code></li>
+        <li><strong>Playwright scraping</strong> — <code>pip install -e ".[playwright]"</code></li>
+      </ul>
+
+      <h4>5. Key Concepts</h4>
+      <ul>
+        <li><strong>Settings</strong> — configure voice, LLM, integrations. All changes persist to <code>~/.plia/config.json</code>.</li>
+        <li><strong>Modules</strong> — Python files in <code>modules/</code> that add tools. Drop a file in and restart to add new capabilities.</li>
+        <li><strong>Agents</strong> — specialist handlers (memory, web, code, calendar, home, reminder). The supervisor routes your message to the right one automatically.</li>
+        <li><strong>Commands</strong> — see <strong>Docs → Commands</strong> for the full list of trigger phrases.</li>
+        <li><strong>Tools</strong> — see <strong>Docs → Tools</strong> for all 47 functions the LLM can call.</li>
+      </ul>
+    </div>
+
     <!-- Voice -->
-    <div id="docs-section-voice" class="docs-pane" style="display:block">
+    <div id="docs-section-voice" class="docs-pane">
       <h3>Voice — Setup &amp; Usage</h3>
 
       <h4>Wake Word</h4>
@@ -2497,7 +2545,7 @@
       closeSettings();
       panel.classList.add('open');
       document.querySelector('.sb-docs-btn').classList.add('active');
-      showDocSection('voice');
+      showDocSection('start');
       document.addEventListener('keydown', _docsKeyHandler);
     }
   }
