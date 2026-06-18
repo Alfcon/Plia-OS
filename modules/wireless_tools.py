@@ -58,12 +58,18 @@ def install_wireless_tools() -> str:
 
 def _detect_wifi_interface() -> str | None:
     r = subprocess.run(["ip", "-o", "link", "show"], capture_output=True, text=True, timeout=5)
+    names = []
     for line in r.stdout.splitlines():
         parts = line.split()
         if len(parts) >= 2:
-            name = parts[1].rstrip(":")
-            if name.startswith("wl") and not name.endswith("mon"):
-                return name
+            names.append(parts[1].rstrip(":"))
+    # Prefer managed interface; fall back to base name derived from monitor interface
+    for name in names:
+        if name.startswith("wl") and not name.endswith("mon"):
+            return name
+    for name in names:
+        if name.startswith("wl") and name.endswith("mon"):
+            return name[:-3]  # strip "mon" to get original interface name
     return None
 
 
@@ -77,12 +83,15 @@ def start_monitor_mode(interface: str = "") -> str:
     iface = interface or _detect_wifi_interface()
     if not iface:
         return "No WiFi interface found. Specify interface name explicitly."
+    mon = iface + "mon"
+    existing = _detect_monitor_interface()
+    if existing:
+        return f"Already in monitor mode on {existing}"
     # Skip 'airmon-ng check kill' — it would kill NetworkManager and crash this server
     r = _sudo("airmon-ng", "start", iface, timeout=15)
     out = (r.stdout + r.stderr).strip()
     if r.returncode != 0:
         return f"Failed: {out}"
-    mon = iface + "mon"
     return f"Monitor mode started on {mon}\n{out}"
 
 
