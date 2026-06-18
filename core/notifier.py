@@ -16,12 +16,20 @@ async def _on_reminder_fired(payload: dict) -> None:
         return
     message = payload.get("message", "")
     try:
-        await asyncio.to_thread(
+        result = await asyncio.to_thread(
             subprocess.run,
             ["notify-send", "Plia Reminder", message],
             timeout=5,
             capture_output=True,
         )
+        if result.returncode != 0:
+            logger.warning(
+                "notify-send exited %d: %s",
+                result.returncode,
+                result.stderr.decode(errors="replace").strip(),
+            )
+    except subprocess.TimeoutExpired:
+        logger.warning("notify-send timed out after 5 s")
     except FileNotFoundError:
         logger.warning("notify-send not available — desktop notifications disabled")
     except Exception:

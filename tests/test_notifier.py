@@ -35,3 +35,14 @@ async def test_notify_send_missing_does_not_raise():
          patch("subprocess.run", side_effect=FileNotFoundError):
         await _on_reminder_fired({"type": "reminder_fired", "message": "test"})
     # must not raise
+
+
+@pytest.mark.asyncio
+async def test_other_event_type_ignored():
+    from core.notifier import _on_reminder_fired
+    mock_cfg = MagicMock()
+    mock_cfg.desktop_notifications = True
+    with patch("core.notifier.get_config", return_value=mock_cfg), \
+         patch("subprocess.run") as mock_run:
+        await _on_reminder_fired({"type": "status", "state": "listening"})
+    mock_run.assert_not_called()
