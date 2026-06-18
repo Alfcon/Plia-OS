@@ -116,22 +116,26 @@ def monitor_scan_networks(interface: str, scan_seconds: int = 15) -> str:
             return "No scan output. Ensure interface is in monitor mode."
         lines = Path(csv_file).read_text(errors="replace").splitlines()
     networks = []
-    in_ap = True
+    in_ap_section = False
     for line in lines:
-        if line.strip() == "":
-            in_ap = False
+        if line.startswith("BSSID"):
+            in_ap_section = True
             continue
-        if not in_ap or line.startswith("BSSID"):
+        if line.startswith("Station MAC"):
+            break
+        if not line.strip() or not in_ap_section:
             continue
+        # Fields: BSSID, first_seen, last_seen, channel, speed, privacy, cipher, auth, power, beacons, iv, lan_ip, id_len, essid, key
         parts = [p.strip() for p in line.split(",")]
         if len(parts) >= 14:
-            bssid, _, _, ch, _, _, _, _, _, _, enc, _, _, essid = parts[:14]
-            networks.append((essid or "<hidden>", bssid, ch.strip(), enc.strip()))
+            bssid, ch, enc, power, essid = parts[0], parts[3], parts[5], parts[8], parts[13]
+            networks.append((essid or "<hidden>", bssid, ch, enc, power))
     if not networks:
         return "No networks found in scan window."
+    networks.sort(key=lambda n: -int(n[4]) if n[4].lstrip("-").isdigit() else 0)
     w = max(len(n[0]) for n in networks)
-    header = f"{'ESSID':<{w}}  BSSID              CH  ENC"
-    rows = [f"{e:<{w}}  {b}  {c:>2}  {enc}" for e, b, c, enc in networks]
+    header = f"{'ESSID':<{w}}  BSSID              CH   PWR  ENC"
+    rows = [f"{e:<{w}}  {b}  {c:>2}  {pwr:>4}  {enc}" for e, b, c, enc, pwr in networks]
     return "\n".join([header] + rows)
 
 
