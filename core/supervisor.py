@@ -125,7 +125,7 @@ async def _respond_node(state: AgentState) -> dict:
             result_str = str(result)
             await events.emit("transcript", {
                 "role": "tool",
-                "text": f"[{fn['name']}] {result_str}",
+                "text": f"[{fn['name']}]\n{result_str}",
             })
             history.append({
                 "role": "tool",
@@ -209,5 +209,11 @@ async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
         await asyncio.to_thread(add_message, "user", last_user)
     if response:
         await asyncio.to_thread(add_message, "assistant", response)
+
+    # If respond node called tools directly, tool output was already broadcast
+    # via transcript events — suppress the LLM's redundant text summary.
+    prev = final_messages[-2] if len(final_messages) >= 2 else {}
+    if prev.get("role") == "tool":
+        response = ""
 
     return response, final_messages
