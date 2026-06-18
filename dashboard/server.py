@@ -684,7 +684,8 @@ _OS_PERMISSION_GROUPS = [
             "echo 'alfcon ALL=(ALL) NOPASSWD:"
             " /usr/sbin/airmon-ng, /usr/sbin/airodump-ng, /usr/sbin/aireplay-ng,"
             " /usr/sbin/reaver, /usr/bin/wash, /usr/sbin/wash,"
-            " /usr/sbin/service, /usr/bin/service'"
+            " /usr/sbin/service, /usr/bin/service,"
+            " /usr/bin/systemctl restart NetworkManager'"
             " | sudo tee /etc/sudoers.d/plia-wireless && sudo chmod 440 /etc/sudoers.d/plia-wireless"
         ),
         "revoke_cmd": "sudo rm /etc/sudoers.d/plia-wireless",

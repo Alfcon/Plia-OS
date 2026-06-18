@@ -56,43 +56,72 @@ def install_wireless_tools() -> str:
     return f"Installed. Available: {', '.join(installed)}"
 
 
-@tool(description="Put a wireless interface into monitor mode for packet capture. Requires Admin permission and Wireless Tools sudoers grant. Usage: interface=wlan0")
-def start_monitor_mode(interface: str = "wlan0") -> str:
+def _detect_wifi_interface() -> str | None:
+    r = subprocess.run(["ip", "-o", "link", "show"], capture_output=True, text=True, timeout=5)
+    for line in r.stdout.splitlines():
+        parts = line.split()
+        if len(parts) >= 2:
+            name = parts[1].rstrip(":")
+            if name.startswith("wl") and not name.endswith("mon"):
+                return name
+    return None
+
+
+@tool(description="Put a wireless interface into monitor mode for packet capture. Requires Admin permission and Wireless Tools sudoers grant. Leave interface empty to auto-detect.")
+def start_monitor_mode(interface: str = "") -> str:
     if not _has_wireless_admin():
         return "Permission denied. Set tool to Admin in Settings → Permissions and run the Wireless Tools grant command."
     miss = _bin_missing("airmon-ng")
     if miss:
         return "airmon-ng not found. Run: install_wireless_tools"
+    iface = interface or _detect_wifi_interface()
+    if not iface:
+        return "No WiFi interface found. Specify interface name explicitly."
     # Skip 'airmon-ng check kill' — it would kill NetworkManager and crash this server
-    r = _sudo("airmon-ng", "start", interface, timeout=15)
+    r = _sudo("airmon-ng", "start", iface, timeout=15)
     out = (r.stdout + r.stderr).strip()
     if r.returncode != 0:
         return f"Failed: {out}"
-    mon = interface + "mon"
+    mon = iface + "mon"
     return f"Monitor mode started on {mon}\n{out}"
 
 
-@tool(description="Stop monitor mode and restore interface to managed mode. Requires Admin permission. Usage: interface=wlan0mon")
-def stop_monitor_mode(interface: str = "wlan0mon") -> str:
+def _detect_monitor_interface() -> str | None:
+    r = subprocess.run(["ip", "-o", "link", "show"], capture_output=True, text=True, timeout=5)
+    for line in r.stdout.splitlines():
+        parts = line.split()
+        if len(parts) >= 2:
+            name = parts[1].rstrip(":")
+            if name.endswith("mon"):
+                return name
+    return None
+
+
+@tool(description="Stop monitor mode and restore interface to managed mode. Requires Admin permission. Leave interface empty to auto-detect.")
+def stop_monitor_mode(interface: str = "") -> str:
     if not _has_wireless_admin():
         return "Permission denied. Set tool to Admin in Settings → Permissions."
     miss = _bin_missing("airmon-ng")
     if miss:
         return "airmon-ng not found. Run: install_wireless_tools"
-    r = _sudo("airmon-ng", "stop", interface, timeout=15)
+    iface = interface or _detect_monitor_interface()
+    if not iface:
+        return "No monitor mode interface found."
+    r = _sudo("airmon-ng", "stop", iface, timeout=15)
     out = (r.stdout + r.stderr).strip()
     if r.returncode != 0:
         return f"Failed: {out}"
-    _sudo("service", "network-manager", "restart", timeout=10)
-    return f"Monitor mode stopped on {interface}. Network manager restarted."
+    _sudo("systemctl", "restart", "NetworkManager", timeout=10)
+    return f"Monitor mode stopped on {iface}. Network manager restarted."
 
 
-@tool(description="Scan WiFi networks using monitor mode interface (airodump-ng). More detailed than nmcli scan. Requires Admin + monitor mode interface. Args: interface (monitor mode, e.g. wlan0mon), scan_seconds (default 15)")
-def monitor_scan_networks(interface: str, scan_seconds: int = 15) -> str:
+@tool(description="Scan WiFi networks using monitor mode interface (airodump-ng). More detailed than nmcli scan. Requires Admin + monitor mode. Leave interface empty to auto-detect monitor interface.")
+def monitor_scan_networks(interface: str = "", scan_seconds: int = 15) -> str:
     if not _has_wireless_admin():
         return "Permission denied. Set tool to Admin in Settings → Permissions."
-    if not interface:
-        return "interface required (must be in monitor mode, e.g. wlan0mon)."
+    iface = interface or _detect_monitor_interface()
+    if not iface:
+        return "No monitor mode interface found. Run start_monitor_mode first."
     miss = _bin_missing("airodump-ng")
     if miss:
         return "airodump-ng not found. Run: install_wireless_tools"
@@ -100,7 +129,7 @@ def monitor_scan_networks(interface: str, scan_seconds: int = 15) -> str:
     with tempfile.TemporaryDirectory() as tmpdir:
         prefix = os.path.join(tmpdir, "scan")
         proc = subprocess.Popen(
-            ["sudo", "airodump-ng", "-w", prefix, "--output-format", "csv", interface],
+            ["sudo", "airodump-ng", "-w", prefix, "--output-format", "csv", iface],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         try:
