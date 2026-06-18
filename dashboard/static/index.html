@@ -58,8 +58,11 @@
     .comp-option { display: flex; align-items: center; gap: 6px; padding: 5px 8px; cursor: pointer; font-size: 0.75rem; color: #ccc; }
     .comp-option:hover { background: #2a2a2a; }
     .comp-dot { font-size: 0.7rem; flex-shrink: 0; }
-    #menu-toggle { background: none; border: none; color: #888; font-size: 1rem; cursor: pointer; width: auto; padding: 0 4px; flex-shrink: 0; }
-    #menu-toggle:hover { color: #e0e0e0; }
+    #left-sidebar { width: 130px; flex-shrink: 0; background: #111; border-right: 1px solid #2a2a2a; display: flex; flex-direction: column; padding: 12px 8px; gap: 8px; }
+    #left-sidebar .sb-settings-btn { background: #0d1b2a; color: #4fc3f7; border: 1px solid #1e3a5f; border-radius: 4px; padding: 8px 10px; font-size: 0.8rem; cursor: pointer; width: 100%; }
+    #left-sidebar .sb-settings-btn:hover { background: #1e3a5f; }
+    #left-sidebar .sb-exit-btn { background: #1a0808; color: #ef9a9a; border: 1px solid #7f1d1d; border-radius: 4px; padding: 8px 10px; font-size: 0.8rem; cursor: pointer; width: 100%; }
+    #left-sidebar .sb-exit-btn:hover { background: #7f1d1d; }
     .agent-badge { padding: 3px 8px; border-radius: 3px; font-size: 0.75rem; display: inline-block; background: #1a1a1a; color: #555; border: 1px solid #333; }
     .agent-badge.active { background: #1e3a5f; color: #4fc3f7; border-color: #4fc3f7; }
     #agent-log { margin-top: 6px; }
@@ -68,14 +71,9 @@
     .config-row { display: flex; gap: 6px; align-items: flex-end; margin-top: 6px; }
     .config-row button { flex: 0 0 auto; width: auto; padding: 6px 10px; }
     #google-fields { margin-top: 4px; }
-    #menu-overlay { position: fixed; inset: 0; z-index: 100; display: none; }
-    #menu-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.75); }
-    #menu-panel { position: absolute; left: 0; top: 0; bottom: 0; width: 633px; background: #111; border-right: 1px solid #2a2a2a; display: flex; flex-direction: column; }
-    #menu-header { padding: 20px 16px 14px; border-bottom: 1px solid #1e1e1e; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-    #menu-header .menu-title { font-size: 1rem; color: #e0e0e0; letter-spacing: 0.08em; text-transform: uppercase; }
-    #menu-header .menu-close { background: none; border: none; color: #555; font-size: 1rem; cursor: pointer; width: auto; padding: 2px 6px; }
-    #menu-header .menu-close:hover { color: #e0e0e0; background: #1a1a1a; }
-    #menu-settings { flex: 1; overflow: hidden; display: flex; flex-direction: row; min-height: 0; }
+    #settings-panel { width: 0; overflow: hidden; transition: width 0.2s ease; display: flex; flex-direction: row; background: #111; border-right: 1px solid #2a2a2a; flex-shrink: 0; min-height: 0; }
+    #settings-panel.open { width: 500px; }
+    #left-sidebar .sb-settings-btn.active { background: #1e3a5f; color: #fff; }
     #m-nav { width: 122px; border-right: 1px solid #1e1e1e; padding: 10px 0; display: flex; flex-direction: column; flex-shrink: 0; }
     .m-nav-btn { background: none; border: none; border-left: 2px solid transparent; border-radius: 0; color: #555; font-size: 0.72rem; padding: 10px 0; cursor: pointer; width: 100%; text-align: center; }
     .m-nav-btn:hover { color: #ccc; background: #181818; }
@@ -86,11 +84,6 @@
     .m-pane .apply-btn { margin-top: 8px; background: #1a1a2e; color: #4fc3f7; border: 1px solid #1e3a5f; border-radius: 4px; padding: 5px 10px; font-size: 0.78rem; cursor: pointer; width: 100%; }
     .m-pane .apply-btn:hover { background: #1e3a5f; }
     #m-agent-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-    #menu-footer { padding: 14px 16px 20px; border-top: 1px solid #1e1e1e; display: flex; flex-direction: column; gap: 0; flex-shrink: 0; }
-    #menu-footer .settings-btn { background: #0d1b2a; color: #4fc3f7; border: 1px solid #1e3a5f; margin-bottom: 12px; }
-    #menu-footer .settings-btn:hover { background: #1e3a5f; }
-    #menu-footer .exit-btn { background: #1a0808; color: #ef9a9a; border: 1px solid #7f1d1d; }
-    #menu-footer .exit-btn:hover { background: #7f1d1d; }
   </style>
 </head>
 <body>
@@ -500,8 +493,6 @@
 </div>
 
 <header id="top-bar">
-  <button id="menu-toggle" onclick="openMenu()">☰</button>
-  <span class="tb-sep">|</span>
   <span id="status-badge">armed</span>
   <span class="tb-sep">|</span>
   <span class="tb-chip"><span class="tb-label">OS</span><span id="tb-os">—</span></span>
@@ -526,6 +517,10 @@
 </header>
 
 <div id="app-body">
+<div id="left-sidebar">
+  <button class="sb-settings-btn" onclick="openSettings()">⚙ Settings</button>
+  <button class="sb-exit-btn" onclick="exitApp()">⏻ Exit</button>
+</div>
 <div id="chat-wrap">
   <main id="conversation">
     <!-- Messages injected here by WebSocket / history load -->
@@ -2044,6 +2039,11 @@
     document.getElementById('menu-overlay').style.display = 'block';
     _syncMenuInputs();
     document.addEventListener('keydown', _menuKeyHandler);
+  }
+  function openSettings() {
+    openMenu();
+    document.getElementById('menu-settings').style.display = 'flex';
+    showMenuSection('voice');
   }
   function closeMenu() {
     document.getElementById('menu-overlay').style.display = 'none';
