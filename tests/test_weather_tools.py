@@ -109,6 +109,7 @@ def test_forecast_fewer_days():
         result = get_forecast("Berlin", days=3)
     day_lines = [l for l in result.splitlines() if "°C / " in l]
     assert len(day_lines) == 3
+    assert "3-day" in result
 
 
 def test_uv_index_success():
