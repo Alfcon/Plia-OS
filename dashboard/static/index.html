@@ -106,7 +106,6 @@
     .m-pane select, .m-pane input[type=range], .m-pane input[type=text], .m-pane input[type=password] { width: 100%; background: #1a1a1a; color: #e0e0e0; border: 1px solid #2a2a2a; border-radius: 4px; padding: 4px 6px; margin-bottom: 2px; }
     .m-pane .apply-btn { margin-top: 8px; background: #1a1a2e; color: #4fc3f7; border: 1px solid #1e3a5f; border-radius: 4px; padding: 5px 10px; font-size: 0.78rem; cursor: pointer; width: 100%; }
     .m-pane .apply-btn:hover { background: #1e3a5f; }
-    #m-agent-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -142,6 +141,16 @@
   <button class="sb-tools-btn" onclick="openTools()">🔧 Tools</button>
   <button class="sb-settings-btn" onclick="openSettings()">⚙ Settings</button>
   <button class="sb-exit-btn" onclick="exitApp()">⏻ Exit</button>
+  <hr style="border:none;border-top:1px solid #2a2a2a;margin:4px 0;">
+  <div style="font-size:0.65rem;color:#444;text-align:center;letter-spacing:0.05em;">agent</div>
+  <div id="agent-badges" style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;">
+    <span class="agent-badge" data-agent="memory">memory</span>
+    <span class="agent-badge" data-agent="web">web</span>
+    <span class="agent-badge" data-agent="code">code</span>
+    <span class="agent-badge" data-agent="calendar">calendar</span>
+    <span class="agent-badge" data-agent="home">home</span>
+  </div>
+  <div id="agent-log"></div>
 </div>
 <div id="docs-panel">
   <div id="docs-nav">
@@ -351,7 +360,7 @@
       </ul>
 
       <h4>Agent Badges</h4>
-      <p>The badges in <strong>Settings → Agents</strong> show which specialist handled the last turn. The top-bar badge also shows the active agent during processing. A badge lights up blue when active.</p>
+      <p>The badges in the <strong>left sidebar</strong> show which specialist handled the last turn. The top-bar badge also shows the active agent during processing. A badge lights up blue when active.</p>
 
       <h4>Agent Log</h4>
       <p>The log below the badges shows recent routing decisions — useful for debugging unexpected responses. If a message went to the wrong agent, rephrase using the trigger keywords above.</p>
@@ -692,7 +701,6 @@
       <div id="m-nav">
         <button class="m-nav-btn active" data-section="voice" onclick="showMenuSection('voice')">Voice</button>
         <button class="m-nav-btn" data-section="web" onclick="showMenuSection('web')">Web</button>
-        <button class="m-nav-btn" data-section="agents" onclick="showMenuSection('agents')">Agents</button>
         <button class="m-nav-btn" data-section="llm" onclick="showMenuSection('llm')">LLM</button>
         <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system');loadPipelineStatus();loadSystemStats()">System</button>
         <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders();loadTimers()">Reminders</button>
@@ -920,17 +928,6 @@
             <button onclick="undoSystemPrompt()" style="background:#1e1e1e;border:1px solid #444;border-radius:4px;color:#aaa;font-size:0.75rem;padding:4px 8px;cursor:pointer;" title="Revert to previous prompt">Undo</button>
             <button onclick="resetSystemPrompt()" style="background:#1e1e1e;border:1px solid #444;border-radius:4px;color:#ef9a9a;font-size:0.75rem;padding:4px 8px;cursor:pointer;" title="Reset to factory default">Reset</button>
           </div>
-        </div>
-        <!-- Agents pane -->
-        <div id="m-section-agents" class="m-pane" style="display:none">
-          <div id="agent-badges" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
-            <span class="agent-badge" data-agent="memory">memory</span>
-            <span class="agent-badge" data-agent="web">web</span>
-            <span class="agent-badge" data-agent="code">code</span>
-            <span class="agent-badge" data-agent="calendar">calendar</span>
-            <span class="agent-badge" data-agent="home">home</span>
-          </div>
-          <div id="agent-log"></div>
         </div>
         <div id="m-section-system" class="m-pane" style="display:none">
           <div style="font-size:0.78rem;color:#aaa;margin-bottom:10px;">Voice Pipeline</div>
