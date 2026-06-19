@@ -731,14 +731,13 @@ async def run_tool(body: dict):
     """Call any registered tool directly — no LLM involved.
     Body: {"tool": "tool_name", "params": {...}}
     """
-    from core.registry import call_tool
+    from core.registry import call_tool_async
     tool_name = body.get("tool")
     params = body.get("params", {})
     if not tool_name:
         raise HTTPException(status_code=400, detail="'tool' is required")
     try:
-        import asyncio
-        result = await asyncio.to_thread(call_tool, tool_name, params)
+        result = await call_tool_async(tool_name, params)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except TypeError as exc:

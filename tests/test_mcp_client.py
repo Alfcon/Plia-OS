@@ -325,3 +325,118 @@ async def test_disabled_server_raises_immediately_without_calling_session():
 
 async def test_shutdown_safe_when_no_servers_started():
     await shutdown_mcp_servers()   # must not raise
+
+
+# ---------------------------------------------------------------------------
+# load_mcp_servers: happy path and partial failure
+# ---------------------------------------------------------------------------
+
+async def test_load_mcp_servers_happy_path(tmp_path, monkeypatch):
+    """load_mcp_servers registers tools on successful server connect."""
+    from core.registry import _tools, clear_tools
+    clear_tools()
+
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text(json.dumps([{"name": "fs", "command": ["npx", "s"]}]))
+    monkeypatch.setattr("core.mcp_client._MCP_CONFIG", cfg)
+
+    fake_tool = MagicMock()
+    fake_tool.name = "read"
+    fake_tool.description = "read"
+    fake_tool.inputSchema = {"type": "object", "properties": {}}
+
+    mock_session = MagicMock()
+    mock_session.initialize = AsyncMock()
+    mock_session.list_tools = AsyncMock(return_value=MagicMock(tools=[fake_tool]))
+
+    session_cm = AsyncMock()
+    session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+    session_cm.__aexit__ = AsyncMock(return_value=False)
+
+    transport_cm = AsyncMock()
+    transport_cm.__aenter__ = AsyncMock(return_value=(object(), object()))
+    transport_cm.__aexit__ = AsyncMock(return_value=False)
+
+    mock_stdio_client = MagicMock(return_value=transport_cm)
+    MockClientSession = MagicMock(return_value=session_cm)
+    MockParams = MagicMock()
+
+    fake_mcp_module = MagicMock()
+    fake_mcp_module.ClientSession = MockClientSession
+    fake_mcp_module.StdioServerParameters = MockParams
+
+    fake_stdio_module = MagicMock()
+    fake_stdio_module.stdio_client = mock_stdio_client
+
+    with patch.dict(sys.modules, {
+        "mcp": fake_mcp_module,
+        "mcp.client": MagicMock(),
+        "mcp.client.stdio": fake_stdio_module,
+    }):
+        await load_mcp_servers()
+
+    assert "fs" in mcp_mod._servers
+    assert "fs__read" in _tools
+    assert mcp_mod._servers["fs"].healthy is True
+    assert len(mcp_mod._servers["fs"].tools) == 1
+
+
+async def test_load_mcp_servers_partial_failure(tmp_path, monkeypatch):
+    """good server registers; bad server (fails initialize) lands in _disabled_servers."""
+    from core.registry import _tools, clear_tools
+    clear_tools()
+
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text(json.dumps([
+        {"name": "good", "command": ["npx", "good"]},
+        {"name": "bad",  "command": ["npx", "bad"]},
+    ]))
+    monkeypatch.setattr("core.mcp_client._MCP_CONFIG", cfg)
+
+    fake_tool = MagicMock()
+    fake_tool.name = "op"
+    fake_tool.description = "op"
+    fake_tool.inputSchema = {"type": "object", "properties": {}}
+
+    good_session = MagicMock()
+    good_session.initialize = AsyncMock()
+    good_session.list_tools = AsyncMock(return_value=MagicMock(tools=[fake_tool]))
+
+    bad_session = MagicMock()
+    bad_session.initialize = AsyncMock(side_effect=RuntimeError("connection refused"))
+
+    def make_session_cm(session):
+        cm = AsyncMock()
+        cm.__aenter__ = AsyncMock(return_value=session)
+        cm.__aexit__ = AsyncMock(return_value=False)
+        return cm
+
+    call_count = 0
+
+    def session_factory(*args):
+        nonlocal call_count
+        call_count += 1
+        return make_session_cm(good_session if call_count == 1 else bad_session)
+
+    transport_cm = AsyncMock()
+    transport_cm.__aenter__ = AsyncMock(return_value=(object(), object()))
+    transport_cm.__aexit__ = AsyncMock(return_value=False)
+
+    fake_mcp_module = MagicMock()
+    fake_mcp_module.ClientSession = MagicMock(side_effect=session_factory)
+    fake_mcp_module.StdioServerParameters = MagicMock()
+
+    fake_stdio_module = MagicMock()
+    fake_stdio_module.stdio_client = MagicMock(return_value=transport_cm)
+
+    with patch.dict(sys.modules, {
+        "mcp": fake_mcp_module,
+        "mcp.client": MagicMock(),
+        "mcp.client.stdio": fake_stdio_module,
+    }):
+        await load_mcp_servers()
+
+    assert "good" in mcp_mod._servers
+    assert "bad" in mcp_mod._disabled_servers
+    assert "bad" not in mcp_mod._servers
+    assert "good__op" in _tools
