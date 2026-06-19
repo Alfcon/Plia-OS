@@ -1872,7 +1872,7 @@
             <span style="color:#666;font-size:0.7rem;margin-left:6px;">${toolCount} tool${toolCount !== 1 ? 's' : ''}</span>
             <span style="color:#444;font-size:0.7rem;margin-left:6px;">${uptime}</span>
           </div>
-          <button onclick="${canDisable ? `disableMcpServer(${JSON.stringify(s.name)})` : ''}"
+          <button onclick="${canDisable ? `disableMcpServer('${_esc(s.name)}')` : ''}"
             style="${btnStyle}" ${canDisable ? '' : 'disabled'}>
             ${canDisable ? 'Disable' : '—'}
           </button>
