@@ -208,6 +208,16 @@ async def test_api_get_mcp_config_existing(app, tmp_path):
     assert r.json() == [{"name": "fs", "command": ["npx"]}]
 
 
+async def test_api_get_mcp_config_corrupted(app, tmp_path):
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text("not json")
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/mcp/config")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
 async def test_api_put_mcp_config_valid(app, tmp_path):
     cfg = tmp_path / "mcp_servers.json"
     new_config = [{"name": "git", "command": ["npx", "-y", "@mcp/git"]}]
@@ -222,6 +232,17 @@ async def test_api_put_mcp_config_valid(app, tmp_path):
 async def test_api_put_mcp_config_not_a_list(app):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         r = await client.put("/api/mcp/config", json={"not": "a list"})
+    assert r.status_code == 422
+    assert "error" in r.json()
+
+
+async def test_api_put_mcp_config_invalid_json_body(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.put(
+            "/api/mcp/config",
+            content=b"{bad json",
+            headers={"Content-Type": "application/json"},
+        )
     assert r.status_code == 422
     assert "error" in r.json()
 

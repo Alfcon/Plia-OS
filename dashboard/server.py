@@ -816,7 +816,9 @@ async def put_mcp_config(request: Request):
     except ValueError as e:
         return JSONResponse(status_code=422, content={"error": str(e)})
     _MCP_CONFIG.parent.mkdir(parents=True, exist_ok=True)
-    _MCP_CONFIG.write_text(json.dumps(body, indent=2))
+    tmp = _MCP_CONFIG.with_suffix(".tmp")
+    tmp.write_text(json.dumps(body, indent=2) + "\n")
+    tmp.replace(_MCP_CONFIG)
     return {"ok": True}
 
 
