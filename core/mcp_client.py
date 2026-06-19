@@ -27,6 +27,7 @@ class _MCPServer:
 
 _servers: dict[str, _MCPServer] = {}
 _disabled_servers: set[str] = set()
+_restart_lock: asyncio.Lock = asyncio.Lock()
 
 
 def _validate_configs(servers: list[dict]) -> None:
@@ -90,6 +91,62 @@ async def load_mcp_servers() -> None:
 
 async def shutdown_mcp_servers() -> None:
     await _exit_stack.aclose()
+
+
+def get_mcp_status() -> list[dict]:
+    if not _MCP_CONFIG.exists():
+        return []
+    try:
+        servers = json.loads(_MCP_CONFIG.read_text())
+    except Exception:
+        return []
+    now = time.monotonic()
+    result = []
+    for cfg in servers:
+        name = cfg.get("name", "")
+        if not name:
+            continue
+        if name in _disabled_servers:
+            status = "disabled"
+        elif name in _servers:
+            status = "connected"
+        else:
+            status = "failed"
+        srv = _servers.get(name)
+        result.append({
+            "name": name,
+            "status": status,
+            "tools": list(srv.tools) if srv else [],
+            "uptime_seconds": (now - srv.started_at) if srv else None,
+        })
+    return result
+
+
+def disable_mcp_server(name: str) -> bool:
+    if not _MCP_CONFIG.exists():
+        return False
+    try:
+        servers = json.loads(_MCP_CONFIG.read_text())
+    except Exception:
+        return False
+    known = {cfg.get("name") for cfg in servers}
+    if name not in known:
+        return False
+    _disabled_servers.add(name)
+    if name in _servers:
+        _servers[name].healthy = False
+    return True
+
+
+async def restart_mcp_servers() -> None:
+    global _exit_stack, _initialized
+    async with _restart_lock:
+        await _exit_stack.aclose()
+        _exit_stack = AsyncExitStack()
+        _servers.clear()
+        _disabled_servers.clear()
+        _initialized = False
+        await load_mcp_servers()
 
 
 async def _register_tools(name: str, server: _MCPServer) -> None:

@@ -1,0 +1,138 @@
+import json
+from contextlib import AsyncExitStack
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+import core.mcp_client as mcp_mod
+from core.mcp_client import (
+    _MCPServer,
+    disable_mcp_server,
+    get_mcp_status,
+    restart_mcp_servers,
+)
+
+
+@pytest.fixture(autouse=True)
+def reset_mcp_state():
+    mcp_mod._servers.clear()
+    mcp_mod._disabled_servers.clear()
+    mcp_mod._initialized = False
+    mcp_mod._exit_stack = AsyncExitStack()
+    yield
+    mcp_mod._servers.clear()
+    mcp_mod._disabled_servers.clear()
+    mcp_mod._initialized = False
+    mcp_mod._exit_stack = AsyncExitStack()
+
+
+# ---------------------------------------------------------------------------
+# get_mcp_status
+# ---------------------------------------------------------------------------
+
+def test_get_mcp_status_no_config(tmp_path):
+    with patch.object(mcp_mod, "_MCP_CONFIG", tmp_path / "missing.json"):
+        assert get_mcp_status() == []
+
+
+def test_get_mcp_status_invalid_config(tmp_path):
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text("not json")
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        assert get_mcp_status() == []
+
+
+def test_get_mcp_status_failed_server(tmp_path):
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text(json.dumps([{"name": "fs", "command": ["npx"]}]))
+    # fs not in _servers, not in _disabled_servers → failed
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        result = get_mcp_status()
+    assert len(result) == 1
+    assert result[0]["name"] == "fs"
+    assert result[0]["status"] == "failed"
+    assert result[0]["tools"] == []
+    assert result[0]["uptime_seconds"] is None
+
+
+def test_get_mcp_status_connected_server(tmp_path):
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text(json.dumps([{"name": "fs", "command": ["npx"]}]))
+    srv = _MCPServer(session=MagicMock())
+    srv.tools = ["fs__read", "fs__write"]
+    mcp_mod._servers["fs"] = srv
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        result = get_mcp_status()
+    assert result[0]["status"] == "connected"
+    assert result[0]["tools"] == ["fs__read", "fs__write"]
+    assert result[0]["uptime_seconds"] is not None
+    assert result[0]["uptime_seconds"] >= 0
+
+
+def test_get_mcp_status_disabled_server(tmp_path):
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text(json.dumps([{"name": "fs", "command": ["npx"]}]))
+    srv = _MCPServer(session=MagicMock())
+    srv.healthy = False
+    mcp_mod._servers["fs"] = srv
+    mcp_mod._disabled_servers.add("fs")
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        result = get_mcp_status()
+    assert result[0]["status"] == "disabled"
+
+
+# ---------------------------------------------------------------------------
+# disable_mcp_server
+# ---------------------------------------------------------------------------
+
+def test_disable_unknown_server_returns_false(tmp_path):
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text(json.dumps([{"name": "fs", "command": ["npx"]}]))
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        assert disable_mcp_server("unknown") is False
+
+
+def test_disable_server_no_config_returns_false(tmp_path):
+    with patch.object(mcp_mod, "_MCP_CONFIG", tmp_path / "missing.json"):
+        assert disable_mcp_server("fs") is False
+
+
+def test_disable_known_server(tmp_path):
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text(json.dumps([{"name": "fs", "command": ["npx"]}]))
+    srv = _MCPServer(session=MagicMock())
+    mcp_mod._servers["fs"] = srv
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        result = disable_mcp_server("fs")
+    assert result is True
+    assert "fs" in mcp_mod._disabled_servers
+    assert srv.healthy is False
+
+
+def test_disable_server_not_in_servers_still_adds_to_disabled(tmp_path):
+    # Server that failed to start — not in _servers but config knows it
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text(json.dumps([{"name": "fs", "command": ["npx"]}]))
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        result = disable_mcp_server("fs")
+    assert result is True
+    assert "fs" in mcp_mod._disabled_servers
+
+
+# ---------------------------------------------------------------------------
+# restart_mcp_servers
+# ---------------------------------------------------------------------------
+
+async def test_restart_resets_state_and_calls_load():
+    srv = _MCPServer(session=MagicMock())
+    mcp_mod._servers["fs"] = srv
+    mcp_mod._disabled_servers.add("fs")
+    mcp_mod._initialized = True
+
+    with patch("core.mcp_client.load_mcp_servers", new_callable=AsyncMock) as mock_load:
+        await restart_mcp_servers()
+
+    assert mcp_mod._servers == {}
+    assert mcp_mod._disabled_servers == set()
+    assert mcp_mod._initialized is False
+    mock_load.assert_called_once()
