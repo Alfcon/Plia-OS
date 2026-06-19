@@ -11,6 +11,7 @@ from core.config import get_config
 from core.reminder_loop import run_reminder_loop
 from core import pipeline_registry
 from core.pipeline_runner import start_pipeline
+from core.mcp_client import load_mcp_servers, shutdown_mcp_servers
 from dashboard.server import router as dashboard_router, setup_event_forwarding
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
             psutil.cpu_percent()  # prime baseline; first call always returns 0.0 otherwise
         except ImportError:
             pass
+        await load_mcp_servers()
         # Start voice pipeline and reminder loop as background tasks
         pipeline_task = asyncio.create_task(start_pipeline())
         pipeline_registry.set_task(pipeline_task)
@@ -44,6 +46,7 @@ def create_app() -> FastAPI:
                 await task
             except asyncio.CancelledError:
                 pass
+        await shutdown_mcp_servers()
 
     app = FastAPI(title="Plia-OS", lifespan=lifespan)
     app.include_router(dashboard_router)

@@ -43,6 +43,7 @@ fallback-openai = ["openai>=1.0"]
 fallback-anthropic = ["anthropic>=0.25"]
 playwright = ["playwright>=1.40"]
 airllm = ["airllm>=2.9", "torch>=2.0", "transformers>=4.40", "bitsandbytes>=0.43"]
+mcp = ["mcp>=1.0"]
 
 [tool.hatch.metadata]
 allow-direct-references = true

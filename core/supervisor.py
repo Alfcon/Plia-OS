@@ -5,7 +5,7 @@ import logging
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
 from core.config import get_config
-from core.registry import get_tool_schemas, call_tool
+from core.registry import get_tool_schemas, call_tool_async, ToolExecutionError
 from agents.llm import call_llm
 from agents.memory import memory_node
 from agents.memory_store import get_memory_store
@@ -153,9 +153,9 @@ async def _respond_node(state: AgentState) -> dict:
         for tc in payload_msg["tool_calls"]:
             fn = tc["function"]
             try:
-                result = call_tool(fn["name"], fn.get("arguments") or {})
-                if inspect.isawaitable(result):
-                    result = await result
+                result = await call_tool_async(fn["name"], fn.get("arguments") or {})
+            except ToolExecutionError as e:
+                result = f"[Tool error: {e}]"
             except Exception as exc:
                 result = f"Error: {exc}"
             result_str = str(result)
