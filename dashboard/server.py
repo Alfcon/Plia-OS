@@ -8,7 +8,7 @@ import numpy as np
 from datetime import datetime
 from scipy.io import wavfile
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pathlib import Path
 from core import events, registry, pipeline_registry
 from core.config import get_config, update_config, restore_system_prompt, reset_system_prompt_to_default
@@ -788,6 +788,35 @@ async def disable_mcp_server_endpoint(name: str):
 @router.post("/api/mcp/restart")
 async def restart_mcp_endpoint():
     await restart_mcp_servers()
+    return {"ok": True}
+
+
+@router.get("/api/mcp/config")
+async def get_mcp_config():
+    from core.mcp_client import _MCP_CONFIG
+    if not _MCP_CONFIG.exists():
+        return []
+    try:
+        return json.loads(_MCP_CONFIG.read_text())
+    except Exception:
+        return []
+
+
+@router.put("/api/mcp/config")
+async def put_mcp_config(request: Request):
+    from core.mcp_client import _MCP_CONFIG, _validate_configs
+    try:
+        body = await request.json()
+    except Exception as e:
+        return JSONResponse(status_code=422, content={"error": f"Invalid JSON: {e}"})
+    if not isinstance(body, list):
+        return JSONResponse(status_code=422, content={"error": "Config must be a JSON array"})
+    try:
+        _validate_configs(body)
+    except ValueError as e:
+        return JSONResponse(status_code=422, content={"error": str(e)})
+    _MCP_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    _MCP_CONFIG.write_text(json.dumps(body, indent=2))
     return {"ok": True}
 
 

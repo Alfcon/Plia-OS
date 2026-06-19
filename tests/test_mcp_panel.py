@@ -184,3 +184,55 @@ async def test_api_restart_mcp(app):
             r = await client.post("/api/mcp/restart")
     assert r.status_code == 200
     assert r.json() == {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Config editor API tests
+# ---------------------------------------------------------------------------
+
+async def test_api_get_mcp_config_no_file(app, tmp_path):
+    with patch.object(mcp_mod, "_MCP_CONFIG", tmp_path / "missing.json"):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/mcp/config")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+async def test_api_get_mcp_config_existing(app, tmp_path):
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text(json.dumps([{"name": "fs", "command": ["npx"]}]))
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/mcp/config")
+    assert r.status_code == 200
+    assert r.json() == [{"name": "fs", "command": ["npx"]}]
+
+
+async def test_api_put_mcp_config_valid(app, tmp_path):
+    cfg = tmp_path / "mcp_servers.json"
+    new_config = [{"name": "git", "command": ["npx", "-y", "@mcp/git"]}]
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.put("/api/mcp/config", json=new_config)
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+    assert json.loads(cfg.read_text()) == new_config
+
+
+async def test_api_put_mcp_config_not_a_list(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.put("/api/mcp/config", json={"not": "a list"})
+    assert r.status_code == 422
+    assert "error" in r.json()
+
+
+async def test_api_put_mcp_config_invalid_config(app, tmp_path):
+    cfg = tmp_path / "mcp_servers.json"
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # missing 'name' field — _validate_configs raises ValueError
+            r = await client.put("/api/mcp/config", json=[{"command": ["npx"]}])
+    assert r.status_code == 422
+    data = r.json()
+    assert "error" in data
+    assert "name" in data["error"]
