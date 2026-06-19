@@ -136,3 +136,51 @@ async def test_restart_resets_state_and_calls_load():
     assert mcp_mod._disabled_servers == set()
     assert mcp_mod._initialized is False
     mock_load.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# API endpoint tests
+# ---------------------------------------------------------------------------
+
+from httpx import AsyncClient, ASGITransport
+from core.main import create_app
+
+
+@pytest.fixture
+def app():
+    return create_app()
+
+
+async def test_api_get_mcp_servers(app):
+    with patch("dashboard.server.get_mcp_status", return_value=[
+        {"name": "fs", "status": "connected", "tools": ["fs__read"], "uptime_seconds": 42.0}
+    ]):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/mcp/servers")
+    assert r.status_code == 200
+    data = r.json()
+    assert isinstance(data, list)
+    assert data[0]["name"] == "fs"
+
+
+async def test_api_disable_unknown_server(app):
+    with patch("dashboard.server.disable_mcp_server", return_value=False):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.post("/api/mcp/servers/unknown/disable")
+    assert r.status_code == 404
+
+
+async def test_api_disable_known_server(app):
+    with patch("dashboard.server.disable_mcp_server", return_value=True):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.post("/api/mcp/servers/fs/disable")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+
+
+async def test_api_restart_mcp(app):
+    with patch("dashboard.server.restart_mcp_servers", new_callable=AsyncMock):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.post("/api/mcp/restart")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}

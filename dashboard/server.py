@@ -14,6 +14,7 @@ from core import events, registry, pipeline_registry
 from core.config import get_config, update_config, restore_system_prompt, reset_system_prompt_to_default
 from voice.tts import get_tts_service
 from voice.vram_broker import get_vram_broker
+from core.mcp_client import get_mcp_status, disable_mcp_server, restart_mcp_servers
 
 try:
     import sounddevice as sd
@@ -770,6 +771,24 @@ async def vram_release(body: dict):
                 logger.exception("TTS engine switch to 'kokoro' after VRAM release failed")
     await _broadcast({"type": "vram_status", **get_vram_broker().status()})
     return get_vram_broker().status()
+
+
+@router.get("/api/mcp/servers")
+async def get_mcp_servers():
+    return get_mcp_status()
+
+
+@router.post("/api/mcp/servers/{name}/disable")
+async def disable_mcp_server_endpoint(name: str):
+    if not disable_mcp_server(name):
+        raise HTTPException(status_code=404, detail=f"MCP server {name!r} not found")
+    return {"ok": True}
+
+
+@router.post("/api/mcp/restart")
+async def restart_mcp_endpoint():
+    await restart_mcp_servers()
+    return {"ok": True}
 
 
 @router.websocket("/ws")
