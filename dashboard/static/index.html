@@ -712,7 +712,7 @@
         <button class="m-nav-btn" data-section="calendar" onclick="showMenuSection('calendar');loadCalendar();loadGcalStatus()">Calendar</button>
         <button class="m-nav-btn" data-section="memory" onclick="showMenuSection('memory');loadMemory()">Memory</button>
         <button class="m-nav-btn" data-section="modules" onclick="showMenuSection('modules');loadModules()">Modules</button>
-        <button class="m-nav-btn" data-section="mcp" onclick="showMenuSection('mcp');loadMcpServers()">MCP</button>
+        <button class="m-nav-btn" data-section="mcp" onclick="showMenuSection('mcp');loadMcpServers();loadMcpConfig()">MCP</button>
         <button class="m-nav-btn" data-section="home" onclick="showMenuSection('home');loadHassEntities()">Home</button>
         <button class="m-nav-btn" data-section="permissions" onclick="showMenuSection('permissions');loadPermissions()">Permissions</button>
       </div>
@@ -1081,6 +1081,19 @@
             <button id="mcp-restart-btn" onclick="restartMcp()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Restart MCP</button>
           </div>
           <ul id="mcp-servers-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
+          <hr style="border:none;border-top:1px solid #1a1a1a;margin:10px 0 8px;">
+          <div style="font-size:0.75rem;color:#aaa;margin-bottom:4px;">Config</div>
+          <textarea id="mcp-config-editor"
+            style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#eee;
+                   padding:6px;border-radius:3px;font-size:0.72rem;font-family:monospace;
+                   resize:vertical;min-height:120px;"
+            rows="8" spellcheck="false"></textarea>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+            <button onclick="saveMcpConfig()"
+              style="background:#1565c0;border:none;color:#eee;padding:4px 10px;border-radius:3px;
+                     font-size:0.75rem;cursor:pointer;">Save Config</button>
+            <span id="mcp-config-status" style="font-size:0.72rem;color:#888;"></span>
+          </div>
         </div>
         <div id="m-section-home" class="m-pane" style="display:none">
           <div style="font-size:0.78rem;color:#aaa;margin-bottom:8px;">Home Assistant</div>
@@ -1912,6 +1925,52 @@
     } finally {
       btn.textContent = '↻ Restart MCP';
       btn.style.pointerEvents = '';
+    }
+  }
+
+  async function loadMcpConfig() {
+    const ta = document.getElementById('mcp-config-editor');
+    try {
+      const r = await fetch('/api/mcp/config');
+      if (!r.ok) throw new Error(r.status);
+      const data = await r.json();
+      ta.value = JSON.stringify(data, null, 2);
+    } catch(e) {
+      ta.value = '// Failed to load config';
+    }
+  }
+
+  async function saveMcpConfig() {
+    const ta = document.getElementById('mcp-config-editor');
+    const status = document.getElementById('mcp-config-status');
+    status.style.color = '#888';
+    status.textContent = 'Saving…';
+    let parsed;
+    try {
+      parsed = JSON.parse(ta.value);
+    } catch(e) {
+      status.style.color = '#ef9a9a';
+      status.textContent = `Invalid JSON: ${e.message}`;
+      return;
+    }
+    try {
+      const r = await fetch('/api/mcp/config', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(parsed),
+      });
+      if (r.status === 422) {
+        const data = await r.json();
+        status.style.color = '#ef9a9a';
+        status.textContent = data.error || 'Validation error';
+        return;
+      }
+      if (!r.ok) throw new Error(r.status);
+      status.style.color = '#81c784';
+      status.textContent = 'Saved. Click ↻ Restart MCP to apply.';
+    } catch(e) {
+      status.style.color = '#ef9a9a';
+      status.textContent = 'Save failed.';
     }
   }
 
