@@ -1,5 +1,8 @@
 import inspect
+import logging
 from typing import Any, Callable, get_type_hints
+
+logger = logging.getLogger(__name__)
 
 _tools: dict[str, dict] = {}
 _LOADING_MODULE: str = ""
@@ -87,6 +90,54 @@ def list_modules() -> dict[str, list[str]]:
         mod = entry["module"] or "unknown"
         result.setdefault(mod, []).append(name)
     return result
+
+
+class ToolExecutionError(Exception):
+    """Raised by tool wrappers (e.g. MCP) on execution failure."""
+
+
+def register_tool(
+    *,
+    name: str,
+    fn: Callable,
+    description: str,
+    parameters: dict,
+    module: str = "",
+    meta: dict | None = None,
+) -> bool:
+    """Register a tool by name. Returns False (logs warning) on collision."""
+    if name in _tools:
+        logger.warning("Tool %r already registered — skipped", name)
+        return False
+    entry: dict = {
+        "fn": fn,
+        "module": module,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": name,
+                "description": description,
+                "parameters": parameters,
+            },
+        },
+    }
+    if meta is not None:
+        entry["meta"] = meta
+    _tools[name] = entry
+    return True
+
+
+async def call_tool_async(name: str, arguments: dict) -> Any:
+    """Async-capable tool dispatch. Awaits coroutine tools, calls sync tools directly."""
+    if name not in _tools:
+        raise KeyError(f"Unknown tool: {name!r}")
+    entry = _tools[name]
+    if entry["module"] in _disabled_modules():
+        raise KeyError(f"Tool {name!r} is in a disabled module")
+    fn = entry["fn"]
+    if inspect.iscoroutinefunction(fn):
+        return await fn(**arguments)
+    return fn(**arguments)
 
 
 def clear_tools() -> None:
