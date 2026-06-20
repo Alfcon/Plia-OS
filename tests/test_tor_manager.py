@@ -148,7 +148,7 @@ def test_enable_no_sudo_iptables():
 def test_enable_full_success():
     import core.tor_manager as tm
     with patch("subprocess.run", return_value=_ok(stdout="109\n")):
-        with patch.object(tm, "_write_torrc"):
+        with patch.object(tm, "_write_torrc", return_value=None):
             with patch.object(tm, "_run_systemctl", return_value=_ok()):
                 with patch.object(tm, "_wait_for_circuits", return_value=True):
                     with patch.object(tm, "_verify_tor_connection", return_value=(True, "185.220.1.1")):
@@ -163,7 +163,7 @@ def test_enable_full_success():
 def test_enable_circuit_timeout_stops_tor():
     import core.tor_manager as tm
     with patch("subprocess.run", return_value=_ok(stdout="109\n")):
-        with patch.object(tm, "_write_torrc"):
+        with patch.object(tm, "_write_torrc", return_value=None):
             with patch.object(tm, "_run_systemctl", return_value=_ok()) as mock_svc:
                 with patch.object(tm, "_wait_for_circuits", return_value=False):
                     result = tm.enable()
@@ -175,7 +175,7 @@ def test_enable_circuit_timeout_stops_tor():
 def test_enable_verify_failure_stops_tor():
     import core.tor_manager as tm
     with patch("subprocess.run", return_value=_ok(stdout="109\n")):
-        with patch.object(tm, "_write_torrc"):
+        with patch.object(tm, "_write_torrc", return_value=None):
             with patch.object(tm, "_run_systemctl", return_value=_ok()) as mock_svc:
                 with patch.object(tm, "_wait_for_circuits", return_value=True):
                     with patch.object(tm, "_verify_tor_connection", return_value=(False, "not tor")):

@@ -48,20 +48,23 @@ def _run_systemctl(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["sudo", "systemctl", *args], capture_output=True, text=True, timeout=30)
 
 
-def _write_torrc() -> None:
+def _write_torrc() -> str | None:
     try:
         current = _TOR_TORRC.read_text() if _TOR_TORRC.exists() else ""
     except PermissionError:
         current = ""
     if _MARKER in current:
-        return
-    subprocess.run(
+        return None
+    r = subprocess.run(
         ["sudo", "tee", "-a", str(_TOR_TORRC)],
         input=_TOR_TORRC_ADDITIONS,
         capture_output=True,
         text=True,
         timeout=10,
     )
+    if r.returncode != 0:
+        return r.stderr.strip() or "sudo tee failed (add /usr/bin/tee to sudoers)"
+    return None
 
 
 def _apply_proxy_rules(tor_uid: str) -> str | None:
@@ -99,7 +102,9 @@ def _activate_kill_switch(tor_uid: str) -> None:
 
 def _deactivate_kill_switch() -> None:
     global _kill_switch_active
-    _run_iptables("-F", "OUTPUT")
+    # Remove only the two rules _activate_kill_switch inserted; don't flush whole chain
+    _run_iptables("-D", "OUTPUT", "-m", "owner", "--uid-owner", _last_tor_uid, "-j", "ACCEPT")
+    _run_iptables("-D", "OUTPUT", "-d", "127.0.0.0/8", "-j", "ACCEPT")
     _run_iptables("-P", "OUTPUT", "ACCEPT")
     _kill_switch_active = False
 
@@ -153,6 +158,9 @@ def _circuit_ok() -> bool:
 def enable() -> str:
     global _monitor_task, _last_tor_uid, _exit_ip
 
+    if _kill_switch_active:
+        _deactivate_kill_switch()
+
     r = subprocess.run(["which", "tor"], capture_output=True)
     if r.returncode != 0:
         return "tor not installed. Run: sudo apt install tor"
@@ -163,12 +171,14 @@ def enable() -> str:
             "sudo iptables access denied. Add to /etc/sudoers.d/plia-tor:\n"
             "plia ALL=(root) NOPASSWD: /usr/sbin/iptables, "
             "/usr/bin/systemctl start tor, /usr/bin/systemctl stop tor, "
-            "/usr/bin/systemctl restart tor"
+            "/usr/bin/systemctl restart tor, /usr/bin/tee"
         )
 
     _, tor_uid = _detect_tor_uid()
     _last_tor_uid = tor_uid
-    _write_torrc()
+    torrc_err = _write_torrc()
+    if torrc_err:
+        return f"Failed to write torrc: {torrc_err}"
 
     r = _run_systemctl("restart", "tor")
     if r.returncode != 0:
@@ -185,9 +195,9 @@ def enable() -> str:
 
     _exit_ip = result
     err = _apply_proxy_rules(tor_uid)
-    if err:
+    if err is not None:
         _run_systemctl("stop", "tor")
-        return f"iptables error: {err}"
+        return f"iptables error: {err or '(no stderr — check dmesg)'}"
 
     update_config(tor_enabled=True)
     return f"Tor enabled. Exit node: {result}"
@@ -227,6 +237,7 @@ async def _monitor_loop(tor_uid: str) -> None:
         ok = await asyncio.to_thread(_circuit_ok)
         if not ok:
             await asyncio.to_thread(_activate_kill_switch, tor_uid)
+            await asyncio.to_thread(_flush_proxy_rules)
             await asyncio.to_thread(update_config, tor_enabled=False)
             await events.emit("tor_status", {
                 "enabled": False,
