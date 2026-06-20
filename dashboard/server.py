@@ -835,6 +835,8 @@ async def post_tor_enable():
     import core.tor_manager as tm
     message = await asyncio.to_thread(tm.enable)
     success = message.lower().startswith("tor enabled")
+    if success:
+        tm._monitor_task = asyncio.create_task(tm._monitor_loop(tm._last_tor_uid))
     return {"success": success, "message": message}
 
 

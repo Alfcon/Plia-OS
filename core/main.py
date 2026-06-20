@@ -17,21 +17,15 @@ from dashboard.server import router as dashboard_router, setup_event_forwarding
 logger = logging.getLogger(__name__)
 
 
-def _start_tor_if_enabled() -> None:
-    """Called at startup in a thread to avoid blocking lifespan."""
+async def _start_tor_if_enabled() -> None:
     import core.tor_manager as tm
-    result = tm.enable()
+    result = await asyncio.to_thread(tm.enable)
     if result.lower().startswith("tor enabled"):
-        import asyncio
-        loop = asyncio.get_event_loop()
-        loop.call_soon_threadsafe(
-            asyncio.ensure_future, tm._monitor_loop(tm._last_tor_uid)
-        )
+        tm._monitor_task = asyncio.create_task(tm._monitor_loop(tm._last_tor_uid))
     else:
         from core.config import update_config
-        update_config(tor_enabled=False)
-        import logging
-        logging.getLogger(__name__).warning("Tor startup failed: %s", result)
+        await asyncio.to_thread(update_config, tor_enabled=False)
+        logger.warning("Tor startup failed: %s", result)
 
 
 def create_app() -> FastAPI:
@@ -56,12 +50,15 @@ def create_app() -> FastAPI:
         pipeline_registry.set_task(pipeline_task)
         reminder_task = asyncio.create_task(run_reminder_loop())
         # Start Tor if previously enabled
+        tor_task = None
         if get_config().tor_enabled:
-            asyncio.create_task(asyncio.to_thread(_start_tor_if_enabled))
+            tor_task = asyncio.create_task(_start_tor_if_enabled())
         yield
         pipeline_task.cancel()
         reminder_task.cancel()
-        for task in (pipeline_task, reminder_task):
+        if tor_task and not tor_task.done():
+            tor_task.cancel()
+        for task in filter(None, (pipeline_task, reminder_task, tor_task)):
             try:
                 await task
             except asyncio.CancelledError:

@@ -190,11 +190,6 @@ def enable() -> str:
         return f"iptables error: {err}"
 
     update_config(tor_enabled=True)
-    try:
-        _monitor_task = asyncio.create_task(_monitor_loop(tor_uid))
-    except RuntimeError:
-        # No running event loop (e.g. called from a synchronous context or tests)
-        pass
     return f"Tor enabled. Exit node: {result}"
 
 
