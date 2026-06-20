@@ -7,6 +7,7 @@ from pathlib import Path
 def isolate_config_file(tmp_path, monkeypatch):
     import core.config as cfg_mod
     monkeypatch.setattr(cfg_mod, "_CONFIG_FILE", tmp_path / "config.json")
+    monkeypatch.setattr(cfg_mod, "_config", cfg_mod.PliaConfig())
 
 
 @pytest.fixture(autouse=True)

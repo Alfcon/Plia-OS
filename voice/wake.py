@@ -18,7 +18,8 @@ def _resolve_model_path(name: str) -> str:
     if os.path.exists(name):
         return name
     if get_pretrained_model_paths is not None:
-        matches = [p for p in get_pretrained_model_paths() if name in p]
+        normalized = name.lower().replace(" ", "_")
+        matches = [p for p in get_pretrained_model_paths() if normalized in p.lower()]
         if matches:
             return matches[0]
     raise ValueError(f"Wake word model {name!r} not found. Available: {get_pretrained_model_paths()}")
