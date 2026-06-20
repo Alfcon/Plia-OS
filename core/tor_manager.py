@@ -29,6 +29,8 @@ _MONITOR_INTERVAL = 10
 
 _kill_switch_active: bool = False
 _monitor_task: asyncio.Task | None = None
+_last_tor_uid: str = ""
+_exit_ip: str | None = None
 
 
 def _detect_tor_uid() -> tuple[str, str]:
@@ -149,7 +151,7 @@ def _circuit_ok() -> bool:
 
 
 def enable() -> str:
-    global _monitor_task
+    global _monitor_task, _last_tor_uid, _exit_ip
 
     r = subprocess.run(["which", "tor"], capture_output=True)
     if r.returncode != 0:
@@ -165,6 +167,7 @@ def enable() -> str:
         )
 
     _, tor_uid = _detect_tor_uid()
+    _last_tor_uid = tor_uid
     _write_torrc()
 
     r = _run_systemctl("restart", "tor")
@@ -180,6 +183,7 @@ def enable() -> str:
         _run_systemctl("stop", "tor")
         return result
 
+    _exit_ip = result
     err = _apply_proxy_rules(tor_uid)
     if err:
         _run_systemctl("stop", "tor")
@@ -195,7 +199,7 @@ def enable() -> str:
 
 
 def disable() -> str:
-    global _monitor_task
+    global _monitor_task, _exit_ip
 
     if _monitor_task and not _monitor_task.done():
         _monitor_task.cancel()
@@ -207,6 +211,7 @@ def disable() -> str:
     _flush_proxy_rules()
     _run_systemctl("stop", "tor")
     update_config(tor_enabled=False)
+    _exit_ip = None
     return "Tor disabled. Clearnet restored."
 
 
@@ -215,7 +220,7 @@ def get_status() -> dict:
     return {
         "enabled": cfg.tor_enabled,
         "kill_switch_active": _kill_switch_active,
-        "exit_ip": None,
+        "exit_ip": _exit_ip,
     }
 
 
@@ -227,7 +232,7 @@ async def _monitor_loop(tor_uid: str) -> None:
         ok = await asyncio.to_thread(_circuit_ok)
         if not ok:
             await asyncio.to_thread(_activate_kill_switch, tor_uid)
-            update_config(tor_enabled=False)
+            await asyncio.to_thread(update_config, tor_enabled=False)
             await events.emit("tor_status", {
                 "enabled": False,
                 "kill_switch_active": True,

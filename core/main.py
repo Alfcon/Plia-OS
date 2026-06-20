@@ -21,7 +21,13 @@ def _start_tor_if_enabled() -> None:
     """Called at startup in a thread to avoid blocking lifespan."""
     import core.tor_manager as tm
     result = tm.enable()
-    if not result.lower().startswith("tor enabled"):
+    if result.lower().startswith("tor enabled"):
+        import asyncio
+        loop = asyncio.get_event_loop()
+        loop.call_soon_threadsafe(
+            asyncio.ensure_future, tm._monitor_loop(tm._last_tor_uid)
+        )
+    else:
         from core.config import update_config
         update_config(tor_enabled=False)
         import logging
