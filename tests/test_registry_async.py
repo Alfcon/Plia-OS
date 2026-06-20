@@ -3,6 +3,7 @@ from core.registry import (
     ToolExecutionError,
     call_tool_async,
     register_tool,
+    unregister_mcp_tools,
     _tools,
     clear_tools,
 )
@@ -106,3 +107,43 @@ async def test_call_tool_async_sync_tool_uses_to_thread():
         # Verify asyncio.to_thread was called with the function and arguments
         mock_to_thread.assert_called_once_with(sync_fn, x=21)
         assert result == 42
+
+
+# unregister_mcp_tools
+
+def test_unregister_mcp_tools_preserves_native_tools():
+    """Verify that unregister_mcp_tools removes MCP tools but preserves native tools."""
+    def native_fn(): return "native"
+    def mcp_fn(): return "mcp"
+
+    # Register a native tool with non-mcp module
+    register_tool(
+        name="native_tool",
+        fn=native_fn,
+        description="a native tool",
+        parameters={"type": "object", "properties": {}},
+        module="modules/memory.py",
+    )
+
+    # Register an MCP tool
+    register_tool(
+        name="mcp_tool",
+        fn=mcp_fn,
+        description="an mcp tool",
+        parameters={"type": "object", "properties": {}},
+        module="mcp:fs",
+    )
+
+    # Verify both are registered
+    assert "native_tool" in _tools
+    assert "mcp_tool" in _tools
+
+    # Call unregister_mcp_tools
+    unregister_mcp_tools()
+
+    # Verify native tool is still registered
+    assert "native_tool" in _tools
+    assert _tools["native_tool"]["module"] == "modules/memory.py"
+
+    # Verify MCP tool is removed
+    assert "mcp_tool" not in _tools
