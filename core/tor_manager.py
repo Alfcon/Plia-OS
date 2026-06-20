@@ -191,7 +191,6 @@ def enable() -> str:
         )
 
     _, tor_uid = _detect_tor_uid()
-    _last_tor_uid = tor_uid
     torrc_err = _write_torrc()
     if torrc_err:
         return f"Failed to write torrc: {torrc_err}"
@@ -217,6 +216,7 @@ def enable() -> str:
         return result
 
     _exit_ip = result
+    _last_tor_uid = tor_uid  # only set after all steps succeed
     update_config(tor_enabled=True)
     return f"Tor enabled. Exit node: {result}"
 
@@ -254,20 +254,45 @@ async def _monitor_loop(tor_uid: str) -> None:
 
     while True:
         await asyncio.sleep(_MONITOR_INTERVAL)
-        ok = await asyncio.to_thread(_circuit_ok)
-        if not ok:
-            await asyncio.to_thread(_activate_kill_switch, tor_uid)
-            await asyncio.to_thread(_flush_proxy_rules)
-            await asyncio.to_thread(update_config, tor_enabled=False)
-            await events.emit("tor_status", {
-                "enabled": False,
-                "kill_switch_active": True,
-                "error": "Tor circuits dropped",
-            })
-            await asyncio.to_thread(
-                subprocess.run,
-                ["notify-send", "Plia: Tor dropped", "All traffic blocked. Run 'enable tor' to reconnect."],
-                capture_output=True,
-                timeout=5,
-            )
-            break
+        try:
+            ok = await asyncio.to_thread(_circuit_ok)
+            if not ok:
+                await asyncio.to_thread(_activate_kill_switch, tor_uid)
+                await asyncio.to_thread(_flush_proxy_rules)
+                await asyncio.to_thread(update_config, tor_enabled=False)
+                await events.emit("tor_status", {
+                    "enabled": False,
+                    "kill_switch_active": True,
+                    "error": "Tor circuits dropped",
+                })
+                await asyncio.to_thread(
+                    subprocess.run,
+                    ["notify-send", "Plia: Tor dropped", "All traffic blocked. Run 'enable tor' to reconnect."],
+                    capture_output=True,
+                    timeout=5,
+                )
+                break
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Tor monitor loop error; will retry in %ss", _MONITOR_INTERVAL)
+
+
+async def _start_monitor(tor_uid: str) -> None:
+    """Cancel any existing monitor task then start a fresh one."""
+    global _monitor_task
+    if _monitor_task and not _monitor_task.done():
+        _monitor_task.cancel()
+        try:
+            await _monitor_task
+        except asyncio.CancelledError:
+            pass
+    _monitor_task = asyncio.create_task(_monitor_loop(tor_uid))
+
+
+def _system_cleanup() -> None:
+    """Flush iptables rules and stop Tor daemon without touching config."""
+    if _kill_switch_active:
+        _deactivate_kill_switch()
+    _flush_proxy_rules()
+    _run_systemctl("stop", "tor")

@@ -21,7 +21,7 @@ async def _start_tor_if_enabled() -> None:
     import core.tor_manager as tm
     result = await asyncio.to_thread(tm.enable)
     if result.lower().startswith("tor enabled"):
-        tm._monitor_task = asyncio.create_task(tm._monitor_loop(tm._last_tor_uid))
+        await tm._start_monitor(tm._last_tor_uid)
     else:
         from core.config import update_config
         await asyncio.to_thread(update_config, tor_enabled=False)
@@ -63,6 +63,17 @@ def create_app() -> FastAPI:
                 await task
             except asyncio.CancelledError:
                 pass
+        # Clean up Tor system state (iptables, monitor task, daemon) without
+        # touching tor_enabled config so it restarts on next boot.
+        import core.tor_manager as tm
+        if tm._monitor_task and not tm._monitor_task.done():
+            tm._monitor_task.cancel()
+            try:
+                await tm._monitor_task
+            except asyncio.CancelledError:
+                pass
+        if tm._exit_ip is not None:
+            await asyncio.to_thread(tm._system_cleanup)
         await shutdown_mcp_servers()
 
     app = FastAPI(title="Plia-OS", lifespan=lifespan)

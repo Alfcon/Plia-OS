@@ -24,3 +24,13 @@ def reset_events():
     events.clear_subscribers()
     yield
     events.clear_subscribers()
+
+
+@pytest.fixture(autouse=True)
+def reset_tor_manager():
+    yield
+    import core.tor_manager as tm
+    tm._kill_switch_active = False
+    tm._monitor_task = None
+    tm._last_tor_uid = ""
+    tm._exit_ip = None
