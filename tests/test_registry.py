@@ -35,15 +35,19 @@ def test_optional_param_not_in_required():
     assert "loud" not in required
 
 
-def test_duplicate_name_raises():
+def test_duplicate_name_warns_and_skips(caplog):
     @tool(description="first")
     def dupe() -> str:
         return "a"
 
-    with pytest.raises(ValueError, match="already registered"):
+    with caplog.at_level("WARNING"):
         @tool(description="second")
         def dupe() -> str:  # noqa: F811
             return "b"
+
+    assert "already registered" in caplog.text
+    # Original tool still registered (not replaced)
+    assert call_tool("dupe", {}) == "a"
 
 
 def test_unknown_tool_raises():

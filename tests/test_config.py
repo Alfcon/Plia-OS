@@ -7,6 +7,6 @@ def test_tor_enabled_default_false(isolate_config_file):
 
 def test_briefing_news_topic_default(isolate_config_file):
     from core.config import get_config, update_config
-    assert get_config().briefing_news_topic == "world news"
+    assert get_config().briefing_news_topic == "breaking news"
     update_config(briefing_news_topic="technology")
     assert get_config().briefing_news_topic == "technology"

@@ -112,11 +112,32 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
 }
 
 
+# keyword → tool name to call directly, bypassing LLM tool selection
+_DIRECT_TOOL_KEYWORDS: dict[str, str] = {
+    "morning briefing": "morning_briefing",
+    "daily briefing": "morning_briefing",
+    "today's briefing": "morning_briefing",
+    "give me a briefing": "morning_briefing",
+    "good morning": "morning_briefing",
+    "what's today": "morning_briefing",
+    "what's on today": "morning_briefing",
+    "what do i have today": "morning_briefing",
+}
+
+
 def _keyword_route(text: str) -> str | None:
     lower = text.lower()
     for intent, keywords in _KEYWORD_ROUTES.items():
         if any(kw in lower for kw in keywords):
             return intent
+    return None
+
+
+def _direct_tool(text: str) -> str | None:
+    lower = text.lower()
+    for kw, tool_name in _DIRECT_TOOL_KEYWORDS.items():
+        if kw in lower:
+            return tool_name
     return None
 
 
@@ -139,6 +160,18 @@ async def _supervisor_node(state: AgentState) -> dict:
     last_user = next(
         (m["content"] for m in reversed(state["messages"]) if m["role"] == "user"), ""
     )
+
+    # Fast path: directly call a known tool without LLM tool selection
+    direct = _direct_tool(last_user)
+    if direct:
+        try:
+            result = await call_tool_async(direct, {})
+            result_str = str(result)
+            await events.emit("transcript", {"role": "tool", "text": f"[{direct}]\n{result_str}"})
+            logger.info("Supervisor direct-called tool: %s", direct)
+            return {"active_agent": "respond", "tool_results": [result_str], "hop_count": state["hop_count"] + 1}
+        except Exception:
+            logger.exception("Direct tool call %r failed; falling through to LLM", direct)
 
     intent = _keyword_route(last_user)
     if intent is None:
@@ -172,8 +205,9 @@ async def _respond_node(state: AgentState) -> dict:
         # Specialist already handled this — don't offer tools or LLM re-invokes them
         tools = []
 
+    active_tools: list | None = tools or None
     for _ in range(_TOOL_CALL_LIMIT):
-        payload_msg = await call_llm(history, tools=tools or None)
+        payload_msg = await call_llm(history, tools=active_tools)
         history.append(payload_msg)
         if not payload_msg.get("tool_calls"):
             break
@@ -195,6 +229,12 @@ async def _respond_node(state: AgentState) -> dict:
                 "tool_call_id": tc.get("id", ""),
                 "content": result_str,
             })
+        # After executing tools, guide the LLM to present results without re-invoking tools
+        active_tools = None
+        history.append({
+            "role": "system",
+            "content": "Present the tool results above to the user exactly as provided. Do not add, expand, or replace information.",
+        })
     else:
         logger.warning("Tool-call limit (%d) reached; returning fallback reply", _TOOL_CALL_LIMIT)
         history.append({"role": "assistant", "content": "I reached the tool call limit and could not complete your request."})

@@ -38,7 +38,8 @@ def tool(description: str) -> Callable:
     def decorator(fn: Callable) -> Callable:
         name = fn.__name__
         if name in _tools:
-            raise ValueError(f"Tool {name!r} already registered")
+            logger.warning("Tool %r already registered — skipped", name)
+            return fn
         _tools[name] = {
             "fn": fn,
             "module": _LOADING_MODULE,

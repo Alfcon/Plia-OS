@@ -27,7 +27,7 @@ def parse_llm_json(content: str | None) -> dict:
         return {}
     return result
 
-_OLLAMA_TIMEOUT = 30.0
+_OLLAMA_TIMEOUT = 180.0
 
 
 async def call_llm(messages: list[dict], tools: list | None = None) -> dict:
