@@ -2,9 +2,12 @@ from __future__ import annotations
 from core.registry import tool
 
 try:
-    from duckduckgo_search import DDGS as _DDGS
+    from ddgs import DDGS as _DDGS
 except ImportError:
-    _DDGS = None  # type: ignore
+    try:
+        from duckduckgo_search import DDGS as _DDGS
+    except ImportError:
+        _DDGS = None  # type: ignore
 
 try:
     import feedparser as _feedparser
@@ -15,7 +18,7 @@ except ImportError:
 @tool("Search for recent news on a topic. Returns headlines with URLs and publish times.")
 def fetch_news(query: str, max_items: int = 5) -> str:
     if _DDGS is None:
-        return "duckduckgo_search not installed."
+        return "ddgs not installed. Run: pip install ddgs"
     try:
         results = list(_DDGS().news(query, max_results=max(1, min(max_items, 20))))
     except Exception as exc:
