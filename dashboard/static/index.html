@@ -2405,9 +2405,9 @@
         <button onclick="toggleToolCat('${id}')"
           style="width:100%;background:#0d0d0d;border:none;border-bottom:1px solid #1a1a1a;padding:5px 14px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:#4fc3f7;">${_esc(label(mod))}</span>
-          <span id="${id}-chv" style="color:#555;font-size:0.65rem;">▲</span>
+          <span id="${id}-chv" style="color:#555;font-size:0.65rem;">▼</span>
         </button>
-        <div id="${id}">${rows}</div>
+        <div id="${id}" style="display:none">${rows}</div>
       </div>`;
     }).join('');
   }
