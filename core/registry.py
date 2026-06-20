@@ -135,6 +135,11 @@ async def call_tool_async(name: str, arguments: dict) -> Any:
     entry = _tools[name]
     if entry["module"] in _disabled_modules():
         raise KeyError(f"Tool {name!r} is in a disabled module")
+    from core.tool_guard import maybe_guard, ToolDeniedError
+    try:
+        await maybe_guard(name, arguments)
+    except ToolDeniedError as exc:
+        return str(exc)
     fn = entry["fn"]
     if inspect.iscoroutinefunction(fn):
         return await fn(**arguments)

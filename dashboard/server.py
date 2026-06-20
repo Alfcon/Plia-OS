@@ -573,6 +573,7 @@ async def create_reminder(body: dict):
 @router.post("/api/chat")
 async def chat(body: dict):
     from core.supervisor import run_turn
+    from core.context_compactor import maybe_compact
     from agents.chat_history import get_recent, _HISTORY_PRELOAD
     text = (body.get("text") or "").strip()
     if not text:
@@ -580,10 +581,21 @@ async def chat(body: dict):
     rows = await asyncio.to_thread(get_recent, _HISTORY_PRELOAD)
     history = [{"role": m["role"], "content": m["content"]} for m in rows]
     history.append({"role": "user", "content": text})
+    history = await maybe_compact(history)
     response, _ = await run_turn(history)
     if response:
         await _broadcast({"type": "transcript", "role": "assistant", "text": response})
     return {"response": response}
+
+
+@router.post("/api/tool-guard/respond/{approval_id}")
+async def tool_guard_respond(approval_id: str, body: dict):
+    from core.tool_guard import respond
+    approved = bool(body.get("approved", False))
+    found = respond(approval_id, approved)
+    if not found:
+        raise HTTPException(status_code=404, detail="Approval request not found")
+    return {"status": "approved" if approved else "denied"}
 
 
 @router.post("/api/shutdown")

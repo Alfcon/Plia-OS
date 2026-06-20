@@ -1303,6 +1303,49 @@
     if (msg.type === 'tor_status') {
       updateTorUI(msg);
     }
+    if (msg.type === 'tool_approval_request') {
+      showToolApprovalModal(msg);
+    }
+    if (msg.type === 'proactive_insight') {
+      _appendMsg('system', '💡 ' + msg.text);
+    }
+  }
+
+  function showToolApprovalModal(req) {
+    const existing = document.getElementById('tool-guard-modal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'tool-guard-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#1e1e2e;border:1px solid #444;border-radius:8px;padding:24px;max-width:480px;width:90%;color:#cdd6f4;';
+
+    const args = JSON.stringify(req.arguments || {}, null, 2);
+    box.innerHTML = `
+      <h3 style="margin:0 0 12px;color:#cba6f7">Tool Approval Required</h3>
+      <p style="margin:0 0 8px"><strong>Tool:</strong> ${req.tool}</p>
+      <pre style="background:#181825;padding:10px;border-radius:4px;overflow:auto;max-height:200px;font-size:12px;">${args}</pre>
+      <p style="margin:12px 0 0;font-size:13px;color:#a6adc8">Allow this tool call?</p>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button id="tool-guard-approve" style="flex:1;padding:8px;background:#a6e3a1;color:#1e1e2e;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">Allow</button>
+        <button id="tool-guard-deny" style="flex:1;padding:8px;background:#f38ba8;color:#1e1e2e;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">Deny</button>
+      </div>`;
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    async function respond(approved) {
+      overlay.remove();
+      await fetch('/api/tool-guard/respond/' + req.id, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({approved})
+      });
+    }
+    document.getElementById('tool-guard-approve').onclick = () => respond(true);
+    document.getElementById('tool-guard-deny').onclick = () => respond(false);
   }
 
   _connectWS();

@@ -3,6 +3,7 @@ import logging
 import time
 import numpy as np
 from core.supervisor import run_turn
+from core.context_compactor import maybe_compact
 from core.config import get_config
 from core import events
 from voice.wake import WakeWordDetector
@@ -228,9 +229,8 @@ class VoicePipeline:
             # --- Phase 4: LLM + tool calls ---
             logger.info("Calling LLM...")
             try:
+                self._conversation = await maybe_compact(self._conversation)
                 response, self._conversation = await run_turn(self._conversation)
-                if len(self._conversation) > _CONVERSATION_CAP + 1:
-                    self._conversation = self._conversation[:1] + self._conversation[-_CONVERSATION_CAP:]
             except Exception as exc:
                 logger.error("Agent error: %s", exc)
                 response = "I encountered an error. Please try again."

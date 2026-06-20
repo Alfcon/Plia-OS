@@ -98,6 +98,9 @@ class PliaConfig:
     # Weather
     weather_location: str = ""
 
+    # Tool guard — tools in this list require user approval before execution
+    tool_guard_list: list = field(default_factory=list)
+
 
 _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
     "tts_engine": ("kokoro", "chatterbox", "dramabox"),

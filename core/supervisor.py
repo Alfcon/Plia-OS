@@ -54,6 +54,9 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
         "read the docx", "read the word", "read the spreadsheet",
         "read the excel", "open the excel", "read xlsx",
         "read the presentation", "read the powerpoint", "read pptx",
+        "index documents", "index my documents", "search my documents",
+        "query documents", "search documents", "find in documents",
+        "list indexed", "remove indexed source",
     ],
     "cron": [
         "schedule every", "schedule a recurring", "run every day",
@@ -99,7 +102,10 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
                 "enable vpn", "turn on vpn", "route through tor",
                 "disable tor", "turn off tor", "stop tor",
                 "disable vpn", "turn off vpn",
-                "tor status", "vpn status", "am i anonymous", "check tor"],
+                "tor status", "vpn status", "am i anonymous", "check tor",
+                "take a screenshot", "screenshot of", "capture screen", "capture my screen",
+                "latest news", "recent news", "fetch news", "news about", "what's in the news",
+                "rss feed", "fetch rss", "read the rss", "read rss"],
 }
 
 
