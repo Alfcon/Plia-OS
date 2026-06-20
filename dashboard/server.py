@@ -848,6 +848,64 @@ async def post_tor_disable():
     return {"success": success, "message": message}
 
 
+@router.get("/api/token-usage")
+async def get_token_usage():
+    from core.token_usage import get_stats
+    return get_stats()
+
+
+@router.post("/api/token-usage/reset")
+async def reset_token_usage():
+    from core.token_usage import reset
+    reset()
+    return {"ok": True}
+
+
+@router.get("/api/cron")
+async def list_cron_jobs():
+    from agents.cron_store import get_cron_store
+    return await asyncio.to_thread(get_cron_store().list_all)
+
+
+@router.post("/api/cron")
+async def add_cron_job(body: dict):
+    name = (body.get("name") or "").strip()
+    expr = (body.get("expr") or "").strip()
+    message = (body.get("message") or "").strip()
+    if not name or not expr or not message:
+        raise HTTPException(status_code=422, detail="name, expr, and message required")
+    try:
+        from croniter import croniter
+        if not croniter.is_valid(expr):
+            raise HTTPException(status_code=422, detail=f"Invalid cron expression: {expr!r}")
+    except ImportError:
+        pass
+    from agents.cron_store import get_cron_store
+    jid = await asyncio.to_thread(get_cron_store().add, name, expr, message)
+    return {"id": jid, "name": name, "expr": expr, "message": message}
+
+
+@router.delete("/api/cron/{name}")
+async def delete_cron_job(name: str):
+    from agents.cron_store import get_cron_store
+    removed = await asyncio.to_thread(get_cron_store().remove, name)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"No cron job named {name!r}")
+    return {"ok": True}
+
+
+@router.patch("/api/cron/{name}")
+async def patch_cron_job(name: str, body: dict):
+    enabled = body.get("enabled")
+    if enabled is None:
+        raise HTTPException(status_code=422, detail="'enabled' field required")
+    from agents.cron_store import get_cron_store
+    ok = await asyncio.to_thread(get_cron_store().set_enabled, name, bool(enabled))
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"No cron job named {name!r}")
+    return {"ok": True}
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()

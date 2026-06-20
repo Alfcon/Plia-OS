@@ -46,13 +46,26 @@ async def call_llm(messages: list[dict], tools: list | None = None) -> dict:
                 payload["tools"] = tools
             resp = await client.post(f"{config.ollama_url}/api/chat", json=payload)
             resp.raise_for_status()
-            return resp.json()["message"]
+            body = resp.json()
+            _record_usage(body, config.ollama_model)
+            return body["message"]
     except Exception as exc:
         if not config.fallback_provider:
             raise RuntimeError(
                 f"Ollama failed and no fallback configured: {exc}"
             ) from exc
         return await _dispatch_fallback(messages, tools, config)
+
+
+def _record_usage(body: dict, model: str) -> None:
+    try:
+        from core.token_usage import record
+        prompt = body.get("prompt_eval_count") or 0
+        completion = body.get("eval_count") or 0
+        if prompt or completion:
+            record(prompt, completion, model)
+    except Exception:
+        pass
 
 
 async def _dispatch_fallback(messages: list[dict], tools: list | None, config) -> dict:

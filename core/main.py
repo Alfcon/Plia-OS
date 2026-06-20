@@ -9,6 +9,7 @@ from pathlib import Path
 from core.loader import load_modules
 from core.config import get_config
 from core.reminder_loop import run_reminder_loop
+from core.cron_loop import run_cron_loop
 from core import pipeline_registry
 from core.pipeline_runner import start_pipeline
 from core.mcp_client import load_mcp_servers, shutdown_mcp_servers
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
         pipeline_task = asyncio.create_task(start_pipeline())
         pipeline_registry.set_task(pipeline_task)
         reminder_task = asyncio.create_task(run_reminder_loop())
+        cron_task = asyncio.create_task(run_cron_loop())
         # Start Tor if previously enabled
         tor_task = None
         if get_config().tor_enabled:
@@ -56,9 +58,10 @@ def create_app() -> FastAPI:
         yield
         pipeline_task.cancel()
         reminder_task.cancel()
+        cron_task.cancel()
         if tor_task and not tor_task.done():
             tor_task.cancel()
-        for task in filter(None, (pipeline_task, reminder_task, tor_task)):
+        for task in filter(None, (pipeline_task, reminder_task, cron_task, tor_task)):
             try:
                 await task
             except asyncio.CancelledError:

@@ -20,18 +20,19 @@ from agents.file import file_node
 from agents.weather import weather_node
 logger = logging.getLogger(__name__)
 
-_KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder", "network", "wifi", "file", "weather"}
+_KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder", "network", "wifi", "file", "weather", "cron"}
 _HOP_LIMIT = 5
 _TOOL_CALL_LIMIT = 10
 
 _CLASSIFY_SYSTEM = (
     "You are a router. Given the conversation, output exactly one word — "
-    "the specialist to handle the request: memory, web, code, calendar, home, reminder, network, wifi, file, weather. "
-    "Use 'reminder' for announcements at a specific future time ('remind me at 3pm', 'notify me in 2 hours'). "
+    "the specialist to handle the request: memory, web, code, calendar, home, reminder, network, wifi, file, weather, cron. "
+    "Use 'reminder' for one-shot announcements at a specific future time ('remind me at 3pm', 'notify me in 2 hours'). "
+    "Use 'cron' for recurring schedules ('every day at 8am', 'every weekday', 'every 30 minutes', cron job management). "
     "Use 'home' only for Home Assistant device control (lights, switches, sensors). "
     "Use 'network' for MAC address operations (show, change, randomize, spoof, restore MAC address). "
     "Use 'wifi' for WiFi status, scanning nearby networks, or listing WiFi interfaces. "
-    "Use 'file' for reading, writing, finding, searching, or running files and directories. "
+    "Use 'file' for reading, writing, finding, searching, or running files and directories; also PDF, Word, Excel, PowerPoint documents. "
     "Use 'weather' for weather conditions, forecasts, temperature, rain, UV index, or climate queries. "
     "Use 'respond' for countdown timers, volume, system info, calculations, or anything answerable with tools directly."
 )
@@ -48,6 +49,19 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
         "save to file", "delete the file", "remove the file",
         "move the file", "rename the file", "copy the file",
         "run the file", "run the script", "execute the file",
+        "read the pdf", "open the pdf", "summarize the pdf", "read pdf",
+        "read the document", "open the document", "summarize the document",
+        "read the docx", "read the word", "read the spreadsheet",
+        "read the excel", "open the excel", "read xlsx",
+        "read the presentation", "read the powerpoint", "read pptx",
+    ],
+    "cron": [
+        "schedule every", "schedule a recurring", "run every day",
+        "run every week", "run every hour", "run every morning",
+        "every weekday", "every monday", "every friday",
+        "cron job", "add cron", "list crons", "remove cron",
+        "delete cron", "pause cron", "enable cron", "disable cron",
+        "recurring reminder", "recurring task",
     ],
     "weather": [
         "forecast", "temperature outside", "will it rain",
@@ -210,6 +224,7 @@ def _build_graph():
         "wifi": "wifi",
         "file": "file",
         "weather": "weather",
+        "cron": "respond",
         "respond": "respond",
     })
     for agent in ("memory", "web", "code", "calendar", "home", "reminder", "network", "wifi", "file", "weather"):
