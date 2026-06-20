@@ -144,3 +144,13 @@ async def call_tool_async(name: str, arguments: dict) -> Any:
 def clear_tools() -> None:
     """For testing only."""
     _tools.clear()
+
+
+def unregister_mcp_tools() -> None:
+    """Remove all MCP-registered tools from the registry (called on MCP restart)."""
+    to_remove = [
+        name for name, entry in _tools.items()
+        if entry.get("module", "").startswith("mcp:")
+    ]
+    for name in to_remove:
+        del _tools[name]

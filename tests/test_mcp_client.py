@@ -1,3 +1,4 @@
+import asyncio
 import json
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -23,11 +24,13 @@ def reset_mcp_state():
     mcp_mod._disabled_servers.clear()
     mcp_mod._initialized = False
     mcp_mod._exit_stack = AsyncExitStack()
+    mcp_mod._restart_lock = None
     yield
     mcp_mod._servers.clear()
     mcp_mod._disabled_servers.clear()
     mcp_mod._initialized = False
     mcp_mod._exit_stack = AsyncExitStack()
+    mcp_mod._restart_lock = None
 
 
 # ---------------------------------------------------------------------------
@@ -440,3 +443,99 @@ async def test_load_mcp_servers_partial_failure(tmp_path, monkeypatch):
     assert "bad" in mcp_mod._disabled_servers
     assert "bad" not in mcp_mod._servers
     assert "good__op" in _tools
+
+
+# ---------------------------------------------------------------------------
+# Bug 1 — Lazy asyncio.Lock
+# ---------------------------------------------------------------------------
+
+def test_restart_lock_is_lazy():
+    """_restart_lock must be None at module level (lazy-initialised, not created at import)."""
+    assert mcp_mod._restart_lock is None
+
+
+async def test_get_restart_lock_returns_lock_and_is_idempotent():
+    lock1 = mcp_mod._get_restart_lock()
+    lock2 = mcp_mod._get_restart_lock()
+    assert isinstance(lock1, asyncio.Lock)
+    assert lock1 is lock2   # same object on repeated calls
+
+
+# ---------------------------------------------------------------------------
+# Bug 2 — KeyError in exception handlers after _servers.clear()
+# ---------------------------------------------------------------------------
+
+async def test_tool_call_exception_after_server_cleared_no_keyerror():
+    """Exception handler must not raise KeyError when _servers was cleared during call."""
+    clear_tools()
+    mcp_mod._disabled_servers.discard("fs")
+
+    async def clear_then_fail(*a, **kw):
+        # Simulate concurrent restart clearing _servers while call_tool was awaited
+        mcp_mod._servers.clear()
+        raise RuntimeError("pipe broke mid-flight")
+
+    fake = _make_fake_tool("broken3")
+    session = _make_mock_session(fake)
+    session.call_tool = clear_then_fail
+
+    server = _MCPServer(session=session)
+    mcp_mod._servers["fs"] = server
+    await _register_tools("fs", server)
+
+    with pytest.raises(ToolExecutionError, match="pipe broke mid-flight"):
+        await _tools["fs__broken3"]["fn"]()
+
+    # disabled set must be updated despite _servers being cleared
+    assert "fs" in mcp_mod._disabled_servers
+
+
+async def test_tool_call_timeout_after_server_cleared_no_keyerror():
+    """TimeoutError handler must not raise KeyError when _servers was cleared during call."""
+    clear_tools()
+    mcp_mod._disabled_servers.discard("fs")
+
+    async def clear_then_hang(*a, **kw):
+        mcp_mod._servers.clear()
+        await asyncio.sleep(9999)
+
+    fake = _make_fake_tool("slow4")
+    session = _make_mock_session(fake)
+    session.call_tool = clear_then_hang
+
+    server = _MCPServer(session=session)
+    mcp_mod._servers["fs"] = server
+    await _register_tools("fs", server)
+
+    original_timeout = mcp_mod._TOOL_TIMEOUT
+    mcp_mod._TOOL_TIMEOUT = 0.05
+    try:
+        with pytest.raises(ToolExecutionError, match="timed out"):
+            await _tools["fs__slow4"]["fn"]()
+    finally:
+        mcp_mod._TOOL_TIMEOUT = original_timeout
+
+    assert "fs" in mcp_mod._disabled_servers
+
+
+# ---------------------------------------------------------------------------
+# Bug 4 — _validate_configs rejects non-dict list elements
+# ---------------------------------------------------------------------------
+
+def test_validate_rejects_non_dict_element():
+    with pytest.raises(ValueError, match="must be a dict"):
+        _validate_configs(["not_a_dict"])
+
+
+def test_validate_rejects_non_dict_int_element():
+    with pytest.raises(ValueError, match="must be a dict"):
+        _validate_configs([42])
+
+
+# ---------------------------------------------------------------------------
+# Bug 5 — _validate_configs rejects string 'command'
+# ---------------------------------------------------------------------------
+
+def test_validate_rejects_string_command():
+    with pytest.raises(ValueError, match="must be a list"):
+        _validate_configs([{"name": "fs", "command": "npx -y server"}])

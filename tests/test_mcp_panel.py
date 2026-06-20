@@ -19,11 +19,13 @@ def reset_mcp_state():
     mcp_mod._disabled_servers.clear()
     mcp_mod._initialized = False
     mcp_mod._exit_stack = AsyncExitStack()
+    mcp_mod._restart_lock = None
     yield
     mcp_mod._servers.clear()
     mcp_mod._disabled_servers.clear()
     mcp_mod._initialized = False
     mcp_mod._exit_stack = AsyncExitStack()
+    mcp_mod._restart_lock = None
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +128,7 @@ def test_disable_server_not_in_servers_still_adds_to_disabled(tmp_path):
 async def test_restart_resets_state_and_calls_load():
     srv = _MCPServer(session=MagicMock())
     mcp_mod._servers["fs"] = srv
-    mcp_mod._disabled_servers.add("fs")
+    # Note: no entry in _disabled_servers here — tests server-map reset only.
     mcp_mod._initialized = True
 
     with patch("core.mcp_client.load_mcp_servers", new_callable=AsyncMock) as mock_load:
@@ -136,6 +138,68 @@ async def test_restart_resets_state_and_calls_load():
     assert mcp_mod._disabled_servers == set()
     assert mcp_mod._initialized is False
     mock_load.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Bug 3 — restart must clear MCP tools from registry so re-registration works
+# ---------------------------------------------------------------------------
+
+async def test_restart_clears_mcp_tools_from_registry():
+    """After restart, stale MCP tools are removed so re-registration succeeds."""
+    from core.registry import _tools, clear_tools, register_tool
+    clear_tools()
+
+    # Simulate tools that were registered during a previous load
+    register_tool(
+        name="fs__read",
+        fn=lambda: None,
+        description="read",
+        parameters={},
+        module="mcp:fs",
+    )
+    assert "fs__read" in _tools
+
+    mcp_mod._initialized = True
+
+    with patch("core.mcp_client.load_mcp_servers", new_callable=AsyncMock):
+        await restart_mcp_servers()
+
+    assert "fs__read" not in _tools
+
+
+# ---------------------------------------------------------------------------
+# Bug 6 — for-loop guard when config file contains JSON null
+# ---------------------------------------------------------------------------
+
+def test_get_mcp_status_null_config(tmp_path):
+    """get_mcp_status returns [] if config is JSON null (not a list)."""
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text("null")
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        assert get_mcp_status() == []
+
+
+def test_disable_mcp_server_null_config(tmp_path):
+    """disable_mcp_server returns False if config is JSON null (not a list)."""
+    cfg = tmp_path / "mcp_servers.json"
+    cfg.write_text("null")
+    with patch.object(mcp_mod, "_MCP_CONFIG", cfg):
+        assert disable_mcp_server("fs") is False
+
+
+# ---------------------------------------------------------------------------
+# Bug 7 — restart preserves user-disabled server state
+# ---------------------------------------------------------------------------
+
+async def test_restart_preserves_user_disabled_servers():
+    """Servers in _disabled_servers before restart must still be disabled afterward."""
+    mcp_mod._disabled_servers.add("user-db")
+    mcp_mod._initialized = True
+
+    with patch("core.mcp_client.load_mcp_servers", new_callable=AsyncMock):
+        await restart_mcp_servers()
+
+    assert "user-db" in mcp_mod._disabled_servers
 
 
 # ---------------------------------------------------------------------------

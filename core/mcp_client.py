@@ -27,12 +27,21 @@ class _MCPServer:
 
 _servers: dict[str, _MCPServer] = {}
 _disabled_servers: set[str] = set()
-_restart_lock: asyncio.Lock = asyncio.Lock()
+_restart_lock: asyncio.Lock | None = None
+
+
+def _get_restart_lock() -> asyncio.Lock:
+    global _restart_lock
+    if _restart_lock is None:
+        _restart_lock = asyncio.Lock()
+    return _restart_lock
 
 
 def _validate_configs(servers: list[dict]) -> None:
     seen: set[str] = set()
     for cfg in servers:
+        if not isinstance(cfg, dict):
+            raise ValueError(f"Each server config must be a dict, got {type(cfg).__name__}")
         name = cfg.get("name")
         if not name:
             raise ValueError(f"MCP server config missing 'name': {cfg!r}")
@@ -41,6 +50,8 @@ def _validate_configs(servers: list[dict]) -> None:
         if name in seen:
             raise ValueError(f"Duplicate MCP server name: {name!r}")
         cmd = cfg.get("command")
+        if not isinstance(cmd, list):
+            raise ValueError(f"MCP server {name!r}: 'command' must be a list")
         if not cmd or not cmd[0]:
             raise ValueError(
                 f"MCP server {name!r}: 'command' must be a non-empty list with a non-empty executable"
@@ -100,6 +111,8 @@ def get_mcp_status() -> list[dict]:
         servers = json.loads(_MCP_CONFIG.read_text())
     except Exception:
         return []
+    if not isinstance(servers, list):
+        return []
     now = time.monotonic()
     result = []
     for cfg in servers:
@@ -129,6 +142,8 @@ def disable_mcp_server(name: str) -> bool:
         servers = json.loads(_MCP_CONFIG.read_text())
     except Exception:
         return False
+    if not isinstance(servers, list):
+        return False
     known = {cfg.get("name") for cfg in servers}
     if name not in known:
         return False
@@ -140,13 +155,17 @@ def disable_mcp_server(name: str) -> bool:
 
 async def restart_mcp_servers() -> None:
     global _exit_stack, _initialized
-    async with _restart_lock:
+    from core.registry import unregister_mcp_tools
+    async with _get_restart_lock():
+        user_disabled = set(_disabled_servers)   # preserve user-disabled state (Bug 7)
         await _exit_stack.aclose()
         _exit_stack = AsyncExitStack()
         _servers.clear()
         _disabled_servers.clear()
         _initialized = False
+        unregister_mcp_tools()                   # clear stale MCP tools (Bug 3)
         await load_mcp_servers()
+        _disabled_servers.update(user_disabled)  # restore user choices (Bug 7)
 
 
 async def _register_tools(name: str, server: _MCPServer) -> None:
@@ -181,13 +200,15 @@ async def _register_tools(name: str, server: _MCPServer) -> None:
                         or "Done."
                     )
                 except asyncio.TimeoutError:
-                    _servers[_n].healthy = False
+                    if _n in _servers:
+                        _servers[_n].healthy = False
                     _disabled_servers.add(_n)
                     raise ToolExecutionError(
                         f"MCP server {_n!r} timed out after {_TOOL_TIMEOUT}s — marked unhealthy"
                     )
                 except Exception as e:
-                    _servers[_n].healthy = False
+                    if _n in _servers:
+                        _servers[_n].healthy = False
                     _disabled_servers.add(_n)
                     raise ToolExecutionError(
                         f"MCP server {_n!r} error on {_t!r}: {e}"
