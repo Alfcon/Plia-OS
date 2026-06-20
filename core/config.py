@@ -103,6 +103,17 @@ class PliaConfig:
     briefing_cron_enabled: bool = False
     briefing_cron_time: str = "07:00"
 
+    # Email
+    email_provider: str = ""                 # "gmail" | "imap" | "" (disabled)
+    email_imap_host: str = ""
+    email_imap_port: int = 993
+    email_smtp_host: str = ""
+    email_smtp_port: int = 587
+    email_username: str = ""
+    email_password: str = ""                 # app password — never logged
+    email_gmail_credentials_file: str = ""  # path to OAuth2 client_secret.json
+    email_briefing_enabled: bool = False
+
     # Tool guard — tools in this list require user approval before execution
     tool_guard_list: list = field(default_factory=list)
 
