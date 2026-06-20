@@ -37,6 +37,13 @@ def test_resolve_model_path_normalizes_spaces():
         assert _resolve_model_path("Hey Jarvis") == fake_paths[0]
 
 
+def test_resolve_model_path_falls_back_to_first_available():
+    fake_paths = ["/venv/openwakeword/resources/models/hey_jarvis_v0.1.onnx"]
+    with patch("voice.wake.get_pretrained_model_paths", return_value=fake_paths):
+        result = _resolve_model_path("Lisa")
+    assert result == fake_paths[0]
+
+
 def test_reset_calls_model_reset():
     mock_model = MagicMock()
     mock_model.predict.return_value = {"hey_jarvis": 0.0}
