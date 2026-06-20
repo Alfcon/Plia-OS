@@ -822,6 +822,29 @@ async def put_mcp_config(request: Request):
     return {"ok": True}
 
 
+# ── Tor / VPN ───────────────────────────────────────────────────────────────
+
+@router.get("/api/tor/status")
+async def get_tor_status():
+    import core.tor_manager as tm
+    return tm.get_status()
+
+
+@router.post("/api/tor/enable")
+async def post_tor_enable():
+    import core.tor_manager as tm
+    message = await asyncio.to_thread(tm.enable)
+    success = message.lower().startswith("tor enabled")
+    return {"success": success, "message": message}
+
+
+@router.post("/api/tor/disable")
+async def post_tor_disable():
+    import core.tor_manager as tm
+    message = await asyncio.to_thread(tm.disable)
+    return {"success": True, "message": message}
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
