@@ -79,6 +79,7 @@ def test_list_memories_shows_facts():
 
 def test_forget_memory_deletes():
     mock_store = MagicMock()
+    mock_store.list_all.return_value = [{"key": "name", "value": "Alice"}]
     mock_store.get_fact.return_value = "Alice"
     with patch("agents.memory_store.get_memory_store", return_value=mock_store):
         from modules.memory_tools import forget_memory
@@ -89,12 +90,50 @@ def test_forget_memory_deletes():
 
 def test_forget_memory_not_found():
     mock_store = MagicMock()
+    mock_store.list_all.return_value = []
     mock_store.get_fact.return_value = None
     with patch("agents.memory_store.get_memory_store", return_value=mock_store):
         from modules.memory_tools import forget_memory
         result = forget_memory("unknown")
     mock_store.forget.assert_not_called()
     assert "unknown" in result
+
+
+def test_forget_memory_blank_lists_all():
+    mock_store = MagicMock()
+    mock_store.list_all.return_value = [
+        {"key": "name", "value": "Alice"},
+        {"key": "city", "value": "NYC"},
+    ]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.memory_tools import forget_memory
+        result = forget_memory()
+    assert "1. name: Alice" in result
+    assert "2. city: NYC" in result
+    mock_store.forget.assert_not_called()
+
+
+def test_forget_memory_by_number():
+    mock_store = MagicMock()
+    mock_store.list_all.return_value = [
+        {"key": "name", "value": "Alice"},
+        {"key": "city", "value": "NYC"},
+    ]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.memory_tools import forget_memory
+        result = forget_memory("2")
+    mock_store.forget.assert_called_once_with("city")
+    assert "city" in result
+
+
+def test_forget_memory_number_out_of_range():
+    mock_store = MagicMock()
+    mock_store.list_all.return_value = [{"key": "name", "value": "Alice"}]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        from modules.memory_tools import forget_memory
+        result = forget_memory("99")
+    mock_store.forget.assert_not_called()
+    assert "99" in result
 
 
 def test_search_memories_returns_results():

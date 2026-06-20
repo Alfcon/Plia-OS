@@ -36,10 +36,26 @@ def search_memories(query: str) -> str:
     return "\n".join(results)
 
 
-@tool(description="Forget a stored memory fact by its exact key. Use list_memories first to get the key.")
-def forget_memory(key: str) -> str:
+@tool(description="Forget a stored memory fact. Leave key blank to list all memories numbered. Pass a number (e.g. '3') to forget that entry. Pass an exact key to forget directly.")
+def forget_memory(key: str = "") -> str:
     from agents.memory_store import get_memory_store
     store = get_memory_store()
+    facts = store.list_all()
+
+    if not key.strip():
+        if not facts:
+            return "No memories stored."
+        lines = [f"{i + 1}. {f['key']}: {f['value']}" for i, f in enumerate(facts)]
+        return "Memories (enter a number to forget one):\n" + "\n".join(lines)
+
+    if key.strip().isdigit():
+        idx = int(key.strip()) - 1
+        if 0 <= idx < len(facts):
+            target = facts[idx]["key"]
+            store.forget(target)
+            return f"Forgotten #{idx + 1}: '{target}'."
+        return f"No memory at position {key}. Leave key blank to see the list."
+
     if store.get_fact(key) is None:
         return f"No memory with key '{key}'."
     store.forget(key)

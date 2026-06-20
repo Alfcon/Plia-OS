@@ -2467,7 +2467,9 @@
         status.textContent = data.detail || 'Error';
         return;
       }
-      status.textContent = '';
+      status.style.color = '#a5d6a7';
+      const resultText = data.result || 'Done';
+      status.textContent = resultText.length > 120 ? resultText.slice(0, 120) + '…' : resultText;
     } catch(e) {
       status.style.color = '#ef9a9a';
       status.textContent = e.message;
