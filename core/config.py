@@ -92,6 +92,9 @@ class PliaConfig:
     # Notifications
     desktop_notifications: bool = True
 
+    # Tor VPN
+    tor_enabled: bool = False
+
     # Weather
     weather_location: str = ""
 
