@@ -979,6 +979,12 @@
           <input type="text" id="cfg-weather-location" placeholder="e.g. Berlin"
             style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;"
             onchange="fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weather_location:this.value.trim()})})">
+          <hr style="border-color:#222;margin:10px 0;" />
+          <div style="font-size:0.78rem;color:#aaa;margin-bottom:8px;">Briefing</div>
+          <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:4px;">News topic</label>
+          <input type="text" id="cfg-briefing-topic" placeholder="e.g. world news"
+            style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;"
+            onchange="fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({briefing_news_topic:this.value.trim()})})">
         </div>
         <div id="m-section-reminders" class="m-pane" style="display:none">
           <div style="margin-bottom:10px;">
@@ -1609,6 +1615,7 @@
       }
       document.getElementById('cfg-desktop-notifications').checked = cfg.desktop_notifications !== false;
       document.getElementById('cfg-weather-location').value = cfg.weather_location || '';
+      document.getElementById('cfg-briefing-topic').value = cfg.briefing_news_topic || 'world news';
       onWebProviderChange();
       onEngineChange();
       startVramPolling();
