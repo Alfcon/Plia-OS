@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import logging
 from typing import Any, Callable, get_type_hints
@@ -128,7 +129,7 @@ def register_tool(
 
 
 async def call_tool_async(name: str, arguments: dict) -> Any:
-    """Async-capable tool dispatch. Awaits coroutine tools, calls sync tools directly."""
+    """Async-capable tool dispatch. Awaits coroutine tools, runs sync tools in thread pool."""
     if name not in _tools:
         raise KeyError(f"Unknown tool: {name!r}")
     entry = _tools[name]
@@ -137,7 +138,7 @@ async def call_tool_async(name: str, arguments: dict) -> Any:
     fn = entry["fn"]
     if inspect.iscoroutinefunction(fn):
         return await fn(**arguments)
-    return fn(**arguments)
+    return await asyncio.to_thread(fn, **arguments)
 
 
 def clear_tools() -> None:

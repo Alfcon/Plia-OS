@@ -87,3 +87,22 @@ async def test_call_tool_async_passes_arguments():
 async def test_call_tool_async_unknown_tool_raises_key_error():
     with pytest.raises(KeyError, match="Unknown tool"):
         await call_tool_async("does_not_exist", {})
+
+
+async def test_call_tool_async_sync_tool_uses_to_thread():
+    """Verify that sync tools are executed in thread pool via asyncio.to_thread."""
+    from unittest.mock import AsyncMock, patch
+
+    def sync_fn(x: int):
+        return x * 2
+
+    register_tool(name="t_sync_thread", fn=sync_fn, description="", parameters={})
+
+    # Mock asyncio.to_thread to verify it's called
+    with patch("core.registry.asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
+        mock_to_thread.return_value = 42
+        result = await call_tool_async("t_sync_thread", {"x": 21})
+
+        # Verify asyncio.to_thread was called with the function and arguments
+        mock_to_thread.assert_called_once_with(sync_fn, x=21)
+        assert result == 42
