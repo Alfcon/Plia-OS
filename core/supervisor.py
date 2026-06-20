@@ -105,7 +105,10 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
                 "tor status", "vpn status", "am i anonymous", "check tor",
                 "take a screenshot", "screenshot of", "capture screen", "capture my screen",
                 "latest news", "recent news", "fetch news", "news about", "what's in the news",
-                "rss feed", "fetch rss", "read the rss", "read rss"],
+                "rss feed", "fetch rss", "read the rss", "read rss",
+                "morning briefing", "daily briefing", "today's briefing",
+                "give me a briefing", "good morning", "what's today",
+                "what's on today", "what do i have today"],
 }
 
 
