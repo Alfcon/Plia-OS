@@ -13,9 +13,9 @@ from modules.news_tools import fetch_news
 from modules.weather_tools import (
     _FORECAST_URL,
     _TIMEOUT,
+    _WMO_CODES,
     _resolve_location,
     _uv_label,
-    _wmo,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,8 @@ def _weather_section() -> str:
     code = daily.get("weathercode", [0])[0]
     uv = daily.get("uv_index_max", [None])[0]
     uv_str = f", UV {round(uv)} ({_uv_label(round(uv))})" if uv is not None else ""
-    return f"Weather: {name} — {_wmo(code)}, high {hi}°C, low {lo}°C{uv_str}."
+    _, desc = _WMO_CODES.get(code, ("", f"condition {code}"))
+    return f"Weather: {name} — {desc}, high {hi}°C, low {lo}°C{uv_str}."
 
 
 def _reminders_section() -> str:
