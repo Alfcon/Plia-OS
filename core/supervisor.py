@@ -80,7 +80,12 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
                 "previous track", "go back a track", "previous song", "last song",
                 "stop music", "stop the music", "stop playback",
                 "what's playing", "what is playing", "now playing",
-                "what song", "current song", "current track"],
+                "what song", "current song", "current track",
+                "enable tor", "turn on tor", "start tor", "use tor", "anonymize",
+                "enable vpn", "turn on vpn", "route through tor",
+                "disable tor", "turn off tor", "stop tor",
+                "disable vpn", "turn off vpn",
+                "tor status", "vpn status", "am i anonymous", "check tor"],
 }
 
 

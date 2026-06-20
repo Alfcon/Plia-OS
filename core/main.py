@@ -17,6 +17,17 @@ from dashboard.server import router as dashboard_router, setup_event_forwarding
 logger = logging.getLogger(__name__)
 
 
+def _start_tor_if_enabled() -> None:
+    """Called at startup in a thread to avoid blocking lifespan."""
+    import core.tor_manager as tm
+    result = tm.enable()
+    if not result.lower().startswith("tor enabled"):
+        from core.config import update_config
+        update_config(tor_enabled=False)
+        import logging
+        logging.getLogger(__name__).warning("Tor startup failed: %s", result)
+
+
 def create_app() -> FastAPI:
     # Load modules and wire event bus eagerly so they are available
     # before the first request regardless of whether the ASGI lifespan
@@ -38,6 +49,9 @@ def create_app() -> FastAPI:
         pipeline_task = asyncio.create_task(start_pipeline())
         pipeline_registry.set_task(pipeline_task)
         reminder_task = asyncio.create_task(run_reminder_loop())
+        # Start Tor if previously enabled
+        if get_config().tor_enabled:
+            asyncio.create_task(asyncio.to_thread(_start_tor_if_enabled))
         yield
         pipeline_task.cancel()
         reminder_task.cancel()
