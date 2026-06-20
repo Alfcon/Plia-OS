@@ -844,7 +844,8 @@ async def post_tor_enable():
 async def post_tor_disable():
     import core.tor_manager as tm
     message = await asyncio.to_thread(tm.disable)
-    return {"success": True, "message": message}
+    success = message.lower().startswith("tor disabled")
+    return {"success": success, "message": message}
 
 
 @router.websocket("/ws")

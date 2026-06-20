@@ -96,8 +96,13 @@ def _activate_kill_switch(tor_uid: str) -> None:
     global _kill_switch_active
     _run_iptables("-I", "OUTPUT", "1", "-m", "owner", "--uid-owner", tor_uid, "-j", "ACCEPT")
     _run_iptables("-I", "OUTPUT", "2", "-d", "127.0.0.0/8", "-j", "ACCEPT")
-    _run_iptables("-P", "OUTPUT", "DROP")
-    _kill_switch_active = True
+    r = _run_iptables("-P", "OUTPUT", "DROP")
+    if r.returncode == 0:
+        _kill_switch_active = True
+    else:
+        logger.error("Kill switch DROP policy failed: %s", r.stderr.strip())
+        _run_iptables("-D", "OUTPUT", "-m", "owner", "--uid-owner", tor_uid, "-j", "ACCEPT")
+        _run_iptables("-D", "OUTPUT", "-d", "127.0.0.0/8", "-j", "ACCEPT")
 
 
 def _deactivate_kill_switch() -> None:
@@ -124,15 +129,26 @@ def _wait_for_circuits(timeout: int = _CIRCUIT_TIMEOUT) -> bool:
             time.sleep(1)
         return False
     except ImportError:
-        time.sleep(5)
-        r = subprocess.run(["pgrep", "-x", "tor"], capture_output=True)
-        return r.returncode == 0
+        import socket
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            r = subprocess.run(["pgrep", "-x", "tor"], capture_output=True)
+            if r.returncode == 0:
+                try:
+                    with socket.create_connection(("127.0.0.1", 9050), timeout=2):
+                        return True
+                except OSError:
+                    pass
+            time.sleep(2)
+        return False
 
 
 def _verify_tor_connection() -> tuple[bool, str]:
+    # Direct connection — relies on the NAT transparent-proxy rules already being in place
+    # so outgoing TCP is redirected to TransPort 9040 by iptables. This validates the
+    # full iptables path, not just SOCKS reachability.
     try:
-        transport = httpx.HTTPTransport(proxy="socks5://127.0.0.1:9050")
-        with httpx.Client(transport=transport, timeout=15.0) as client:
+        with httpx.Client(timeout=15.0) as client:
             resp = client.get("https://check.torproject.org/api/ip")
         data = resp.json()
         if data.get("IsTor"):
@@ -188,17 +204,19 @@ def enable() -> str:
         _run_systemctl("stop", "tor")
         return "Tor failed to establish circuits within 30s"
 
-    ok, result = _verify_tor_connection()
-    if not ok:
-        _run_systemctl("stop", "tor")
-        return result
-
-    _exit_ip = result
+    _flush_proxy_rules()  # evict stale PLIA_TOR chain from any previous unclean shutdown
     err = _apply_proxy_rules(tor_uid)
     if err is not None:
         _run_systemctl("stop", "tor")
         return f"iptables error: {err or '(no stderr — check dmesg)'}"
 
+    ok, result = _verify_tor_connection()  # tests full NAT path, not just SOCKS port
+    if not ok:
+        _flush_proxy_rules()
+        _run_systemctl("stop", "tor")
+        return result
+
+    _exit_ip = result
     update_config(tor_enabled=True)
     return f"Tor enabled. Exit node: {result}"
 
@@ -214,9 +232,11 @@ def disable() -> str:
         _deactivate_kill_switch()
 
     _flush_proxy_rules()
-    _run_systemctl("stop", "tor")
+    r = _run_systemctl("stop", "tor")
     update_config(tor_enabled=False)
     _exit_ip = None
+    if r.returncode != 0:
+        return f"Tor stop error: {r.stderr.strip() or 'systemctl stop tor failed'}"
     return "Tor disabled. Clearnet restored."
 
 
