@@ -29,11 +29,15 @@ def fetch_news(query: str, max_items: int = 5) -> str:
 
     lines = []
     for r in results:
+        title = r.get("title", "")
+        if not title:
+            continue
         date = r.get("date", "")[:10]
         source = r.get("source", "")
-        title = r.get("title", "")
         url = r.get("url", "")
         lines.append(f"[{date}] {title} — {source}\n  {url}")
+    if not lines:
+        return f"No news found for '{query}'."
     return "\n\n".join(lines)
 
 

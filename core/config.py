@@ -99,7 +99,7 @@ class PliaConfig:
     weather_location: str = ""
 
     # Briefing
-    briefing_news_topic: str = "world news"
+    briefing_news_topic: str = "breaking news"
 
     # Tool guard — tools in this list require user approval before execution
     tool_guard_list: list = field(default_factory=list)
