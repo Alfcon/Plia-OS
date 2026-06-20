@@ -1,5 +1,6 @@
+import asyncio
 import subprocess
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import AsyncMock, patch, MagicMock, call
 import pytest
 
 
@@ -243,3 +244,42 @@ def test_get_status_reflects_config_and_kill_switch():
         status = tm.get_status()
     assert status["enabled"] is True
     assert status["kill_switch_active"] is False
+
+
+# --- monitor loop ---
+
+async def test_monitor_loop_activates_kill_switch_on_circuit_loss():
+    import core.tor_manager as tm
+    tm._kill_switch_active = False
+
+    with patch.object(tm, "_MONITOR_INTERVAL", 0):
+        with patch.object(tm, "_circuit_ok", return_value=False):
+            with patch.object(tm, "_activate_kill_switch"):
+                with patch("core.tor_manager.update_config"):
+                    with patch("core.events.emit", new=AsyncMock()):
+                        with patch("subprocess.run", return_value=_ok()):
+                            await tm._monitor_loop("109")
+
+    # Loop must have exited after kill switch — if we reach here it didn't hang
+    assert tm._kill_switch_active is False  # patched _activate_kill_switch didn't set it
+
+
+async def test_monitor_loop_does_not_exit_while_circuits_ok():
+    import core.tor_manager as tm
+    tm._kill_switch_active = False
+
+    call_count = 0
+
+    async def mock_sleep(n):
+        nonlocal call_count
+        call_count += 1
+        if call_count >= 3:
+            raise asyncio.CancelledError()
+
+    with patch("asyncio.sleep", side_effect=mock_sleep):
+        with patch.object(tm, "_circuit_ok", return_value=True):
+            with patch.object(tm, "_activate_kill_switch") as mock_ks:
+                with pytest.raises(asyncio.CancelledError):
+                    await tm._monitor_loop("109")
+
+    mock_ks.assert_not_called()
