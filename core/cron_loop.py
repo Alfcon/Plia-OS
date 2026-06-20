@@ -8,10 +8,26 @@ logger = logging.getLogger(__name__)
 _POLL_INTERVAL_S = 60
 
 
+async def _fire_cron_job(job: dict) -> None:
+    from core import events
+    msg = job["message"]
+    if msg.startswith("tool:"):
+        tool_name = msg[5:].strip()
+        try:
+            from core.registry import call_tool_async
+            msg = str(await call_tool_async(tool_name, {}))
+        except Exception:
+            logger.exception("Cron tool call %r failed", tool_name)
+            msg = f"Failed to run {tool_name}."
+    await events.emit("reminder_fired", {
+        "id": job["id"],
+        "message": f"[Cron: {job['name']}] {msg}",
+    })
+
+
 async def run_cron_loop() -> None:
     from croniter import croniter
     from agents.cron_store import get_cron_store
-    from core import events
 
     logger.info("Cron loop started (poll=%ds)", _POLL_INTERVAL_S)
     store = get_cron_store()
@@ -36,10 +52,7 @@ async def run_cron_loop() -> None:
                     if delta <= _POLL_INTERVAL_S:
                         last_fired[jid] = minute_key
                         logger.info("Cron fired: %s — %s", job["name"], job["message"])
-                        await events.emit("reminder_fired", {
-                            "id": jid,
-                            "message": f"[Cron: {job['name']}] {job['message']}",
-                        })
+                        await _fire_cron_job(job)
                 except Exception:
                     logger.exception("Cron eval error for %r (%s)", job["name"], job["expr"])
         except Exception:

@@ -155,10 +155,25 @@ async def get_config_route():
 async def post_config(updates: dict):
     updates.pop("system_prompt_backup", None)  # internal field — not settable via public API
     old_engine = get_config().tts_engine
+    old_briefing_enabled = get_config().briefing_cron_enabled
+    old_briefing_time = get_config().briefing_cron_time
     try:
         config = update_config(**updates)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    # Sync briefing cron job when enabled/time changes
+    if config.briefing_cron_enabled != old_briefing_enabled or config.briefing_cron_time != old_briefing_time:
+        from agents.cron_store import get_cron_store
+        store = get_cron_store()
+        if config.briefing_cron_enabled:
+            try:
+                h, m = config.briefing_cron_time.split(":")
+                expr = f"{int(m)} {int(h)} * * *"
+            except Exception:
+                expr = "0 7 * * *"
+            await asyncio.to_thread(store.add, "morning_briefing", expr, "tool:morning_briefing")
+        else:
+            await asyncio.to_thread(store.remove, "morning_briefing")
     if config.tts_engine != old_engine:
         svc = get_tts_service()
         if svc is not None:
