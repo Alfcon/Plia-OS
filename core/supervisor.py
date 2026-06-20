@@ -202,6 +202,7 @@ async def _respond_node(state: AgentState) -> dict:
     if state["tool_results"]:
         combined = "\n".join(state["tool_results"])
         history.append({"role": "system", "content": f"Agent results:\n{combined}"})
+        history.append({"role": "system", "content": "Present the result above to the user exactly as provided. Do not add, expand, or replace information."})
         # Specialist already handled this — don't offer tools or LLM re-invokes them
         tools = []
 
