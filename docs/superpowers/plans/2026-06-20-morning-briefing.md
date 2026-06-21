@@ -163,7 +163,7 @@ def test_briefing_all_sections():
     mock_cal.list_events_json.return_value = CALENDAR_EVENTS
 
     with patch("modules.briefing_tools.get_config", return_value=_mock_cfg()):
-        with patch("modules.weather_tools._resolve_location", return_value=(52.5, 13.4, "Berlin")):
+        with patch("modules.briefing_tools._resolve_location", return_value=(52.5, 13.4, "Berlin")):
             with patch("httpx.get", return_value=_mock_forecast_response()):
                 with patch("modules.briefing_tools.get_memory_store", return_value=mock_store):
                     with patch("modules.briefing_tools.get_calendar_store", return_value=mock_cal):
@@ -198,7 +198,7 @@ def test_briefing_no_reminders():
     mock_cal.list_events_json.return_value = []
 
     with patch("modules.briefing_tools.get_config", return_value=_mock_cfg()):
-        with patch("modules.weather_tools._resolve_location", return_value=(52.5, 13.4, "Berlin")):
+        with patch("modules.briefing_tools._resolve_location", return_value=(52.5, 13.4, "Berlin")):
             with patch("httpx.get", return_value=_mock_forecast_response()):
                 with patch("modules.briefing_tools.get_memory_store", return_value=mock_store):
                     with patch("modules.briefing_tools.get_calendar_store", return_value=mock_cal):
@@ -226,7 +226,7 @@ def test_briefing_weather_error():
     mock_cal.list_events_json.return_value = CALENDAR_EVENTS
 
     with patch("modules.briefing_tools.get_config", return_value=_mock_cfg()):
-        with patch("modules.weather_tools._resolve_location", side_effect=ValueError("No location set")):
+        with patch("modules.briefing_tools._resolve_location", side_effect=ValueError("No location set")):
             with patch("modules.briefing_tools.get_memory_store", return_value=mock_store):
                 with patch("modules.briefing_tools.get_calendar_store", return_value=mock_cal):
                     with patch("modules.briefing_tools.fetch_news", return_value=NEWS_TEXT):
@@ -252,7 +252,7 @@ def test_briefing_news_uses_config_topic():
     mock_cal.list_events_json.return_value = []
 
     with patch("modules.briefing_tools.get_config", return_value=_mock_cfg(topic="Linux")):
-        with patch("modules.weather_tools._resolve_location", side_effect=ValueError("no loc")):
+        with patch("modules.briefing_tools._resolve_location", side_effect=ValueError("no loc")):
             with patch("modules.briefing_tools.get_memory_store", return_value=mock_store):
                 with patch("modules.briefing_tools.get_calendar_store", return_value=mock_cal):
                     with patch("modules.briefing_tools.fetch_news", return_value=NEWS_TEXT) as mock_news:
