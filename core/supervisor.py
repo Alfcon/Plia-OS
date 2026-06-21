@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import logging
+import re
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
 from core.config import get_config
@@ -131,6 +132,17 @@ _DIRECT_TOOL_KEYWORDS: dict[str, str] = {
     "new emails": "list_inbox",
 }
 
+_EMAIL_SEARCH_RE = re.compile(
+    r"(?:search|find|look\s+(?:for|up))\s+(?:my\s+)?(?:email|emails|inbox|gmail)"
+    r"\s+(?:for|about|from|with|regarding)\s+(.+)",
+    re.I,
+)
+
+
+def _extract_email_search(text: str) -> str | None:
+    m = _EMAIL_SEARCH_RE.match(text.strip())
+    return m.group(1).strip().rstrip("?.") if m else None
+
 
 def _keyword_route(text: str) -> str | None:
     lower = text.lower()
@@ -168,6 +180,18 @@ async def _supervisor_node(state: AgentState) -> dict:
     last_user = next(
         (m["content"] for m in reversed(state["messages"]) if m["role"] == "user"), ""
     )
+
+    # Fast path: email search with extracted query
+    email_query = _extract_email_search(last_user)
+    if email_query:
+        try:
+            result = await call_tool_async("search_email", {"query": email_query})
+            result_str = str(result)
+            await events.emit("transcript", {"role": "tool", "text": f"[search_email]\n{result_str}"})
+            logger.info("Supervisor direct-called search_email query=%r", email_query)
+            return {"active_agent": "respond", "direct_result": result_str, "hop_count": state["hop_count"] + 1}
+        except Exception:
+            logger.exception("Direct search_email call failed; falling through to LLM")
 
     # Fast path: directly call a known tool without LLM tool selection
     direct = _direct_tool(last_user)

@@ -212,6 +212,15 @@ def test_supervisor_keywords_route_to_list_inbox():
     assert _direct_tool("read my inbox please") == "list_inbox"
 
 
+def test_extract_email_search_query():
+    from core.supervisor import _extract_email_search
+    assert _extract_email_search("search my email for the Steam gift") == "the Steam gift"
+    assert _extract_email_search("search email for invoices") == "invoices"
+    assert _extract_email_search("find emails about Amazon") == "Amazon"
+    assert _extract_email_search("find my inbox for Steam") == "Steam"
+    assert _extract_email_search("check my email") is None
+
+
 # --- _parse_from ---
 
 def test_parse_from_with_display_name():
