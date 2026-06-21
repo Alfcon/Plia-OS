@@ -51,11 +51,11 @@ def _fetch_headers(conn, nums: list[bytes], max_items: int) -> list[str]:
         flags_str = raw[0].decode(errors="replace")
         msg = _email_lib.message_from_bytes(raw[1])
         from_ = _fmt(msg.get("From"))
-        subject = _fmt(msg.get("Subject")) or "(no subject)"
+        subject = _decode_header(msg.get("Subject")) or "(no subject)"
         date = msg.get("Date") or ""
         is_spam = "\\Junk" in flags_str or "\\Spam" in flags_str
         spam_tag = " [SPAM]" if is_spam else ""
-        lines.append(f"[{i}] From: {from_} | Subject: {subject} | Date: {date}{spam_tag}")
+        lines.append(f"[{i}]\n  From: {from_}\n  Subject: {subject}{spam_tag}\n  Date: {date}")
     return lines
 
 
