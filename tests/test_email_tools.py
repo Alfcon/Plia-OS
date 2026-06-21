@@ -168,6 +168,3 @@ def test_supervisor_keywords_route_to_list_inbox():
     assert _direct_tool("read my inbox please") == "list_inbox"
 
 
-def test_supervisor_keywords_route_to_search_email():
-    from core.supervisor import _direct_tool
-    assert _direct_tool("search email for invoices") == "search_email"

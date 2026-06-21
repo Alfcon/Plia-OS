@@ -107,7 +107,9 @@ def smtp_connection() -> Iterator[smtplib.SMTP]:
             conn.ehlo()
             conn.starttls()
             conn.ehlo()
-            conn.docmd("AUTH", f"XOAUTH2 {auth_bytes.decode()}")
+            code, msg = conn.docmd("AUTH", f"XOAUTH2 {auth_bytes.decode()}")
+            if code != 235:
+                raise smtplib.SMTPAuthenticationError(code, msg)
         else:
             conn = smtplib.SMTP(cfg.email_smtp_host, cfg.email_smtp_port)
             conn.ehlo()

@@ -129,8 +129,6 @@ _DIRECT_TOOL_KEYWORDS: dict[str, str] = {
     "read my inbox": "list_inbox",
     "show my inbox": "list_inbox",
     "new emails": "list_inbox",
-    "search email": "search_email",
-    "search my email": "search_email",
 }
 
 

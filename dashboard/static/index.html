@@ -1225,10 +1225,20 @@
 
             <!-- Generic IMAP fields -->
             <div id="email-imap-fields" style="display:none">
-              <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">IMAP host</label>
-              <input id="cfg-email-imap-host" type="text" placeholder="imap.example.com"
-                style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:4px;"
-                onchange="applyEmailConfig()">
+              <div style="display:flex;gap:6px;margin-bottom:4px;">
+                <div style="flex:1">
+                  <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">IMAP host</label>
+                  <input id="cfg-email-imap-host" type="text" placeholder="imap.example.com"
+                    style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;"
+                    onchange="applyEmailConfig()">
+                </div>
+                <div style="width:70px">
+                  <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">IMAP port</label>
+                  <input id="cfg-email-imap-port" type="number" value="993"
+                    style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;"
+                    onchange="applyEmailConfig()">
+                </div>
+              </div>
               <div style="display:flex;gap:6px;margin-bottom:4px;">
                 <div style="flex:1">
                   <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">SMTP host</label>
@@ -1707,6 +1717,7 @@
       document.getElementById('email-imap-fields').style.display = emailProvider === 'imap' ? '' : 'none';
       document.getElementById('email-gmail-fields').style.display = emailProvider === 'gmail' ? '' : 'none';
       document.getElementById('cfg-email-imap-host').value = cfg.email_imap_host || '';
+      document.getElementById('cfg-email-imap-port').value = cfg.email_imap_port || 993;
       document.getElementById('cfg-email-smtp-host').value = cfg.email_smtp_host || '';
       document.getElementById('cfg-email-smtp-port').value = cfg.email_smtp_port || 587;
       document.getElementById('cfg-email-username').value = cfg.email_username || '';
@@ -3582,6 +3593,7 @@
     };
     if (provider === 'imap') {
       payload.email_imap_host = document.getElementById('cfg-email-imap-host').value.trim();
+      payload.email_imap_port = parseInt(document.getElementById('cfg-email-imap-port').value) || 993;
       payload.email_smtp_host = document.getElementById('cfg-email-smtp-host').value.trim();
       payload.email_smtp_port = parseInt(document.getElementById('cfg-email-smtp-port').value) || 587;
       payload.email_username = document.getElementById('cfg-email-username').value.trim();

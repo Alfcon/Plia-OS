@@ -100,6 +100,7 @@ def test_smtp_connection_gmail_uses_xoauth2():
     mock_creds.valid = True
 
     mock_conn = MagicMock()
+    mock_conn.docmd.return_value = (235, b"2.7.0 Accepted")
     with patch("agents.email_client.get_gmail_credentials", return_value=mock_creds), \
          patch("smtplib.SMTP", return_value=mock_conn):
         from agents.email_client import smtp_connection
@@ -119,6 +120,27 @@ def test_smtp_connection_gmail_raises_if_no_credentials():
     with patch("agents.email_client.get_gmail_credentials", return_value=None):
         from agents.email_client import smtp_connection
         with pytest.raises(RuntimeError, match="not authorized"):
+            with smtp_connection():
+                pass
+
+
+def test_smtp_connection_gmail_raises_on_auth_failure():
+    """Gmail SMTP raises SMTPAuthenticationError when AUTH returns non-235."""
+    import smtplib
+    from core.config import update_config
+    update_config(email_provider="gmail", email_username="user@gmail.com")
+
+    mock_creds = MagicMock()
+    mock_creds.token = "fake_token"
+    mock_creds.valid = True
+
+    mock_conn = MagicMock()
+    mock_conn.docmd.return_value = (535, b"5.7.8 Bad credentials")
+
+    with patch("agents.email_client.get_gmail_credentials", return_value=mock_creds), \
+         patch("smtplib.SMTP", return_value=mock_conn):
+        from agents.email_client import smtp_connection
+        with pytest.raises(smtplib.SMTPAuthenticationError):
             with smtp_connection():
                 pass
 

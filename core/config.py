@@ -123,6 +123,7 @@ _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
     "studio_pipeline_mode": ("cpu_stt", "pause"),
     "stt_model_size": ("tiny", "base", "small", "medium", "large"),
     "airllm_compression": ("4bit", "8bit", "none"),
+    "email_provider": ("gmail", "imap", ""),
 }
 
 
