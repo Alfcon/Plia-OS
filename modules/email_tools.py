@@ -1,5 +1,6 @@
 from __future__ import annotations
 import email as _email_lib
+import email.header as _email_header
 import logging
 import smtplib
 from email.mime.text import MIMEText
@@ -11,8 +12,21 @@ logger = logging.getLogger(__name__)
 _NO_ACCOUNTS = "No email accounts configured. Add one via Settings → Email."
 
 
+def _decode_header(value: str | None) -> str:
+    if not value:
+        return "Unknown"
+    parts = _email_header.decode_header(value)
+    decoded = []
+    for chunk, charset in parts:
+        if isinstance(chunk, bytes):
+            decoded.append(chunk.decode(charset or "utf-8", errors="replace"))
+        else:
+            decoded.append(chunk)
+    return "".join(decoded)
+
+
 def _fmt(value: str | None, limit: int = 80) -> str:
-    return (value or "Unknown")[:limit]
+    return _decode_header(value)[:limit]
 
 
 def _resolve(account_name: str) -> dict | None:
