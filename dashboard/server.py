@@ -511,6 +511,52 @@ async def google_calendar_callback(request: Request, code: str = ""):
     )
 
 
+# --- Email ---
+
+@router.post("/api/email/auth")
+async def email_auth(request: Request):
+    from agents.email_client import build_auth_url
+    config = get_config()
+    if not config.email_gmail_credentials_file:
+        raise HTTPException(status_code=422, detail="email_gmail_credentials_file not configured")
+    redirect_uri = str(request.base_url).rstrip("/") + "/api/email/callback"
+    auth_url = await asyncio.to_thread(build_auth_url, config.email_gmail_credentials_file, redirect_uri)
+    return {"auth_url": auth_url}
+
+
+@router.get("/api/email/callback")
+async def email_callback(request: Request, code: str = ""):
+    from agents.email_client import exchange_code
+    config = get_config()
+    redirect_uri = str(request.base_url).rstrip("/") + "/api/email/callback"
+    try:
+        await asyncio.to_thread(exchange_code, config.email_gmail_credentials_file, redirect_uri, code)
+    except (AttributeError, TypeError, ImportError, NameError):
+        raise
+    except Exception:
+        logger.exception("Gmail OAuth callback failed")
+        return HTMLResponse(
+            "<html><body style='font-family:sans-serif;padding:2rem;background:#111;color:#eee'>"
+            "<h2>Authorization failed.</h2><p>Close this tab and try again.</p></body></html>",
+            status_code=400,
+        )
+    return HTMLResponse(
+        "<html><body style='font-family:sans-serif;padding:2rem;background:#111;color:#eee'>"
+        "<h2>Gmail connected.</h2><p>You can close this tab.</p></body></html>"
+    )
+
+
+@router.get("/api/email/status")
+async def email_status():
+    from core.config import get_config as _get_config
+    cfg = _get_config()
+    if cfg.email_provider == "gmail":
+        from agents.email_client import is_connected
+        connected = await asyncio.to_thread(is_connected)
+        return {"connected": connected}
+    return {"connected": cfg.email_provider == "imap" and bool(cfg.email_username)}
+
+
 @router.get("/api/calendar")
 async def list_calendar_events():
     from agents.google_calendar import is_connected, list_events as gcal_list
