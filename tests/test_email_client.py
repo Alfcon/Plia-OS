@@ -73,6 +73,8 @@ def test_imap_connection_gmail_uses_xoauth2():
         mock_conn.authenticate.assert_called_once()
         call_args = mock_conn.authenticate.call_args
         assert call_args[0][0] == "XOAUTH2"
+        callback = mock_conn.authenticate.call_args[0][1]
+        assert isinstance(callback(None), bytes)
         mock_conn.login.assert_not_called()
 
 

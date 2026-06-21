@@ -76,7 +76,7 @@ def imap_connection() -> Iterator[imaplib.IMAP4_SSL]:
                 raise RuntimeError("Gmail not authorized — connect via Settings → Email")
             auth_string = f"user={cfg.email_username}\x01auth=Bearer {creds.token}\x01\x01"
             conn = imaplib.IMAP4_SSL("imap.gmail.com", 993)
-            conn.authenticate("XOAUTH2", lambda x: auth_string)
+            conn.authenticate("XOAUTH2", lambda x: auth_string.encode())
         else:
             conn = imaplib.IMAP4_SSL(cfg.email_imap_host, cfg.email_imap_port)
             conn.login(cfg.email_username, cfg.email_password)
