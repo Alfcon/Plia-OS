@@ -122,6 +122,15 @@ _DIRECT_TOOL_KEYWORDS: dict[str, str] = {
     "what's today": "morning_briefing",
     "what's on today": "morning_briefing",
     "what do i have today": "morning_briefing",
+    # Email
+    "check my email": "list_inbox",
+    "any new emails": "list_inbox",
+    "any emails": "list_inbox",
+    "read my inbox": "list_inbox",
+    "show my inbox": "list_inbox",
+    "new emails": "list_inbox",
+    "search email": "search_email",
+    "search my email": "search_email",
 }
 
 
