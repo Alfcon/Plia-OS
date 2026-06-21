@@ -155,6 +155,7 @@ class AgentState(TypedDict):
     search_provider: str
     hop_count: int
     tool_results: list[str]
+    direct_result: str  # set by direct-tool path; respond node returns it without LLM
 
 
 async def _supervisor_node(state: AgentState) -> dict:
@@ -176,7 +177,7 @@ async def _supervisor_node(state: AgentState) -> dict:
             result_str = str(result)
             await events.emit("transcript", {"role": "tool", "text": f"[{direct}]\n{result_str}"})
             logger.info("Supervisor direct-called tool: %s", direct)
-            return {"active_agent": "respond", "tool_results": [result_str], "hop_count": state["hop_count"] + 1}
+            return {"active_agent": "respond", "direct_result": result_str, "hop_count": state["hop_count"] + 1}
         except Exception:
             logger.exception("Direct tool call %r failed; falling through to LLM", direct)
 
@@ -199,6 +200,11 @@ async def _supervisor_node(state: AgentState) -> dict:
 
 
 async def _respond_node(state: AgentState) -> dict:
+    if state.get("direct_result"):
+        history = list(state["messages"])
+        history.append({"role": "assistant", "content": state["direct_result"]})
+        return {"messages": history}
+
     tools = get_tool_schemas()
     history = list(state["messages"])
 
@@ -309,6 +315,7 @@ async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
         search_provider=config.web_search_default,
         hop_count=0,
         tool_results=[],
+        direct_result="",
     )
     result = await _graph.ainvoke(state)
     final_messages = result["messages"]
