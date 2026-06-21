@@ -80,19 +80,28 @@ def _calendar_section() -> str:
 
 
 def _email_section() -> str:
-    cfg = get_config()
-    if not cfg.email_briefing_enabled or not cfg.email_provider:
-        return ""
     try:
+        from agents.email_store import list_accounts
         from agents.email_client import imap_connection
-        with imap_connection() as conn:
-            conn.select("INBOX", readonly=True)
-            _, data = conn.search(None, "UNSEEN")
-            count = len(data[0].split()) if data[0] else 0
-        return f"Email: {count} unread." if count > 0 else ""
     except Exception:
-        logger.exception("Email briefing section failed")
         return ""
+    accounts = [a for a in list_accounts() if a.get("briefing_enabled")]
+    if not accounts:
+        return ""
+    parts = []
+    for acc in accounts:
+        try:
+            with imap_connection(acc) as conn:
+                conn.select("INBOX", readonly=True)
+                _, data = conn.search(None, "UNSEEN")
+                count = len(data[0].split()) if data[0] else 0
+            if count > 0:
+                parts.append(f"{acc['name']}: {count} unread")
+        except Exception:
+            logger.exception("Email briefing section failed for %s", acc.get("name"))
+    if not parts:
+        return ""
+    return "Email: " + ", ".join(parts) + "."
 
 
 def _news_section() -> str:

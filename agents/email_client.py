@@ -10,22 +10,26 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 _SCOPES = ["https://mail.google.com/"]
-_TOKEN_FILENAME = "gmail_token.json"
 
 
-def _token_path() -> Path:
-    from core.config import get_config
-    return Path(get_config().memory_dir) / _TOKEN_FILENAME
+def _client_dir() -> Path:
+    from agents.email_store import client_dir
+    return client_dir()
 
 
-def get_gmail_credentials():
-    """Return valid OAuth2 Credentials or None if not authorized / not installed."""
+def _token_path(account_name: str) -> Path:
+    safe = account_name.replace(" ", "_").replace("/", "_")
+    return _client_dir() / f"{safe}_gmail_token.json"
+
+
+def get_gmail_credentials(account: dict):
+    """Return valid OAuth2 Credentials for the account, or None."""
     try:
         from google.oauth2.credentials import Credentials
         from google.auth.transport.requests import Request
     except ImportError:
         return None
-    path = _token_path()
+    path = _token_path(account["name"])
     if not path.exists():
         return None
     try:
@@ -38,48 +42,57 @@ def get_gmail_credentials():
             creds.refresh(Request())
             path.write_text(creds.to_json())
         except Exception:
-            logger.exception("Failed to refresh Gmail token")
+            logger.exception("Failed to refresh Gmail token for %s", account["name"])
             return None
     return creds if creds.valid else None
 
 
-def build_auth_url(credentials_file: str, redirect_uri: str) -> str:
+def build_auth_url(account: dict, redirect_uri: str) -> str:
     from google_auth_oauthlib.flow import Flow
-    flow = Flow.from_client_secrets_file(credentials_file, scopes=_SCOPES, redirect_uri=redirect_uri)
+    flow = Flow.from_client_secrets_file(
+        account["gmail_credentials_file"], scopes=_SCOPES, redirect_uri=redirect_uri
+    )
     auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
     return auth_url
 
 
-def exchange_code(credentials_file: str, redirect_uri: str, code: str) -> None:
+def exchange_code(account: dict, redirect_uri: str, code: str) -> None:
     from google_auth_oauthlib.flow import Flow
-    flow = Flow.from_client_secrets_file(credentials_file, scopes=_SCOPES, redirect_uri=redirect_uri)
+    flow = Flow.from_client_secrets_file(
+        account["gmail_credentials_file"], scopes=_SCOPES, redirect_uri=redirect_uri
+    )
     flow.fetch_token(code=code)
-    path = _token_path()
+    path = _token_path(account["name"])
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(flow.credentials.to_json())
     logger.info("Gmail token saved to %s", path)
 
 
-def is_connected() -> bool:
-    return get_gmail_credentials() is not None
+def is_connected(account: dict) -> bool:
+    if account.get("provider") == "gmail":
+        return get_gmail_credentials(account) is not None
+    return bool(account.get("username"))
 
 
 @contextlib.contextmanager
-def imap_connection() -> Iterator[imaplib.IMAP4_SSL]:
+def imap_connection(account: dict) -> Iterator[imaplib.IMAP4_SSL]:
     """Yield an authenticated IMAP4_SSL connection. Always calls logout on exit."""
-    from core.config import get_config
-    cfg = get_config()
     conn = None
     try:
-        if cfg.email_provider == "gmail":
-            creds = get_gmail_credentials()
+        if account.get("provider") == "gmail":
+            creds = get_gmail_credentials(account)
             if creds is None:
-                raise RuntimeError("Gmail not authorized — connect via Settings → Email")
-            auth_string = f"user={cfg.email_username}\x01auth=Bearer {creds.token}\x01\x01"
+                raise RuntimeError(
+                    f"Gmail not authorized for '{account['name']}' — connect via Settings → Email"
+                )
+            auth_string = (
+                f"user={account['username']}\x01auth=Bearer {creds.token}\x01\x01"
+            )
             conn = imaplib.IMAP4_SSL("imap.gmail.com", 993)
             conn.authenticate("XOAUTH2", lambda x: auth_string.encode())
         else:
-            conn = imaplib.IMAP4_SSL(cfg.email_imap_host, cfg.email_imap_port)
-            conn.login(cfg.email_username, cfg.email_password)
+            conn = imaplib.IMAP4_SSL(account["imap_host"], account.get("imap_port", 993))
+            conn.login(account["username"], account["password"])
         yield conn
     finally:
         if conn is not None:
@@ -90,18 +103,18 @@ def imap_connection() -> Iterator[imaplib.IMAP4_SSL]:
 
 
 @contextlib.contextmanager
-def smtp_connection() -> Iterator[smtplib.SMTP]:
+def smtp_connection(account: dict) -> Iterator[smtplib.SMTP]:
     """Yield an authenticated SMTP connection. Always calls quit on exit."""
-    from core.config import get_config
-    cfg = get_config()
     conn = None
     try:
-        if cfg.email_provider == "gmail":
-            creds = get_gmail_credentials()
+        if account.get("provider") == "gmail":
+            creds = get_gmail_credentials(account)
             if creds is None:
-                raise RuntimeError("Gmail not authorized — connect via Settings → Email")
+                raise RuntimeError(
+                    f"Gmail not authorized for '{account['name']}' — connect via Settings → Email"
+                )
             auth_bytes = base64.b64encode(
-                f"user={cfg.email_username}\x01auth=Bearer {creds.token}\x01\x01".encode()
+                f"user={account['username']}\x01auth=Bearer {creds.token}\x01\x01".encode()
             )
             conn = smtplib.SMTP("smtp.gmail.com", 587)
             conn.ehlo()
@@ -111,11 +124,11 @@ def smtp_connection() -> Iterator[smtplib.SMTP]:
             if code != 235:
                 raise smtplib.SMTPAuthenticationError(code, msg)
         else:
-            conn = smtplib.SMTP(cfg.email_smtp_host, cfg.email_smtp_port)
+            conn = smtplib.SMTP(account["smtp_host"], account.get("smtp_port", 587))
             conn.ehlo()
             conn.starttls()
             conn.ehlo()
-            conn.login(cfg.email_username, cfg.email_password)
+            conn.login(account["username"], account["password"])
         yield conn
     finally:
         if conn is not None:

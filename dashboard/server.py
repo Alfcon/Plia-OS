@@ -511,30 +511,70 @@ async def google_calendar_callback(request: Request, code: str = ""):
     )
 
 
-# --- Email ---
+# --- Email accounts ---
 
-@router.post("/api/email/auth")
-async def email_auth(request: Request):
+@router.get("/api/email/accounts")
+async def email_list_accounts():
+    from agents.email_store import list_accounts
+    accounts = await asyncio.to_thread(list_accounts)
+    # Strip passwords from response
+    return [
+        {k: v for k, v in acc.items() if k != "password"}
+        for acc in accounts
+    ]
+
+
+@router.post("/api/email/accounts")
+async def email_add_account(request: Request):
+    data = await request.json()
+    if not data.get("name"):
+        raise HTTPException(status_code=422, detail="name required")
+    from agents.email_store import add_account
+    acc = await asyncio.to_thread(add_account, data)
+    return {k: v for k, v in acc.items() if k != "password"}
+
+
+@router.delete("/api/email/accounts/{name}")
+async def email_remove_account(name: str):
+    from agents.email_store import remove_account
+    removed = await asyncio.to_thread(remove_account, name)
+    if not removed:
+        raise HTTPException(status_code=404, detail="account not found")
+    return {"removed": name}
+
+
+@router.post("/api/email/accounts/{name}/auth")
+async def email_account_auth(name: str, request: Request):
+    from agents.email_store import get_account
     from agents.email_client import build_auth_url
-    config = get_config()
-    if not config.email_gmail_credentials_file:
-        raise HTTPException(status_code=422, detail="email_gmail_credentials_file not configured")
-    redirect_uri = str(request.base_url).rstrip("/") + "/api/email/callback"
-    auth_url = await asyncio.to_thread(build_auth_url, config.email_gmail_credentials_file, redirect_uri)
+    acc = await asyncio.to_thread(get_account, name)
+    if acc is None:
+        raise HTTPException(status_code=404, detail="account not found")
+    if not acc.get("gmail_credentials_file"):
+        raise HTTPException(status_code=422, detail="gmail_credentials_file not set for this account")
+    redirect_uri = str(request.base_url).rstrip("/") + f"/api/email/accounts/{name}/callback"
+    auth_url = await asyncio.to_thread(build_auth_url, acc, redirect_uri)
     return {"auth_url": auth_url}
 
 
-@router.get("/api/email/callback")
-async def email_callback(request: Request, code: str = ""):
+@router.get("/api/email/accounts/{name}/callback")
+async def email_account_callback(name: str, request: Request, code: str = ""):
+    from agents.email_store import get_account
     from agents.email_client import exchange_code
-    config = get_config()
-    redirect_uri = str(request.base_url).rstrip("/") + "/api/email/callback"
+    acc = await asyncio.to_thread(get_account, name)
+    if acc is None:
+        return HTMLResponse(
+            "<html><body style='font-family:sans-serif;padding:2rem;background:#111;color:#eee'>"
+            "<h2>Account not found.</h2></body></html>",
+            status_code=404,
+        )
+    redirect_uri = str(request.base_url).rstrip("/") + f"/api/email/accounts/{name}/callback"
     try:
-        await asyncio.to_thread(exchange_code, config.email_gmail_credentials_file, redirect_uri, code)
+        await asyncio.to_thread(exchange_code, acc, redirect_uri, code)
     except (AttributeError, TypeError, ImportError, NameError):
         raise
     except Exception:
-        logger.exception("Gmail OAuth callback failed")
+        logger.exception("Gmail OAuth callback failed for %s", name)
         return HTMLResponse(
             "<html><body style='font-family:sans-serif;padding:2rem;background:#111;color:#eee'>"
             "<h2>Authorization failed.</h2><p>Close this tab and try again.</p></body></html>",
@@ -542,19 +582,22 @@ async def email_callback(request: Request, code: str = ""):
         )
     return HTMLResponse(
         "<html><body style='font-family:sans-serif;padding:2rem;background:#111;color:#eee'>"
-        "<h2>Gmail connected.</h2><p>You can close this tab.</p></body></html>"
+        f"<h2>{name} connected.</h2><p>You can close this tab.</p></body></html>"
     )
 
 
-@router.get("/api/email/status")
-async def email_status():
-    from core.config import get_config as _get_config
-    cfg = _get_config()
-    if cfg.email_provider == "gmail":
-        from agents.email_client import is_connected
-        connected = await asyncio.to_thread(is_connected)
-        return {"connected": connected}
-    return {"connected": cfg.email_provider == "imap" and bool(cfg.email_username)}
+@router.get("/api/email/accounts/{name}/status")
+async def email_account_status(name: str):
+    from agents.email_store import get_account
+    from agents.email_client import is_connected
+    acc = await asyncio.to_thread(get_account, name)
+    if acc is None:
+        raise HTTPException(status_code=404, detail="account not found")
+    if acc.get("provider") == "gmail":
+        connected = await asyncio.to_thread(is_connected, acc)
+    else:
+        connected = bool(acc.get("username"))
+    return {"connected": connected}
 
 
 @router.get("/api/calendar")

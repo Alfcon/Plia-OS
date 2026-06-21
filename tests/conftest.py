@@ -26,6 +26,14 @@ def reset_events():
     events.clear_subscribers()
 
 
+@pytest.fixture
+def isolate_email_store(tmp_path, monkeypatch):
+    """Redirect email account store to a temp directory so tests never touch ~/.email_client."""
+    import agents.email_store as es
+    monkeypatch.setattr(es, "_CLIENT_DIR", tmp_path / "email_client")
+    monkeypatch.setattr(es, "_ACCOUNTS_FILE", tmp_path / "email_client" / "accounts.json")
+
+
 @pytest.fixture(autouse=True)
 def reset_tor_manager():
     yield

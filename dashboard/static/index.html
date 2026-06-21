@@ -719,7 +719,7 @@
         <button class="m-nav-btn" data-section="network" onclick="showMenuSection('network');loadTorStatus()">Network</button>
         <button class="m-nav-btn" data-section="cron" onclick="showMenuSection('cron');loadCronJobs()">Cron</button>
         <button class="m-nav-btn" data-section="tokens" onclick="showMenuSection('tokens');loadTokenUsage()">Tokens</button>
-        <button class="m-nav-btn" data-section="email" onclick="showMenuSection('email');loadEmailStatus()">Email</button>
+        <button class="m-nav-btn" data-section="email" onclick="showMenuSection('email');loadEmailAccounts()">Email</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1213,82 +1213,78 @@
         <!-- Email -->
         <div id="m-section-email" class="m-pane" style="display:none">
           <div class="settings-section">
-            <h3 style="margin:0 0 8px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">Email</h3>
-            <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:4px;">Provider</label>
-            <select id="cfg-email-provider"
-              style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:8px;"
-              onchange="applyEmailProvider()">
-              <option value="">— disabled —</option>
-              <option value="gmail">Gmail (OAuth2)</option>
-              <option value="imap">Generic IMAP/SMTP</option>
-            </select>
+            <h3 style="margin:0 0 8px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">Email Accounts</h3>
+            <div id="email-accounts-list" style="margin-bottom:10px"></div>
 
-            <!-- Generic IMAP fields -->
-            <div id="email-imap-fields" style="display:none">
-              <div style="display:flex;gap:6px;margin-bottom:4px;">
-                <div style="flex:1">
-                  <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">IMAP host</label>
-                  <input id="cfg-email-imap-host" type="text" placeholder="imap.example.com"
-                    style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;"
-                    onchange="applyEmailConfig()">
-                </div>
-                <div style="width:70px">
-                  <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">IMAP port</label>
-                  <input id="cfg-email-imap-port" type="number" value="993"
-                    style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;"
-                    onchange="applyEmailConfig()">
-                </div>
-              </div>
-              <div style="display:flex;gap:6px;margin-bottom:4px;">
-                <div style="flex:1">
-                  <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">SMTP host</label>
-                  <input id="cfg-email-smtp-host" type="text" placeholder="smtp.example.com"
-                    style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;"
-                    onchange="applyEmailConfig()">
-                </div>
-                <div style="width:70px">
-                  <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">SMTP port</label>
-                  <input id="cfg-email-smtp-port" type="number" value="587"
-                    style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;"
-                    onchange="applyEmailConfig()">
-                </div>
-              </div>
-              <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">Username</label>
-              <input id="cfg-email-username" type="text" placeholder="user@example.com"
-                style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:4px;"
-                onchange="applyEmailConfig()">
-              <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">App password</label>
-              <input id="cfg-email-password" type="password" placeholder="app password"
-                style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:8px;"
-                onchange="applyEmailConfig()">
-            </div>
+            <!-- Add account form -->
+            <details id="email-add-form" style="margin-top:4px">
+              <summary style="font-size:0.78rem;color:#64b5f6;cursor:pointer;user-select:none;">+ Add account</summary>
+              <div style="margin-top:8px">
+                <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">Account name</label>
+                <input id="new-email-name" type="text" placeholder="e.g. Gmail, Work"
+                  style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:6px;">
+                <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">Provider</label>
+                <select id="new-email-provider"
+                  style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:6px;"
+                  onchange="emailToggleAddFields()">
+                  <option value="imap">Generic IMAP/SMTP</option>
+                  <option value="gmail">Gmail (OAuth2)</option>
+                </select>
 
-            <!-- Gmail OAuth2 fields -->
-            <div id="email-gmail-fields" style="display:none">
-              <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">Gmail address</label>
-              <input id="cfg-email-gmail-username" type="text" placeholder="you@gmail.com"
-                style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:4px;"
-                onchange="applyEmailConfig()">
-              <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">Path to client_secret.json</label>
-              <input id="cfg-email-creds-file" type="text" placeholder="/home/user/client_secret.json"
-                style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:8px;"
-                onchange="applyEmailConfig()">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-                <span style="font-size:0.72rem;color:#aaa;">Gmail OAuth2</span>
-                <span id="email-status-badge" style="font-size:0.72rem;color:#888;">Checking...</span>
-              </div>
-              <div id="email-connect-section">
-                <button onclick="connectGmail()"
-                  style="background:#1565c0;border:none;color:#eee;padding:4px 10px;border-radius:3px;font-size:0.75rem;cursor:pointer;width:100%;">Connect Gmail</button>
-                <div id="email-connect-status" style="font-size:0.72rem;margin-top:4px;color:#888;min-height:1em;"></div>
-              </div>
-            </div>
+                <!-- IMAP add fields -->
+                <div id="new-email-imap-fields">
+                  <div style="display:flex;gap:6px;margin-bottom:4px;">
+                    <div style="flex:1">
+                      <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">IMAP host</label>
+                      <input id="new-email-imap-host" type="text" placeholder="imap.example.com"
+                        style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;">
+                    </div>
+                    <div style="width:70px">
+                      <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">Port</label>
+                      <input id="new-email-imap-port" type="number" value="993"
+                        style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;">
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:6px;margin-bottom:4px;">
+                    <div style="flex:1">
+                      <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">SMTP host</label>
+                      <input id="new-email-smtp-host" type="text" placeholder="smtp.example.com"
+                        style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;">
+                    </div>
+                    <div style="width:70px">
+                      <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">Port</label>
+                      <input id="new-email-smtp-port" type="number" value="587"
+                        style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;">
+                    </div>
+                  </div>
+                  <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">Username</label>
+                  <input id="new-email-username" type="text" placeholder="user@example.com"
+                    style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:4px;">
+                  <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">App password</label>
+                  <input id="new-email-password" type="password" placeholder="app password"
+                    style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:6px;">
+                </div>
 
-            <hr style="border-color:#222;margin:10px 0;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:#ccc;cursor:pointer;">
-              <input type="checkbox" id="cfg-email-briefing" onchange="applyEmailConfig()">
-              Show unread count in morning briefing
-            </label>
+                <!-- Gmail add fields -->
+                <div id="new-email-gmail-fields" style="display:none">
+                  <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">Gmail address</label>
+                  <input id="new-email-gmail-username" type="text" placeholder="you@gmail.com"
+                    style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:4px;">
+                  <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:2px;">Path to client_secret.json</label>
+                  <input id="new-email-creds-file" type="text" placeholder="/home/alfcon/.email_client/client_secret.json"
+                    style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:6px;">
+                </div>
+
+                <div style="display:flex;gap:6px;margin-bottom:4px;">
+                  <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;color:#ccc;cursor:pointer;">
+                    <input type="checkbox" id="new-email-briefing"> Briefing
+                  </label>
+                </div>
+                <button onclick="emailAddAccount()"
+                  style="background:#1565c0;border:none;color:#eee;padding:4px 10px;border-radius:3px;font-size:0.75rem;cursor:pointer;width:100%;">Add Account</button>
+                <div id="email-add-status" style="font-size:0.72rem;margin-top:4px;color:#888;min-height:1em;"></div>
+              </div>
+            </details>
           </div>
         </div>
 
@@ -1711,19 +1707,7 @@
       document.getElementById('cfg-briefing-topic').value = cfg.briefing_news_topic || 'breaking news';
       document.getElementById('cfg-briefing-time').value = cfg.briefing_cron_time || '07:00';
       document.getElementById('cfg-briefing-enabled').checked = !!cfg.briefing_cron_enabled;
-      // Email
-      const emailProvider = cfg.email_provider || '';
-      document.getElementById('cfg-email-provider').value = emailProvider;
-      document.getElementById('email-imap-fields').style.display = emailProvider === 'imap' ? '' : 'none';
-      document.getElementById('email-gmail-fields').style.display = emailProvider === 'gmail' ? '' : 'none';
-      document.getElementById('cfg-email-imap-host').value = cfg.email_imap_host || '';
-      document.getElementById('cfg-email-imap-port').value = cfg.email_imap_port || 993;
-      document.getElementById('cfg-email-smtp-host').value = cfg.email_smtp_host || '';
-      document.getElementById('cfg-email-smtp-port').value = cfg.email_smtp_port || 587;
-      document.getElementById('cfg-email-username').value = cfg.email_username || '';
-      document.getElementById('cfg-email-gmail-username').value = cfg.email_username || '';
-      document.getElementById('cfg-email-creds-file').value = cfg.email_gmail_credentials_file || '';
-      document.getElementById('cfg-email-briefing').checked = !!cfg.email_briefing_enabled;
+      // Email accounts loaded separately on panel open
       onWebProviderChange();
       onEngineChange();
       startVramPolling();
@@ -3574,107 +3558,143 @@
     }
   }, true);
 
-  async function applyEmailProvider() {
-    const provider = document.getElementById('cfg-email-provider').value;
-    document.getElementById('email-imap-fields').style.display = provider === 'imap' ? '' : 'none';
-    document.getElementById('email-gmail-fields').style.display = provider === 'gmail' ? '' : 'none';
-    await fetch('/api/config', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({email_provider: provider}),
-    });
-    if (provider === 'gmail') loadEmailStatus();
+  function emailToggleAddFields() {
+    const p = document.getElementById('new-email-provider').value;
+    document.getElementById('new-email-imap-fields').style.display = p === 'imap' ? '' : 'none';
+    document.getElementById('new-email-gmail-fields').style.display = p === 'gmail' ? '' : 'none';
   }
 
-  async function applyEmailConfig() {
-    const provider = document.getElementById('cfg-email-provider').value;
-    const payload = {
-      email_briefing_enabled: document.getElementById('cfg-email-briefing').checked,
-    };
-    if (provider === 'imap') {
-      payload.email_imap_host = document.getElementById('cfg-email-imap-host').value.trim();
-      payload.email_imap_port = parseInt(document.getElementById('cfg-email-imap-port').value) || 993;
-      payload.email_smtp_host = document.getElementById('cfg-email-smtp-host').value.trim();
-      payload.email_smtp_port = parseInt(document.getElementById('cfg-email-smtp-port').value) || 587;
-      payload.email_username = document.getElementById('cfg-email-username').value.trim();
-      payload.email_password = document.getElementById('cfg-email-password').value;
-    } else if (provider === 'gmail') {
-      payload.email_username = document.getElementById('cfg-email-gmail-username').value.trim();
-      payload.email_gmail_credentials_file = document.getElementById('cfg-email-creds-file').value.trim();
-    }
-    await fetch('/api/config', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-    });
+  function _esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  let _emailPollId = null;
-
-  async function loadEmailStatus() {
+  async function loadEmailAccounts() {
     try {
-      const r = await fetch('/api/email/status');
-      const data = await r.json();
-      const badge = document.getElementById('email-status-badge');
-      const section = document.getElementById('email-connect-section');
-      if (!badge) return;
-      if (data.connected) {
-        clearInterval(_emailPollId);
-        badge.textContent = '● Connected';
-        badge.style.color = '#a5d6a7';
-        if (section) section.style.display = 'none';
-      } else {
-        badge.textContent = '○ Not connected';
-        badge.style.color = '#ef9a9a';
-        if (section) section.style.display = '';
+      const r = await fetch('/api/email/accounts');
+      const accounts = await r.json();
+      const list = document.getElementById('email-accounts-list');
+      if (!list) return;
+      if (!accounts.length) {
+        list.innerHTML = '<p style="font-size:0.75rem;color:#666;margin:0">No accounts configured.</p>';
+        return;
+      }
+      list.innerHTML = accounts.map(acc => `
+        <div style="border:1px solid #2a2a2a;border-radius:4px;padding:8px;margin-bottom:6px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:0.8rem;font-weight:600;color:#eee">${_esc(acc.name)}</span>
+            <button onclick="emailRemoveAccount('${_esc(acc.name)}')"
+              style="background:none;border:1px solid #444;color:#999;padding:1px 7px;border-radius:3px;font-size:0.7rem;cursor:pointer;">✕</button>
+          </div>
+          <div style="font-size:0.72rem;color:#888;margin-bottom:4px;">${_esc(acc.provider || '—')} · ${_esc(acc.username || '—')}</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;color:#aaa;cursor:pointer;">
+              <input type="checkbox" ${acc.briefing_enabled ? 'checked' : ''} onchange="emailSetBriefing('${_esc(acc.name)}', this.checked)">
+              Briefing
+            </label>
+            ${acc.provider === 'gmail' ? `<button onclick="emailConnectGmail('${_esc(acc.name)}')"
+              style="background:#1565c0;border:none;color:#eee;padding:2px 8px;border-radius:3px;font-size:0.7rem;cursor:pointer;">Connect</button>
+              <span id="gmail-status-${_esc(acc.name)}" style="font-size:0.7rem;color:#888"></span>` : ''}
+          </div>
+        </div>
+      `).join('');
+      accounts.filter(a => a.provider === 'gmail').forEach(a => emailCheckGmailStatus(a.name));
+    } catch (e) {}
+  }
+
+  async function emailCheckGmailStatus(name) {
+    try {
+      const r = await fetch(`/api/email/accounts/${encodeURIComponent(name)}/status`);
+      const d = await r.json();
+      const el = document.getElementById(`gmail-status-${name}`);
+      if (el) {
+        el.textContent = d.connected ? '● Connected' : '○ Not connected';
+        el.style.color = d.connected ? '#a5d6a7' : '#ef9a9a';
       }
     } catch (e) {}
   }
 
-  async function connectGmail() {
-    const credsFile = document.getElementById('cfg-email-creds-file').value.trim();
-    const username = document.getElementById('cfg-email-gmail-username').value.trim();
-    const statusEl = document.getElementById('email-connect-status');
-    if (!credsFile) { statusEl.textContent = 'Enter path to credentials.json first.'; return; }
-    if (!username) { statusEl.textContent = 'Enter your Gmail address first.'; return; }
-    statusEl.textContent = 'Saving config...';
-    await fetch('/api/config', {
+  async function emailRemoveAccount(name) {
+    if (!confirm(`Remove account "${name}"?`)) return;
+    await fetch(`/api/email/accounts/${encodeURIComponent(name)}`, {method: 'DELETE'});
+    loadEmailAccounts();
+  }
+
+  async function emailSetBriefing(name, enabled) {
+    const r = await fetch('/api/email/accounts');
+    const accounts = await r.json();
+    const acc = accounts.find(a => a.name === name);
+    if (!acc) return;
+    await fetch('/api/email/accounts', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({email_gmail_credentials_file: credsFile, email_username: username}),
+      body: JSON.stringify({...acc, briefing_enabled: enabled}),
     });
-    statusEl.textContent = 'Opening Google authorization...';
-    const r = await fetch('/api/email/auth', {method: 'POST'});
+  }
+
+  let _gmailPollIds = {};
+
+  async function emailConnectGmail(name) {
+    const statusEl = document.getElementById(`gmail-status-${name}`);
+    if (statusEl) { statusEl.textContent = 'Opening...'; statusEl.style.color = '#888'; }
+    const r = await fetch(`/api/email/accounts/${encodeURIComponent(name)}/auth`, {method: 'POST'});
     if (!r.ok) {
-      const e = await r.json();
-      statusEl.textContent = e.detail || 'Error';
-      statusEl.style.color = '#ef9a9a';
+      const e = await r.json().catch(() => ({}));
+      if (statusEl) { statusEl.textContent = e.detail || 'Error'; statusEl.style.color = '#ef9a9a'; }
       return;
     }
     const data = await r.json();
     window.open(data.auth_url, '_blank', 'width=600,height=700');
-    statusEl.textContent = 'Waiting for authorization...';
-    clearInterval(_emailPollId);
-    let _pollCount = 0;
-    _emailPollId = setInterval(async () => {
-      _pollCount++;
-      if (_pollCount > 150) {
-        clearInterval(_emailPollId);
-        statusEl.textContent = 'Timed out. Try connecting again.';
-        statusEl.style.color = '#ef9a9a';
+    if (statusEl) statusEl.textContent = 'Waiting...';
+    clearInterval(_gmailPollIds[name]);
+    let count = 0;
+    _gmailPollIds[name] = setInterval(async () => {
+      count++;
+      if (count > 150) {
+        clearInterval(_gmailPollIds[name]);
+        if (statusEl) { statusEl.textContent = 'Timed out.'; statusEl.style.color = '#ef9a9a'; }
         return;
       }
-      try {
-        const s = await fetch('/api/email/status');
-        const sd = await s.json();
-        if (sd.connected) {
-          clearInterval(_emailPollId);
-          statusEl.textContent = 'Connected!';
-          statusEl.style.color = '#a5d6a7';
-          loadEmailStatus();
-        }
-      } catch (e) {}
+      const s = await fetch(`/api/email/accounts/${encodeURIComponent(name)}/status`).catch(() => null);
+      if (!s) return;
+      const sd = await s.json().catch(() => ({}));
+      if (sd.connected) {
+        clearInterval(_gmailPollIds[name]);
+        if (statusEl) { statusEl.textContent = '● Connected'; statusEl.style.color = '#a5d6a7'; }
+      }
     }, 2000);
+  }
+
+  async function emailAddAccount() {
+    const statusEl = document.getElementById('email-add-status');
+    const provider = document.getElementById('new-email-provider').value;
+    const name = document.getElementById('new-email-name').value.trim();
+    if (!name) { statusEl.textContent = 'Account name required.'; statusEl.style.color = '#ef9a9a'; return; }
+    const acc = {
+      name, provider,
+      briefing_enabled: document.getElementById('new-email-briefing').checked,
+    };
+    if (provider === 'imap') {
+      acc.imap_host = document.getElementById('new-email-imap-host').value.trim();
+      acc.imap_port = parseInt(document.getElementById('new-email-imap-port').value) || 993;
+      acc.smtp_host = document.getElementById('new-email-smtp-host').value.trim();
+      acc.smtp_port = parseInt(document.getElementById('new-email-smtp-port').value) || 587;
+      acc.username = document.getElementById('new-email-username').value.trim();
+      acc.password = document.getElementById('new-email-password').value;
+    } else {
+      acc.username = document.getElementById('new-email-gmail-username').value.trim();
+      acc.gmail_credentials_file = document.getElementById('new-email-creds-file').value.trim();
+    }
+    const r = await fetch('/api/email/accounts', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(acc),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      statusEl.textContent = e.detail || 'Error adding account.'; statusEl.style.color = '#ef9a9a'; return;
+    }
+    statusEl.textContent = `Added "${name}".`; statusEl.style.color = '#a5d6a7';
+    document.getElementById('new-email-name').value = '';
+    document.getElementById('email-add-form').removeAttribute('open');
+    loadEmailAccounts();
   }
 </script>
 
