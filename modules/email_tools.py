@@ -30,7 +30,7 @@ def _fetch_headers(conn, nums: list[bytes], max_items: int) -> list[str]:
         flags_str = raw[0].decode(errors="replace")
         msg = _email_lib.message_from_bytes(raw[1])
         from_ = _fmt(msg.get("From"))
-        subject = msg.get("Subject") or "(no subject)"
+        subject = _fmt(msg.get("Subject")) or "(no subject)"
         date = msg.get("Date") or ""
         is_spam = "\\Junk" in flags_str or "\\Spam" in flags_str
         spam_tag = " [SPAM]" if is_spam else ""
@@ -69,12 +69,13 @@ def search_email(query: str, max_items: int = 10) -> str:
         return _NOT_CONFIGURED
     try:
         from agents.email_client import imap_connection
+        safe_query = query.replace('"', '')
         with imap_connection() as conn:
             conn.select("INBOX", readonly=True)
             if cfg.email_provider == "gmail":
-                _, data = conn.search(None, f'X-GM-RAW "{query}"')
+                _, data = conn.search(None, f'X-GM-RAW "{safe_query}"')
             else:
-                _, data = conn.search(None, f'TEXT "{query}"')
+                _, data = conn.search(None, f'TEXT "{safe_query}"')
             nums = data[0].split() if data[0] else []
             if not nums:
                 return f"No emails found for '{query}'."

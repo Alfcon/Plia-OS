@@ -144,9 +144,10 @@ def test_send_email_calls_sendmail(imap_cfg):
     with _patch_smtp(mock_conn):
         from modules.email_tools import send_email
         result = send_email("bob@example.com", "Hello", "Hi there!")
-    mock_conn.sendmail.assert_called_once_with(
-        "user@example.com", ["bob@example.com"], mock_conn.sendmail.call_args[0][2]
-    )
+    args = mock_conn.sendmail.call_args[0]
+    assert args[0] == "user@example.com"
+    assert args[1] == ["bob@example.com"]
+    assert "Hi there!" in args[2]
     assert "bob@example.com" in result
 
 
