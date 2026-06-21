@@ -212,6 +212,14 @@ def test_supervisor_keywords_route_to_list_inbox():
     assert _direct_tool("read my inbox please") == "list_inbox"
 
 
+def test_supervisor_keywords_route_send_email_to_respond():
+    from core.supervisor import _keyword_route
+    assert _keyword_route("send email to bob@example.com") == "respond"
+    assert _keyword_route("send an email to my boss") == "respond"
+    assert _keyword_route("email to alice about the meeting") == "respond"
+    assert _keyword_route("compose an email to support") == "respond"
+
+
 def test_extract_email_search_query():
     from core.supervisor import _extract_email_search
     assert _extract_email_search("search my email for the Steam gift") == "the Steam gift"
