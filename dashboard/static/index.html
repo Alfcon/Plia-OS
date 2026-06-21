@@ -3578,25 +3578,83 @@
         list.innerHTML = '<p style="font-size:0.75rem;color:#666;margin:0">No accounts configured.</p>';
         return;
       }
-      list.innerHTML = accounts.map(acc => `
+      list.innerHTML = accounts.map(acc => {
+        const n = _esc(acc.name);
+        const editId = `email-edit-${n}`;
+        const imapFields = acc.provider === 'imap' ? `
+          <div style="display:flex;gap:6px;margin-bottom:4px;">
+            <div style="flex:1">
+              <label style="display:block;font-size:0.72rem;color:#999;margin-bottom:2px;">IMAP host</label>
+              <input id="${editId}-imap-host" type="text" value="${_esc(acc.imap_host||'')}"
+                style="width:100%;padding:3px 5px;background:#111;border:1px solid #333;color:#eee;border-radius:3px;font-size:0.72rem;box-sizing:border-box;">
+            </div>
+            <div style="width:65px">
+              <label style="display:block;font-size:0.72rem;color:#999;margin-bottom:2px;">Port</label>
+              <input id="${editId}-imap-port" type="number" value="${acc.imap_port||993}"
+                style="width:100%;padding:3px 5px;background:#111;border:1px solid #333;color:#eee;border-radius:3px;font-size:0.72rem;box-sizing:border-box;">
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:4px;">
+            <div style="flex:1">
+              <label style="display:block;font-size:0.72rem;color:#999;margin-bottom:2px;">SMTP host</label>
+              <input id="${editId}-smtp-host" type="text" value="${_esc(acc.smtp_host||'')}"
+                style="width:100%;padding:3px 5px;background:#111;border:1px solid #333;color:#eee;border-radius:3px;font-size:0.72rem;box-sizing:border-box;">
+            </div>
+            <div style="width:65px">
+              <label style="display:block;font-size:0.72rem;color:#999;margin-bottom:2px;">Port</label>
+              <input id="${editId}-smtp-port" type="number" value="${acc.smtp_port||587}"
+                style="width:100%;padding:3px 5px;background:#111;border:1px solid #333;color:#eee;border-radius:3px;font-size:0.72rem;box-sizing:border-box;">
+            </div>
+          </div>
+          <label style="display:block;font-size:0.72rem;color:#999;margin-bottom:2px;">Username</label>
+          <input id="${editId}-username" type="text" value="${_esc(acc.username||'')}"
+            style="width:100%;padding:3px 5px;background:#111;border:1px solid #333;color:#eee;border-radius:3px;font-size:0.72rem;box-sizing:border-box;margin-bottom:4px;">
+          <label style="display:block;font-size:0.72rem;color:#999;margin-bottom:2px;">App password</label>
+          <input id="${editId}-password" type="password" placeholder="(unchanged)"
+            style="width:100%;padding:3px 5px;background:#111;border:1px solid #333;color:#eee;border-radius:3px;font-size:0.72rem;box-sizing:border-box;margin-bottom:4px;">` : `
+          <label style="display:block;font-size:0.72rem;color:#999;margin-bottom:2px;">Gmail address</label>
+          <input id="${editId}-username" type="text" value="${_esc(acc.username||'')}"
+            style="width:100%;padding:3px 5px;background:#111;border:1px solid #333;color:#eee;border-radius:3px;font-size:0.72rem;box-sizing:border-box;margin-bottom:4px;">
+          <label style="display:block;font-size:0.72rem;color:#999;margin-bottom:2px;">Path to client_secret.json</label>
+          <input id="${editId}-creds-file" type="text" value="${_esc(acc.gmail_credentials_file||'')}"
+            style="width:100%;padding:3px 5px;background:#111;border:1px solid #333;color:#eee;border-radius:3px;font-size:0.72rem;box-sizing:border-box;margin-bottom:4px;">`;
+        return `
         <div style="border:1px solid #2a2a2a;border-radius:4px;padding:8px;margin-bottom:6px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="font-size:0.8rem;font-weight:600;color:#eee">${_esc(acc.name)}</span>
-            <button onclick="emailRemoveAccount('${_esc(acc.name)}')"
-              style="background:none;border:1px solid #444;color:#999;padding:1px 7px;border-radius:3px;font-size:0.7rem;cursor:pointer;">✕</button>
+            <span style="font-size:0.8rem;font-weight:600;color:#eee">${n}</span>
+            <div style="display:flex;gap:4px;">
+              <button onclick="emailToggleEdit('${n}')"
+                style="background:none;border:1px solid #444;color:#aaa;padding:1px 7px;border-radius:3px;font-size:0.7rem;cursor:pointer;">Edit</button>
+              <button onclick="emailRemoveAccount('${n}')"
+                style="background:none;border:1px solid #444;color:#999;padding:1px 7px;border-radius:3px;font-size:0.7rem;cursor:pointer;">✕</button>
+            </div>
           </div>
-          <div style="font-size:0.72rem;color:#888;margin-bottom:4px;">${_esc(acc.provider || '—')} · ${_esc(acc.username || '—')}</div>
-          <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-size:0.72rem;color:#888;margin-bottom:4px;">${_esc(acc.provider||'—')} · ${_esc(acc.username||'—')}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;color:#aaa;cursor:pointer;">
-              <input type="checkbox" ${acc.briefing_enabled ? 'checked' : ''} onchange="emailSetBriefing('${_esc(acc.name)}', this.checked)">
+              <input type="checkbox" ${acc.briefing_enabled ? 'checked' : ''} onchange="emailSetBriefing('${n}', this.checked)">
               Briefing
             </label>
-            ${acc.provider === 'gmail' ? `<button onclick="emailConnectGmail('${_esc(acc.name)}')"
+            ${acc.provider === 'gmail' ? `<button onclick="emailConnectGmail('${n}')"
               style="background:#1565c0;border:none;color:#eee;padding:2px 8px;border-radius:3px;font-size:0.7rem;cursor:pointer;">Connect</button>
-              <span id="gmail-status-${_esc(acc.name)}" style="font-size:0.7rem;color:#888"></span>` : ''}
+              <span id="gmail-status-${n}" style="font-size:0.7rem;color:#888"></span>` : ''}
           </div>
-        </div>
-      `).join('');
+          <!-- inline edit form -->
+          <div id="${editId}" style="display:none;border-top:1px solid #2a2a2a;padding-top:8px;margin-top:4px;">
+            ${imapFields}
+            <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;color:#aaa;cursor:pointer;margin-bottom:6px;">
+              <input type="checkbox" id="${editId}-briefing" ${acc.briefing_enabled ? 'checked' : ''}> Briefing
+            </label>
+            <div style="display:flex;gap:6px;">
+              <button onclick="emailSaveEdit('${n}','${_esc(acc.provider||'imap')}')"
+                style="background:#1b5e20;border:none;color:#eee;padding:3px 10px;border-radius:3px;font-size:0.72rem;cursor:pointer;flex:1;">Save</button>
+              <button onclick="emailToggleEdit('${n}')"
+                style="background:none;border:1px solid #444;color:#aaa;padding:3px 10px;border-radius:3px;font-size:0.72rem;cursor:pointer;">Cancel</button>
+            </div>
+            <div id="${editId}-status" style="font-size:0.7rem;margin-top:4px;color:#888;min-height:1em;"></div>
+          </div>
+        </div>`;
+      }).join('');
       accounts.filter(a => a.provider === 'gmail').forEach(a => emailCheckGmailStatus(a.name));
     } catch (e) {}
   }
@@ -3611,6 +3669,46 @@
         el.style.color = d.connected ? '#a5d6a7' : '#ef9a9a';
       }
     } catch (e) {}
+  }
+
+  function emailToggleEdit(name) {
+    const el = document.getElementById(`email-edit-${name}`);
+    if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+  }
+
+  async function emailSaveEdit(name, provider) {
+    const id = `email-edit-${name}`;
+    const statusEl = document.getElementById(`${id}-status`);
+    // Fetch current account to preserve password if field left blank
+    const existing = await fetch('/api/email/accounts').then(r => r.json())
+      .then(list => list.find(a => a.name === name) || {});
+    const acc = {
+      ...existing,
+      name,
+      provider,
+      briefing_enabled: document.getElementById(`${id}-briefing`).checked,
+    };
+    if (provider === 'imap') {
+      acc.imap_host = document.getElementById(`${id}-imap-host`).value.trim();
+      acc.imap_port = parseInt(document.getElementById(`${id}-imap-port`).value) || 993;
+      acc.smtp_host = document.getElementById(`${id}-smtp-host`).value.trim();
+      acc.smtp_port = parseInt(document.getElementById(`${id}-smtp-port`).value) || 587;
+      acc.username = document.getElementById(`${id}-username`).value.trim();
+      const pw = document.getElementById(`${id}-password`).value;
+      if (pw) acc.password = pw;
+    } else {
+      acc.username = document.getElementById(`${id}-username`).value.trim();
+      acc.gmail_credentials_file = document.getElementById(`${id}-creds-file`).value.trim();
+    }
+    const r = await fetch('/api/email/accounts', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(acc),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      if (statusEl) { statusEl.textContent = e.detail || 'Save failed.'; statusEl.style.color = '#ef9a9a'; }
+      return;
+    }
+    loadEmailAccounts();
   }
 
   async function emailRemoveAccount(name) {
