@@ -79,6 +79,22 @@ def _calendar_section() -> str:
     return "Calendar: " + ". ".join(parts) + "."
 
 
+def _email_section() -> str:
+    cfg = get_config()
+    if not cfg.email_briefing_enabled or not cfg.email_provider:
+        return ""
+    try:
+        from agents.email_client import imap_connection
+        with imap_connection() as conn:
+            conn.select("INBOX", readonly=True)
+            _, data = conn.search(None, "UNSEEN")
+            count = len(data[0].split()) if data[0] else 0
+        return f"Email: {count} unread." if count > 0 else ""
+    except Exception:
+        logger.exception("Email briefing section failed")
+        return ""
+
+
 def _news_section() -> str:
     cfg = get_config()
     topic = cfg.briefing_news_topic or "world news"
@@ -98,7 +114,7 @@ def _news_section() -> str:
 @tool("Get the morning briefing: today's weather, reminders, calendar events, and top news headlines.")
 def morning_briefing() -> str:
     sections = []
-    for helper in (_weather_section, _reminders_section, _calendar_section, _news_section):
+    for helper in (_weather_section, _reminders_section, _calendar_section, _email_section, _news_section):
         try:
             section = helper()
             if section:
