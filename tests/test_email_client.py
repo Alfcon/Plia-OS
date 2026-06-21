@@ -22,27 +22,36 @@ _GMAIL_ACCOUNT = {
 }
 
 
+def _make_mock_mailbox():
+    """Return a MagicMock that behaves like an imap_tools MailBox context manager."""
+    mb = MagicMock()
+    mb.login.return_value = mb
+    mb.xoauth2.return_value = mb
+    mb.__enter__ = MagicMock(return_value=mb)
+    mb.__exit__ = MagicMock(return_value=False)
+    return mb
+
+
 def test_imap_connection_generic_login():
-    """Generic IMAP opens SSL connection and calls LOGIN."""
-    mock_conn = MagicMock()
-    with patch("imaplib.IMAP4_SSL", return_value=mock_conn) as mock_cls:
+    """Generic IMAP opens MailBox and calls login."""
+    mock_mb = _make_mock_mailbox()
+    with patch("imap_tools.MailBox", return_value=mock_mb) as MockMailBox:
         from agents.email_client import imap_connection
-        with imap_connection(_IMAP_ACCOUNT) as conn:
-            assert conn is mock_conn
-    mock_cls.assert_called_once_with("mail.example.com", 993)
-    mock_conn.login.assert_called_once_with("user@example.com", "secret123")
-    mock_conn.logout.assert_called_once()
+        with imap_connection(_IMAP_ACCOUNT) as mb:
+            assert mb is mock_mb
+    MockMailBox.assert_called_once_with("mail.example.com", 993)
+    mock_mb.login.assert_called_once_with("user@example.com", "secret123")
 
 
 def test_imap_connection_logout_on_exception():
-    """IMAP connection always calls logout even if body raises."""
-    mock_conn = MagicMock()
-    with patch("imaplib.IMAP4_SSL", return_value=mock_conn):
+    """MailBox __exit__ is called even if body raises."""
+    mock_mb = _make_mock_mailbox()
+    with patch("imap_tools.MailBox", return_value=mock_mb):
         from agents.email_client import imap_connection
         with pytest.raises(ValueError):
             with imap_connection(_IMAP_ACCOUNT):
                 raise ValueError("oops")
-    mock_conn.logout.assert_called_once()
+    mock_mb.__exit__.assert_called_once()
 
 
 def test_smtp_connection_generic_login():
@@ -60,22 +69,19 @@ def test_smtp_connection_generic_login():
 
 
 def test_imap_connection_gmail_uses_xoauth2():
-    """Gmail IMAP uses XOAUTH2 instead of LOGIN."""
+    """Gmail IMAP calls xoauth2() with username and access token."""
     mock_creds = MagicMock()
     mock_creds.token = "fake_access_token"
     mock_creds.valid = True
 
-    mock_conn = MagicMock()
+    mock_mb = _make_mock_mailbox()
     with patch("agents.email_client.get_gmail_credentials", return_value=mock_creds), \
-         patch("imaplib.IMAP4_SSL", return_value=mock_conn):
+         patch("imap_tools.MailBox", return_value=mock_mb):
         from agents.email_client import imap_connection
-        with imap_connection(_GMAIL_ACCOUNT) as conn:
-            assert conn is mock_conn
-    mock_conn.authenticate.assert_called_once()
-    assert mock_conn.authenticate.call_args[0][0] == "XOAUTH2"
-    callback = mock_conn.authenticate.call_args[0][1]
-    assert isinstance(callback(None), bytes)
-    mock_conn.login.assert_not_called()
+        with imap_connection(_GMAIL_ACCOUNT) as mb:
+            assert mb is mock_mb
+    mock_mb.xoauth2.assert_called_once_with("user@gmail.com", "fake_access_token")
+    mock_mb.login.assert_not_called()
 
 
 def test_imap_connection_gmail_raises_if_no_credentials():

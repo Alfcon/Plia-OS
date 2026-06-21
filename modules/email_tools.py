@@ -1,6 +1,4 @@
 from __future__ import annotations
-import email as _email_lib
-import email.header as _email_header
 import logging
 import smtplib
 from email.mime.text import MIMEText
@@ -12,51 +10,22 @@ logger = logging.getLogger(__name__)
 _NO_ACCOUNTS = "No email accounts configured. Add one via Settings → Email."
 
 
-def _decode_header(value: str | None) -> str:
-    if not value:
-        return "Unknown"
-    parts = _email_header.decode_header(value)
-    decoded = []
-    for chunk, charset in parts:
-        if isinstance(chunk, bytes):
-            decoded.append(chunk.decode(charset or "utf-8", errors="replace"))
-        else:
-            decoded.append(chunk)
-    return "".join(decoded)
-
-
-def _fmt(value: str | None, limit: int = 80) -> str:
-    return _decode_header(value)[:limit]
-
-
 def _resolve(account_name: str) -> dict | None:
-    """Return account dict by name, or the first account if name is empty."""
     from agents.email_store import get_account, get_default_account
     if account_name:
         return get_account(account_name)
     return get_default_account()
 
 
-def _fetch_headers(conn, nums: list[bytes], max_items: int) -> list[str]:
-    """Fetch FROM/SUBJECT/DATE/FLAGS for the last max_items message numbers."""
-    recent = nums[-max_items:][::-1]
-    lines = []
-    for i, num in enumerate(recent, 1):
-        _, data = conn.fetch(num, "(FLAGS BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])")
-        if not data or data[0] is None:
-            continue
-        raw = data[0]
-        if not isinstance(raw, tuple):
-            continue
-        flags_str = raw[0].decode(errors="replace")
-        msg = _email_lib.message_from_bytes(raw[1])
-        from_ = _fmt(msg.get("From"))
-        subject = _decode_header(msg.get("Subject")) or "(no subject)"
-        date = msg.get("Date") or ""
-        is_spam = "\\Junk" in flags_str or "\\Spam" in flags_str
-        spam_tag = " [SPAM]" if is_spam else ""
-        lines.append(f"[{i}]\n  From: {from_}\n  Subject: {subject}{spam_tag}\n  Date: {date}")
-    return lines
+def _format_msg(i: int, msg) -> str:
+    is_spam = "\\Junk" in (msg.flags or ()) or "\\Spam" in (msg.flags or ())
+    spam_tag = " [SPAM]" if is_spam else ""
+    return (
+        f"[{i}]\n"
+        f"  From: {msg.from_ or 'Unknown'}\n"
+        f"  Subject: {msg.subject or '(no subject)'}{spam_tag}\n"
+        f"  Date: {msg.date_str or ''}"
+    )
 
 
 @tool(
@@ -69,15 +38,13 @@ def list_inbox(account: str = "", max_items: int = 10) -> str:
         return _NO_ACCOUNTS
     try:
         from agents.email_client import imap_connection
-        with imap_connection(acc) as conn:
-            conn.select("INBOX", readonly=True)
-            _, data = conn.search(None, "ALL")
-            nums = data[0].split() if data[0] else []
-            if not nums:
-                return f"[{acc['name']}] Inbox is empty."
-            lines = _fetch_headers(conn, nums, max_items)
+        with imap_connection(acc) as mb:
+            msgs = list(mb.fetch("ALL", limit=max_items, reverse=True, bulk=True, mark_seen=False))
+        if not msgs:
+            return f"[{acc['name']}] Inbox is empty."
+        lines = [_format_msg(i, msg) for i, msg in enumerate(msgs, 1)]
         prefix = f"[{acc['name']}] " if account else ""
-        return prefix + ("\n".join(lines) if lines else "No messages found.")
+        return prefix + "\n".join(lines)
     except RuntimeError as exc:
         return f"Email authentication failed: {exc}"
     except Exception as exc:
@@ -95,18 +62,14 @@ def search_email(query: str, account: str = "", max_items: int = 10) -> str:
         return _NO_ACCOUNTS
     try:
         from agents.email_client import imap_connection
-        safe_query = query.replace('"', "")
-        with imap_connection(acc) as conn:
-            conn.select("INBOX", readonly=True)
-            if acc.get("provider") == "gmail":
-                _, data = conn.search(None, f'X-GM-RAW "{safe_query}"')
-            else:
-                _, data = conn.search(None, f'TEXT "{safe_query}"')
-            nums = data[0].split() if data[0] else []
-            if not nums:
-                return f"No emails found for '{query}'."
-            lines = _fetch_headers(conn, nums, max_items)
-        return "\n".join(lines) if lines else f"No emails found for '{query}'."
+        safe_q = query.replace('"', "")
+        criteria = f'X-GM-RAW "{safe_q}"' if acc.get("provider") == "gmail" else f'TEXT "{safe_q}"'
+        with imap_connection(acc) as mb:
+            msgs = list(mb.fetch(criteria, limit=max_items, reverse=True, bulk=True, mark_seen=False))
+        if not msgs:
+            return f"No emails found for '{query}'."
+        lines = [_format_msg(i, msg) for i, msg in enumerate(msgs, 1)]
+        return "\n".join(lines)
     except RuntimeError as exc:
         return f"Email authentication failed: {exc}"
     except Exception as exc:

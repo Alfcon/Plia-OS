@@ -91,10 +91,8 @@ def _email_section() -> str:
     parts = []
     for acc in accounts:
         try:
-            with imap_connection(acc) as conn:
-                conn.select("INBOX", readonly=True)
-                _, data = conn.search(None, "UNSEEN")
-                count = len(data[0].split()) if data[0] else 0
+            with imap_connection(acc) as mb:
+                count = len(list(mb.fetch("UNSEEN", mark_seen=False)))
             if count > 0:
                 parts.append(f"{acc['name']}: {count} unread")
         except Exception:

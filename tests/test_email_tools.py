@@ -24,29 +24,22 @@ _GMAIL_ACCOUNT = {
 }
 
 
-def _mock_fetch_response(
-    from_addr: str = "alice@example.com",
-    subject: str = "Hello",
-    date: str = "Mon, 1 Jan 2024 12:00:00 +0000",
-    flags: str = "",
-) -> tuple:
-    headers = f"From: {from_addr}\r\nSubject: {subject}\r\nDate: {date}\r\n\r\n".encode()
-    flags_part = (
-        f"1 (FLAGS ({flags}) BODY[HEADER.FIELDS (FROM SUBJECT DATE)] {{{len(headers)}}}".encode()
-    )
-    return ("OK", [(flags_part, headers), b")"])
+def _make_msg(from_addr="alice@example.com", subject="Hello",
+              date_str="Mon, 1 Jan 2024 12:00:00 +0000", flags=()):
+    msg = MagicMock()
+    msg.from_ = from_addr
+    msg.subject = subject
+    msg.date_str = date_str
+    msg.flags = flags
+    return msg
 
 
-def _make_imap_mock(search_result: bytes = b"1 2 3", **fetch_kwargs):
-    conn = MagicMock()
-    conn.search.return_value = ("OK", [search_result])
-    conn.fetch.return_value = _mock_fetch_response(**fetch_kwargs)
-    return conn
-
-
-def _patch_imap(mock_conn):
+def _patch_imap(messages):
+    """Patch imap_connection to yield a mock mailbox whose fetch() returns messages."""
+    mock_mb = MagicMock()
+    mock_mb.fetch.return_value = messages
     cm = MagicMock()
-    cm.__enter__ = MagicMock(return_value=mock_conn)
+    cm.__enter__ = MagicMock(return_value=mock_mb)
     cm.__exit__ = MagicMock(return_value=False)
     return patch("agents.email_client.imap_connection", return_value=cm)
 
@@ -76,8 +69,8 @@ def test_list_inbox_not_configured():
 
 
 def test_list_inbox_returns_formatted_lines():
-    mock_conn = _make_imap_mock(b"1 2 3", from_addr="alice@example.com", subject="Invoice")
-    with _patch_default(_IMAP_ACCOUNT), _patch_imap(mock_conn):
+    msgs = [_make_msg(from_addr="alice@example.com", subject="Invoice")]
+    with _patch_default(_IMAP_ACCOUNT), _patch_imap(msgs):
         from modules.email_tools import list_inbox
         result = list_inbox(max_items=5)
     assert "alice@example.com" in result
@@ -85,16 +78,15 @@ def test_list_inbox_returns_formatted_lines():
 
 
 def test_list_inbox_empty_inbox():
-    mock_conn = _make_imap_mock(b"")
-    with _patch_default(_IMAP_ACCOUNT), _patch_imap(mock_conn):
+    with _patch_default(_IMAP_ACCOUNT), _patch_imap([]):
         from modules.email_tools import list_inbox
         result = list_inbox()
     assert "empty" in result.lower() or "no messages" in result.lower()
 
 
 def test_list_inbox_spam_flag_shown():
-    mock_conn = _make_imap_mock(b"1", flags="\\Junk")
-    with _patch_default(_IMAP_ACCOUNT), _patch_imap(mock_conn):
+    msgs = [_make_msg(flags=("\\Junk",))]
+    with _patch_default(_IMAP_ACCOUNT), _patch_imap(msgs):
         from modules.email_tools import list_inbox
         result = list_inbox()
     assert "SPAM" in result
@@ -110,8 +102,8 @@ def test_list_inbox_connection_error():
 
 def test_list_inbox_named_account():
     """list_inbox(account='Work') uses get_account, not get_default_account."""
-    mock_conn = _make_imap_mock(b"1", from_addr="boss@work.com", subject="Meeting")
-    with _patch_get(_IMAP_ACCOUNT), _patch_imap(mock_conn):
+    msgs = [_make_msg(from_addr="boss@work.com", subject="Meeting")]
+    with _patch_get(_IMAP_ACCOUNT), _patch_imap(msgs):
         from modules.email_tools import list_inbox
         result = list_inbox(account="Work")
     assert "boss@work.com" in result
@@ -127,25 +119,39 @@ def test_search_email_not_configured():
 
 
 def test_search_email_uses_imap_text():
-    mock_conn = _make_imap_mock(b"1", from_addr="bob@example.com", subject="Invoice Q4")
-    with _patch_default(_IMAP_ACCOUNT), _patch_imap(mock_conn):
+    msgs = [_make_msg(from_addr="bob@example.com", subject="Invoice Q4")]
+    mock_mb = MagicMock()
+    mock_mb.fetch.return_value = msgs
+    cm = MagicMock()
+    cm.__enter__ = MagicMock(return_value=mock_mb)
+    cm.__exit__ = MagicMock(return_value=False)
+    with _patch_default(_IMAP_ACCOUNT), \
+         patch("agents.email_client.imap_connection", return_value=cm):
         from modules.email_tools import search_email
         result = search_email("invoice")
-    mock_conn.search.assert_called_with(None, 'TEXT "invoice"')
+    mock_mb.fetch.assert_called_once()
+    criteria = mock_mb.fetch.call_args[0][0]
+    assert 'TEXT "invoice"' in criteria
     assert "Invoice Q4" in result
 
 
 def test_search_email_uses_xgmraw_for_gmail():
-    mock_conn = _make_imap_mock(b"")
-    with _patch_default(_GMAIL_ACCOUNT), _patch_imap(mock_conn):
+    mock_mb = MagicMock()
+    mock_mb.fetch.return_value = []
+    cm = MagicMock()
+    cm.__enter__ = MagicMock(return_value=mock_mb)
+    cm.__exit__ = MagicMock(return_value=False)
+    with _patch_default(_GMAIL_ACCOUNT), \
+         patch("agents.email_client.imap_connection", return_value=cm):
         from modules.email_tools import search_email
         search_email("from:alice")
-    mock_conn.search.assert_called_with(None, 'X-GM-RAW "from:alice"')
+    criteria = mock_mb.fetch.call_args[0][0]
+    assert "X-GM-RAW" in criteria
+    assert "from:alice" in criteria
 
 
 def test_search_email_no_results():
-    mock_conn = _make_imap_mock(b"")
-    with _patch_default(_IMAP_ACCOUNT), _patch_imap(mock_conn):
+    with _patch_default(_IMAP_ACCOUNT), _patch_imap([]):
         from modules.email_tools import search_email
         result = search_email("xyzzy_nonexistent")
     assert "no emails found" in result.lower() or "not found" in result.lower()

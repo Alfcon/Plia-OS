@@ -1,7 +1,6 @@
 from __future__ import annotations
 import base64
 import contextlib
-import imaplib
 import logging
 import smtplib
 from collections.abc import Iterator
@@ -79,31 +78,22 @@ def is_connected(account: dict) -> bool:
 
 
 @contextlib.contextmanager
-def imap_connection(account: dict) -> Iterator[imaplib.IMAP4_SSL]:
-    """Yield an authenticated IMAP4_SSL connection. Always calls logout on exit."""
-    conn = None
-    try:
-        if account.get("provider") == "gmail":
-            creds = get_gmail_credentials(account)
-            if creds is None:
-                raise RuntimeError(
-                    f"Gmail not authorized for '{account['name']}' — connect via Settings → Email"
-                )
-            auth_string = (
-                f"user={account['username']}\x01auth=Bearer {creds.token}\x01\x01"
+def imap_connection(account: dict):
+    """Yield an authenticated imap_tools MailBox. Handles Gmail XOAUTH2 and generic IMAP."""
+    from imap_tools import MailBox
+    if account.get("provider") == "gmail":
+        creds = get_gmail_credentials(account)
+        if creds is None:
+            raise RuntimeError(
+                f"Gmail not authorized for '{account['name']}' — connect via Settings → Email"
             )
-            conn = imaplib.IMAP4_SSL("imap.gmail.com", 993)
-            conn.authenticate("XOAUTH2", lambda x: auth_string.encode())
-        else:
-            conn = imaplib.IMAP4_SSL(account["imap_host"], account.get("imap_port", 993))
-            conn.login(account["username"], account["password"])
-        yield conn
-    finally:
-        if conn is not None:
-            try:
-                conn.logout()
-            except Exception:
-                pass
+        with MailBox("imap.gmail.com", 993).xoauth2(account["username"], creds.token) as mb:
+            yield mb
+    else:
+        with MailBox(account["imap_host"], account.get("imap_port", 993)).login(
+            account["username"], account["password"]
+        ) as mb:
+            yield mb
 
 
 @contextlib.contextmanager
