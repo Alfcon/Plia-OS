@@ -75,9 +75,10 @@ def _summarize_batch(bodies: list[str]) -> list[str]:
 def _format_emails(msgs, summaries: list[str]) -> str:
     parts = [_SEP]
     for msg, summary in zip(msgs, summaries):
-        parts.append(f"From:    | {_parse_from(msg.from_ or '')}")
-        parts.append(f"Subject: | {msg.subject or '(no subject)'}")
-        parts.append(f"Body:    | {summary}")
+        parts.append(f"From:      | {_parse_from(msg.from_ or '')}")
+        parts.append(f"Date Sent: | {msg.date_str or ''}")
+        parts.append(f"Subject:   | {msg.subject or '(no subject)'}")
+        parts.append(f"Body:      | {summary}")
         parts.append(_SEP)
     return "\n".join(parts)
 

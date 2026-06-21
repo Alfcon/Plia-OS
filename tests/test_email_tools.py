@@ -80,9 +80,10 @@ def test_list_inbox_returns_formatted_lines():
     assert "alice@example.com" in result
     assert "Invoice" in result
     assert "Invoice summary." in result
-    assert "From:    |" in result
-    assert "Subject: |" in result
-    assert "Body:    |" in result
+    assert "From:      |" in result
+    assert "Date Sent: |" in result
+    assert "Subject:   |" in result
+    assert "Body:      |" in result
 
 
 def test_list_inbox_empty_inbox():
