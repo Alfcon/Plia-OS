@@ -1,7 +1,7 @@
 """Tests for agents/email_client.py connection helpers."""
 from __future__ import annotations
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 
 @pytest.fixture
@@ -49,7 +49,7 @@ def test_smtp_connection_generic_login(imap_cfg):
         with smtp_connection() as conn:
             assert conn is mock_conn
         mock_cls.assert_called_once_with("smtp.example.com", 587)
-        mock_conn.ehlo.assert_called_once()
+        assert mock_conn.ehlo.call_count == 2
         mock_conn.starttls.assert_called_once()
         mock_conn.login.assert_called_once_with("user@example.com", "secret123")
         mock_conn.quit.assert_called_once()
@@ -105,7 +105,20 @@ def test_smtp_connection_gmail_uses_xoauth2():
             assert conn is mock_conn
         mock_conn.docmd.assert_called_once()
         assert mock_conn.docmd.call_args[0][0] == "AUTH"
+        assert mock_conn.docmd.call_args[0][1].startswith("XOAUTH2 ")
         mock_conn.login.assert_not_called()
+
+
+def test_smtp_connection_gmail_raises_if_no_credentials():
+    """Gmail SMTP raises RuntimeError when not authorized."""
+    from core.config import update_config
+    update_config(email_provider="gmail", email_username="user@gmail.com")
+
+    with patch("agents.email_client.get_gmail_credentials", return_value=None):
+        from agents.email_client import smtp_connection
+        with pytest.raises(RuntimeError, match="not authorized"):
+            with smtp_connection():
+                pass
 
 
 def test_is_connected_false_when_no_token():

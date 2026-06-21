@@ -54,8 +54,9 @@ def exchange_code(credentials_file: str, redirect_uri: str, code: str) -> None:
     from google_auth_oauthlib.flow import Flow
     flow = Flow.from_client_secrets_file(credentials_file, scopes=_SCOPES, redirect_uri=redirect_uri)
     flow.fetch_token(code=code)
-    _token_path().write_text(flow.credentials.to_json())
-    logger.info("Gmail token saved to %s", _token_path())
+    path = _token_path()
+    path.write_text(flow.credentials.to_json())
+    logger.info("Gmail token saved to %s", path)
 
 
 def is_connected() -> bool:
@@ -67,23 +68,25 @@ def imap_connection() -> Iterator[imaplib.IMAP4_SSL]:
     """Yield an authenticated IMAP4_SSL connection. Always calls logout on exit."""
     from core.config import get_config
     cfg = get_config()
-    if cfg.email_provider == "gmail":
-        creds = get_gmail_credentials()
-        if creds is None:
-            raise RuntimeError("Gmail not authorized — connect via Settings → Email")
-        auth_string = f"user={cfg.email_username}\x01auth=Bearer {creds.token}\x01\x01"
-        conn = imaplib.IMAP4_SSL("imap.gmail.com", 993)
-        conn.authenticate("XOAUTH2", lambda x: auth_string)
-    else:
-        conn = imaplib.IMAP4_SSL(cfg.email_imap_host, cfg.email_imap_port)
-        conn.login(cfg.email_username, cfg.email_password)
+    conn = None
     try:
+        if cfg.email_provider == "gmail":
+            creds = get_gmail_credentials()
+            if creds is None:
+                raise RuntimeError("Gmail not authorized — connect via Settings → Email")
+            auth_string = f"user={cfg.email_username}\x01auth=Bearer {creds.token}\x01\x01"
+            conn = imaplib.IMAP4_SSL("imap.gmail.com", 993)
+            conn.authenticate("XOAUTH2", lambda x: auth_string)
+        else:
+            conn = imaplib.IMAP4_SSL(cfg.email_imap_host, cfg.email_imap_port)
+            conn.login(cfg.email_username, cfg.email_password)
         yield conn
     finally:
-        try:
-            conn.logout()
-        except Exception:
-            pass
+        if conn is not None:
+            try:
+                conn.logout()
+            except Exception:
+                pass
 
 
 @contextlib.contextmanager
@@ -91,26 +94,30 @@ def smtp_connection() -> Iterator[smtplib.SMTP]:
     """Yield an authenticated SMTP connection. Always calls quit on exit."""
     from core.config import get_config
     cfg = get_config()
-    if cfg.email_provider == "gmail":
-        creds = get_gmail_credentials()
-        if creds is None:
-            raise RuntimeError("Gmail not authorized — connect via Settings → Email")
-        auth_bytes = base64.b64encode(
-            f"user={cfg.email_username}\x01auth=Bearer {creds.token}\x01\x01".encode()
-        )
-        conn = smtplib.SMTP("smtp.gmail.com", 587)
-        conn.ehlo()
-        conn.starttls()
-        conn.docmd("AUTH", f"XOAUTH2 {auth_bytes.decode()}")
-    else:
-        conn = smtplib.SMTP(cfg.email_smtp_host, cfg.email_smtp_port)
-        conn.ehlo()
-        conn.starttls()
-        conn.login(cfg.email_username, cfg.email_password)
+    conn = None
     try:
+        if cfg.email_provider == "gmail":
+            creds = get_gmail_credentials()
+            if creds is None:
+                raise RuntimeError("Gmail not authorized — connect via Settings → Email")
+            auth_bytes = base64.b64encode(
+                f"user={cfg.email_username}\x01auth=Bearer {creds.token}\x01\x01".encode()
+            )
+            conn = smtplib.SMTP("smtp.gmail.com", 587)
+            conn.ehlo()
+            conn.starttls()
+            conn.ehlo()
+            conn.docmd("AUTH", f"XOAUTH2 {auth_bytes.decode()}")
+        else:
+            conn = smtplib.SMTP(cfg.email_smtp_host, cfg.email_smtp_port)
+            conn.ehlo()
+            conn.starttls()
+            conn.ehlo()
+            conn.login(cfg.email_username, cfg.email_password)
         yield conn
     finally:
-        try:
-            conn.quit()
-        except Exception:
-            pass
+        if conn is not None:
+            try:
+                conn.quit()
+            except Exception:
+                pass
