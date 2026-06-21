@@ -41,6 +41,9 @@ UPLOADS_DIR = Path(__file__).parent.parent / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 
 router = APIRouter()
+
+# state → code_verifier for Gmail PKCE OAuth flows
+_email_oauth_verifiers: dict[str, str] = {}
 _ws_clients: list[WebSocket] = []
 _recent_notifications: list[dict] = []  # replay buffer for clients that connect after startup
 _NOTIFICATION_REPLAY_TYPES: set[str] = {"status", "vram_status", "agent_routing"}
@@ -553,12 +556,14 @@ async def email_account_auth(name: str, request: Request):
     if not acc.get("gmail_credentials_file"):
         raise HTTPException(status_code=422, detail="gmail_credentials_file not set for this account")
     redirect_uri = str(request.base_url).rstrip("/") + f"/api/email/accounts/{name}/callback"
-    auth_url = await asyncio.to_thread(build_auth_url, acc, redirect_uri)
+    auth_url, state, verifier = await asyncio.to_thread(build_auth_url, acc, redirect_uri)
+    if verifier:
+        _email_oauth_verifiers[state] = verifier
     return {"auth_url": auth_url}
 
 
 @router.get("/api/email/accounts/{name}/callback")
-async def email_account_callback(name: str, request: Request, code: str = ""):
+async def email_account_callback(name: str, request: Request, code: str = "", state: str = ""):
     from agents.email_store import get_account
     from agents.email_client import exchange_code
     acc = await asyncio.to_thread(get_account, name)
@@ -569,8 +574,9 @@ async def email_account_callback(name: str, request: Request, code: str = ""):
             status_code=404,
         )
     redirect_uri = str(request.base_url).rstrip("/") + f"/api/email/accounts/{name}/callback"
+    verifier = _email_oauth_verifiers.pop(state, "")
     try:
-        await asyncio.to_thread(exchange_code, acc, redirect_uri, code)
+        await asyncio.to_thread(exchange_code, acc, redirect_uri, code, verifier)
     except (AttributeError, TypeError, ImportError, NameError):
         raise
     except Exception:

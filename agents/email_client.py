@@ -47,20 +47,24 @@ def get_gmail_credentials(account: dict):
     return creds if creds.valid else None
 
 
-def build_auth_url(account: dict, redirect_uri: str) -> str:
+def build_auth_url(account: dict, redirect_uri: str) -> tuple[str, str, str]:
+    """Return (auth_url, state, code_verifier). Verifier may be empty if PKCE not used."""
     from google_auth_oauthlib.flow import Flow
     flow = Flow.from_client_secrets_file(
         account["gmail_credentials_file"], scopes=_SCOPES, redirect_uri=redirect_uri
     )
-    auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
-    return auth_url
+    auth_url, state = flow.authorization_url(access_type="offline", prompt="consent")
+    verifier = getattr(flow, "code_verifier", None) or ""
+    return auth_url, state, verifier
 
 
-def exchange_code(account: dict, redirect_uri: str, code: str) -> None:
+def exchange_code(account: dict, redirect_uri: str, code: str, code_verifier: str = "") -> None:
     from google_auth_oauthlib.flow import Flow
     flow = Flow.from_client_secrets_file(
         account["gmail_credentials_file"], scopes=_SCOPES, redirect_uri=redirect_uri
     )
+    if code_verifier:
+        flow.code_verifier = code_verifier
     flow.fetch_token(code=code)
     path = _token_path(account["name"])
     path.parent.mkdir(parents=True, exist_ok=True)
