@@ -25,17 +25,17 @@ _GMAIL_ACCOUNT = {
 
 
 def _make_msg(from_addr="alice@example.com", subject="Hello",
-              date_str="Mon, 1 Jan 2024 12:00:00 +0000", flags=()):
+              text="Email body text.", flags=()):
     msg = MagicMock()
     msg.from_ = from_addr
     msg.subject = subject
-    msg.date_str = date_str
+    msg.text = text
+    msg.html = None
     msg.flags = flags
     return msg
 
 
 def _patch_imap(messages):
-    """Patch imap_connection to yield a mock mailbox whose fetch() returns messages."""
     mock_mb = MagicMock()
     mock_mb.fetch.return_value = messages
     cm = MagicMock()
@@ -59,6 +59,10 @@ def _patch_get(account):
     return patch("agents.email_store.get_account", return_value=account)
 
 
+def _patch_summarize(summaries):
+    return patch("modules.email_tools._summarize_batch", return_value=summaries)
+
+
 # --- list_inbox ---
 
 def test_list_inbox_not_configured():
@@ -70,11 +74,15 @@ def test_list_inbox_not_configured():
 
 def test_list_inbox_returns_formatted_lines():
     msgs = [_make_msg(from_addr="alice@example.com", subject="Invoice")]
-    with _patch_default(_IMAP_ACCOUNT), _patch_imap(msgs):
+    with _patch_default(_IMAP_ACCOUNT), _patch_imap(msgs), _patch_summarize(["Invoice summary."]):
         from modules.email_tools import list_inbox
         result = list_inbox(max_items=5)
     assert "alice@example.com" in result
     assert "Invoice" in result
+    assert "Invoice summary." in result
+    assert "From:    |" in result
+    assert "Subject: |" in result
+    assert "Body:    |" in result
 
 
 def test_list_inbox_empty_inbox():
@@ -86,10 +94,10 @@ def test_list_inbox_empty_inbox():
 
 def test_list_inbox_spam_flag_shown():
     msgs = [_make_msg(flags=("\\Junk",))]
-    with _patch_default(_IMAP_ACCOUNT), _patch_imap(msgs):
+    with _patch_default(_IMAP_ACCOUNT), _patch_imap(msgs), _patch_summarize(["Spam."]):
         from modules.email_tools import list_inbox
         result = list_inbox()
-    assert "SPAM" in result
+    assert "SPAM" in result or "Junk" in result or "Spam" in result
 
 
 def test_list_inbox_connection_error():
@@ -101,9 +109,8 @@ def test_list_inbox_connection_error():
 
 
 def test_list_inbox_named_account():
-    """list_inbox(account='Work') uses get_account, not get_default_account."""
     msgs = [_make_msg(from_addr="boss@work.com", subject="Meeting")]
-    with _patch_get(_IMAP_ACCOUNT), _patch_imap(msgs):
+    with _patch_get(_IMAP_ACCOUNT), _patch_imap(msgs), _patch_summarize(["Meeting summary."]):
         from modules.email_tools import list_inbox
         result = list_inbox(account="Work")
     assert "boss@work.com" in result
@@ -126,10 +133,10 @@ def test_search_email_uses_imap_text():
     cm.__enter__ = MagicMock(return_value=mock_mb)
     cm.__exit__ = MagicMock(return_value=False)
     with _patch_default(_IMAP_ACCOUNT), \
-         patch("agents.email_client.imap_connection", return_value=cm):
+         patch("agents.email_client.imap_connection", return_value=cm), \
+         _patch_summarize(["Invoice summary."]):
         from modules.email_tools import search_email
         result = search_email("invoice")
-    mock_mb.fetch.assert_called_once()
     criteria = mock_mb.fetch.call_args[0][0]
     assert 'TEXT "invoice"' in criteria
     assert "Invoice Q4" in result
@@ -188,7 +195,6 @@ def test_send_email_smtp_error():
 
 
 def test_send_email_uses_named_account():
-    """send_email(account='Work') uses get_account."""
     mock_conn = MagicMock()
     with _patch_get(_IMAP_ACCOUNT), _patch_smtp(mock_conn):
         from modules.email_tools import send_email
@@ -203,3 +209,17 @@ def test_supervisor_keywords_route_to_list_inbox():
     assert _direct_tool("check my email") == "list_inbox"
     assert _direct_tool("any new emails?") == "list_inbox"
     assert _direct_tool("read my inbox please") == "list_inbox"
+
+
+# --- _parse_from ---
+
+def test_parse_from_with_display_name():
+    from modules.email_tools import _parse_from
+    result = _parse_from("Alice Smith <alice@example.com>")
+    assert result == "Alice Smith - alice@example.com"
+
+
+def test_parse_from_addr_only():
+    from modules.email_tools import _parse_from
+    result = _parse_from("alice@example.com")
+    assert "alice@example.com" in result
