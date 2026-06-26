@@ -95,6 +95,12 @@ class PliaConfig:
     # Tor VPN
     tor_enabled: bool = False
 
+    # Observer — user activity monitoring
+    observer_enabled: bool = False
+    observer_screen_interval: int = 30
+    observer_profile_interval: int = 300
+    observer_retention_hours: int = 24
+
     # Weather
     weather_location: str = ""
 
