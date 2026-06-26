@@ -95,7 +95,7 @@ class ObserverService:
         for t in self._tasks:
             try:
                 await t
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, Exception):
                 pass
         self._tasks = []
         logger.info("Observer stopped")
@@ -253,9 +253,20 @@ class ObserverService:
                     logger.exception("Keystroke event processing error")
         except asyncio.CancelledError:
             raise
+        except Exception:
+            logger.exception("Keystroke device error; key capture stopped")
 
     async def _run_profile_once(self) -> None:
         try:
+            from core.config import get_config as _get_cfg
+            cfg = _get_cfg()
+            if cfg.fallback_provider:
+                logger.warning(
+                    "Observer: skipping profile — cloud fallback provider '%s' is configured; "
+                    "observation data is not sent to external services",
+                    cfg.fallback_provider,
+                )
+                return
             obs = await asyncio.to_thread(self._store.get_recent_obs, 10)
             screen_snippets = "\n".join(
                 f"[{o['ts'][:19]}] {o['window_title']}: {o['ocr_text'][:200]}"

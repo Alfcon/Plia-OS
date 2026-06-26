@@ -20,8 +20,13 @@ logger = logging.getLogger(__name__)
 
 
 async def _start_observer() -> None:
-    import core.observer as obs_mod
-    await obs_mod.get_observer().start()
+    try:
+        import core.observer as obs_mod
+        await obs_mod.get_observer().start()
+    except Exception as exc:
+        from core.config import update_config
+        await asyncio.to_thread(update_config, observer_enabled=False)
+        logger.warning("Observer startup failed, disabled: %s", exc)
 
 
 async def _start_tor_if_enabled() -> None:
