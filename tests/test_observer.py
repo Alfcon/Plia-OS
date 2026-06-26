@@ -106,6 +106,24 @@ async def test_profile_loop_skips_on_llm_error():
 
 
 @pytest.mark.asyncio
+async def test_profile_skips_when_cloud_provider_configured():
+    """Cloud fallback guard: _run_profile_once must not call LLM when fallback_provider is set."""
+    store = _make_store()
+    store.get_recent_obs.return_value = {"screen": [], "focus": [], "keys": []}
+    mock_llm = AsyncMock()
+    mock_config = MagicMock()
+    mock_config.fallback_provider = "openai"
+    with patch("agents.observer_store.get_observer_store", return_value=store), \
+         patch("agents.llm.call_llm", mock_llm), \
+         patch("core.config.get_config", return_value=mock_config):
+        from core.observer import ObserverService
+        obs = ObserverService()
+        await obs._run_profile_once()
+    mock_llm.assert_not_called()
+    store.save_profile.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_screen_loop_skips_duplicate_text():
     store = _make_store()
 
