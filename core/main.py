@@ -19,6 +19,11 @@ from dashboard.server import router as dashboard_router, setup_event_forwarding
 logger = logging.getLogger(__name__)
 
 
+async def _start_observer() -> None:
+    import core.observer as obs_mod
+    await obs_mod.get_observer().start()
+
+
 async def _start_tor_if_enabled() -> None:
     import core.tor_manager as tm
     result = await asyncio.to_thread(tm.enable)
@@ -57,6 +62,10 @@ def create_app() -> FastAPI:
         tor_task = None
         if get_config().tor_enabled:
             tor_task = asyncio.create_task(_start_tor_if_enabled())
+        # Start Observer if previously enabled
+        observer_task = None
+        if get_config().observer_enabled:
+            observer_task = asyncio.create_task(_start_observer())
         yield
         pipeline_task.cancel()
         reminder_task.cancel()
@@ -64,7 +73,9 @@ def create_app() -> FastAPI:
         proactive_task.cancel()
         if tor_task and not tor_task.done():
             tor_task.cancel()
-        for task in filter(None, (pipeline_task, reminder_task, cron_task, proactive_task, tor_task)):
+        if observer_task and not observer_task.done():
+            observer_task.cancel()
+        for task in filter(None, (pipeline_task, reminder_task, cron_task, proactive_task, tor_task, observer_task)):
             try:
                 await task
             except asyncio.CancelledError:

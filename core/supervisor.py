@@ -111,7 +111,9 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
                 "compose an email", "draft an email", "reply to ",
                 "morning briefing", "daily briefing", "today's briefing",
                 "give me a briefing", "good morning", "what's today",
-                "what's on today", "what do i have today"],
+                "what's on today", "what do i have today",
+                "enable observer", "start observer", "disable observer", "stop observer",
+                "observer status", "what am i doing", "what are you tracking"],
 }
 
 
@@ -333,6 +335,16 @@ async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
         (m["content"] for m in reversed(messages) if m["role"] == "user"), ""
     )
     memory_context = "\n".join(store.recall(last_user)) if last_user else ""
+
+    try:
+        from core.observer import get_observer
+        profile = get_observer().get_profile()
+        if profile:
+            messages = [messages[0],
+                        {"role": "system", "content": f"User activity context:\n{profile}"},
+                        *messages[1:]]
+    except Exception:
+        pass
 
     state = AgentState(
         messages=list(messages),

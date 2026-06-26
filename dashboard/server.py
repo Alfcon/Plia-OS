@@ -970,6 +970,53 @@ async def post_tor_disable():
     return {"success": success, "message": message}
 
 
+# ── Observer ─────────────────────────────────────────────────────────────────
+
+@router.get("/api/observer/status")
+async def get_observer_status():
+    import core.observer as obs_mod
+    obs = obs_mod.get_observer()
+    return {
+        "enabled": get_config().observer_enabled,
+        "running": obs.is_running(),
+        "last_capture": obs.last_capture_ts(),
+        "last_profile": obs.last_profile_ts(),
+        "profile_preview": obs.get_profile()[:200],
+    }
+
+
+@router.post("/api/observer/enable")
+async def post_observer_enable():
+    import core.observer as obs_mod
+    import core.config as cfg_mod
+    obs = obs_mod.get_observer()
+    if not obs.is_running():
+        asyncio.create_task(obs.start())
+    cfg_mod.update_config(observer_enabled=True)
+    await events.emit("observer_status", {
+        "enabled": True, "running": True,
+        "last_capture": obs.last_capture_ts(),
+        "last_profile": obs.last_profile_ts(),
+        "profile_preview": obs.get_profile()[:200],
+    })
+    return {"success": True, "message": "Observer enabled"}
+
+
+@router.post("/api/observer/disable")
+async def post_observer_disable():
+    import core.observer as obs_mod
+    import core.config as cfg_mod
+    obs = obs_mod.get_observer()
+    if obs.is_running():
+        asyncio.create_task(obs.stop())
+    cfg_mod.update_config(observer_enabled=False)
+    await events.emit("observer_status", {
+        "enabled": False, "running": False,
+        "last_capture": None, "last_profile": None, "profile_preview": "",
+    })
+    return {"success": True, "message": "Observer disabled"}
+
+
 @router.get("/api/token-usage")
 async def get_token_usage():
     from core.token_usage import get_stats
