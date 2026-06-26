@@ -171,3 +171,70 @@ def test_keycode_to_char_import_error_fallback():
         sys.modules.pop("core.observer", None)
 
     assert result == ""
+
+
+def test_keycode_to_char_happy_path():
+    """_keycode_to_char maps codes to chars correctly with a mocked evdev."""
+    import sys
+    from unittest.mock import MagicMock
+
+    mock_evdev = MagicMock()
+    # KEY_A = 30 in real evdev; use same value in mock
+    mock_evdev.ecodes.KEY_A = 30
+    mock_evdev.ecodes.KEY_SPACE = 57
+    mock_evdev.ecodes.KEY_ENTER = 28
+    mock_evdev.ecodes.KEY_BACKSPACE = 14
+    mock_evdev.ecodes.KEY_B = 48
+    mock_evdev.ecodes.KEY_C = 46
+    mock_evdev.ecodes.KEY_D = 32
+    mock_evdev.ecodes.KEY_E = 18
+    mock_evdev.ecodes.KEY_F = 33
+    mock_evdev.ecodes.KEY_G = 34
+    mock_evdev.ecodes.KEY_H = 35
+    mock_evdev.ecodes.KEY_I = 23
+    mock_evdev.ecodes.KEY_J = 36
+    mock_evdev.ecodes.KEY_K = 37
+    mock_evdev.ecodes.KEY_L = 38
+    mock_evdev.ecodes.KEY_M = 50
+    mock_evdev.ecodes.KEY_N = 49
+    mock_evdev.ecodes.KEY_O = 24
+    mock_evdev.ecodes.KEY_P = 25
+    mock_evdev.ecodes.KEY_Q = 16
+    mock_evdev.ecodes.KEY_R = 19
+    mock_evdev.ecodes.KEY_S = 31
+    mock_evdev.ecodes.KEY_T = 20
+    mock_evdev.ecodes.KEY_U = 22
+    mock_evdev.ecodes.KEY_V = 47
+    mock_evdev.ecodes.KEY_W = 17
+    mock_evdev.ecodes.KEY_X = 45
+    mock_evdev.ecodes.KEY_Y = 21
+    mock_evdev.ecodes.KEY_Z = 44
+    mock_evdev.ecodes.KEY_0 = 11
+    mock_evdev.ecodes.KEY_1 = 2
+    mock_evdev.ecodes.KEY_2 = 3
+    mock_evdev.ecodes.KEY_3 = 4
+    mock_evdev.ecodes.KEY_4 = 5
+    mock_evdev.ecodes.KEY_5 = 6
+    mock_evdev.ecodes.KEY_6 = 7
+    mock_evdev.ecodes.KEY_7 = 8
+    mock_evdev.ecodes.KEY_8 = 9
+    mock_evdev.ecodes.KEY_9 = 10
+    mock_evdev.ecodes.KEY_MINUS = 12
+    mock_evdev.ecodes.KEY_EQUAL = 13
+    mock_evdev.ecodes.KEY_COMMA = 51
+    mock_evdev.ecodes.KEY_DOT = 52
+    mock_evdev.ecodes.KEY_SLASH = 53
+    mock_evdev.ecodes.KEY_SEMICOLON = 39
+    mock_evdev.ecodes.KEY_APOSTROPHE = 40
+
+    # Remove any cached core.observer so the function re-imports evdev fresh
+    sys.modules.pop("core.observer", None)
+
+    with patch.dict(sys.modules, {"evdev": mock_evdev, "evdev.ecodes": mock_evdev.ecodes}):
+        from core.observer import _keycode_to_char
+        assert _keycode_to_char(30, False) == "a"    # KEY_A, no shift
+        assert _keycode_to_char(30, True) == "A"     # KEY_A, shift
+        assert _keycode_to_char(57, False) == " "    # KEY_SPACE
+        assert _keycode_to_char(9999, False) == ""   # unknown code
+
+    sys.modules.pop("core.observer", None)

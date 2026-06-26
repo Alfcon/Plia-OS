@@ -150,7 +150,7 @@ class ObserverService:
     async def _focus_loop(self) -> None:
         prev_window: str | None = None
         prev_app: str | None = None
-        focus_start = asyncio.get_event_loop().time()
+        focus_start = asyncio.get_running_loop().time()
 
         while True:
             try:
@@ -181,7 +181,7 @@ class ObserverService:
 
                 if title != prev_window:
                     if prev_window is not None:
-                        elapsed = asyncio.get_event_loop().time() - focus_start
+                        elapsed = asyncio.get_running_loop().time() - focus_start
                         ts = datetime.now(timezone.utc).isoformat()
                         await asyncio.to_thread(
                             self._store.add_focus_event,
@@ -189,7 +189,7 @@ class ObserverService:
                         )
                     prev_window = title
                     prev_app = app
-                    focus_start = asyncio.get_event_loop().time()
+                    focus_start = asyncio.get_running_loop().time()
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -217,41 +217,42 @@ class ObserverService:
             return
 
         buffer: list[str] = []
-        last_flush = asyncio.get_event_loop().time()
+        last_flush = asyncio.get_running_loop().time()
         shift_held = False
         FLUSH_INTERVAL = 10.0
 
         try:
             async for event in dev.async_read_loop():
-                if event.type != evdev.ecodes.EV_KEY:
-                    continue
-                key_event = evdev.categorize(event)
-                code = key_event.scancode
-                if key_event.keystate == evdev.KeyEvent.key_down:
-                    if code in (evdev.ecodes.KEY_LEFTSHIFT, evdev.ecodes.KEY_RIGHTSHIFT):
-                        shift_held = True
+                try:
+                    if event.type != evdev.ecodes.EV_KEY:
                         continue
-                    char = _keycode_to_char(code, shift_held)
-                    if char:
-                        buffer.append(char)
-                elif key_event.keystate == evdev.KeyEvent.key_up:
-                    if code in (evdev.ecodes.KEY_LEFTSHIFT, evdev.ecodes.KEY_RIGHTSHIFT):
-                        shift_held = False
+                    key_event = evdev.categorize(event)
+                    code = key_event.scancode
+                    if key_event.keystate == evdev.KeyEvent.key_down:
+                        if code in (evdev.ecodes.KEY_LEFTSHIFT, evdev.ecodes.KEY_RIGHTSHIFT):
+                            shift_held = True
+                            continue
+                        char = _keycode_to_char(code, shift_held)
+                        if char:
+                            buffer.append(char)
+                    elif key_event.keystate == evdev.KeyEvent.key_up:
+                        if code in (evdev.ecodes.KEY_LEFTSHIFT, evdev.ecodes.KEY_RIGHTSHIFT):
+                            shift_held = False
 
-                now = asyncio.get_event_loop().time()
-                if now - last_flush >= FLUSH_INTERVAL and buffer:
-                    chunk = "".join(buffer)
-                    buffer.clear()
-                    last_flush = now
-                    ts = datetime.now(timezone.utc).isoformat()
-                    await asyncio.to_thread(
-                        self._store.add_key_chunk,
-                        ts, self._current_window, self._current_app, chunk,
-                    )
+                    now = asyncio.get_running_loop().time()
+                    if now - last_flush >= FLUSH_INTERVAL and buffer:
+                        chunk = "".join(buffer)
+                        buffer.clear()
+                        last_flush = now
+                        ts = datetime.now(timezone.utc).isoformat()
+                        await asyncio.to_thread(
+                            self._store.add_key_chunk,
+                            ts, self._current_window, self._current_app, chunk,
+                        )
+                except Exception:
+                    logger.exception("Keystroke event processing error")
         except asyncio.CancelledError:
             raise
-        except Exception:
-            logger.exception("Keystroke capture error")
 
     async def _run_profile_once(self) -> None:
         try:
