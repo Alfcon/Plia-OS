@@ -2975,13 +2975,23 @@
       ? Object.entries(t.schema.parameters.properties)
       : [];
     if (!params.length) return '<div style="color:#555;font-size:0.7rem;margin-bottom:2px;">No parameters</div>';
+    const req = new Set((t.schema.parameters.required || []));
     return params.map(([name, def]) => {
-      const req = t.schema.parameters.required && t.schema.parameters.required.includes(name);
-      return `<div style="margin-bottom:4px;">
-        <label style="color:#888;font-size:0.68rem;display:block;">${_esc(name)}${req ? ' *' : ''}</label>
-        <input id="tool-param-${_esc(t.name)}-${_esc(name)}" type="text" placeholder="${_esc(def.type || 'string')}"
-          style="width:100%;background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:3px 5px;font-size:0.72rem;box-sizing:border-box;" />
-      </div>`;
+      const id = `tool-param-${_esc(t.name)}-${_esc(name)}`;
+      const label = `<label style="color:#888;font-size:0.68rem;display:block;">${_esc(name)}${req.has(name) ? ' <span style="color:#ef9a9a">*</span>' : ''}</label>`;
+      const style = 'width:100%;background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:3px 5px;font-size:0.72rem;box-sizing:border-box;';
+      let input;
+      if (def.type === 'boolean') {
+        input = `<select id="${id}" style="${style}"><option value="">— (default)</option><option value="true">true</option><option value="false">false</option></select>`;
+      } else if (def.type === 'integer' || def.type === 'number') {
+        const step = def.type === 'integer' ? '1' : 'any';
+        const min = def.minimum !== undefined ? `min="${def.minimum}"` : '';
+        const max = def.maximum !== undefined ? `max="${def.maximum}"` : '';
+        input = `<input id="${id}" type="number" step="${step}" ${min} ${max} placeholder="${_esc(def.type)}" style="${style}">`;
+      } else {
+        input = `<input id="${id}" type="text" placeholder="${_esc(def.description || def.type || 'string')}" style="${style}">`;
+      }
+      return `<div style="margin-bottom:4px;">${label}${input}</div>`;
     }).join('');
   }
 
@@ -3005,14 +3015,19 @@
     const t = _toolSchemas.find(t => t.name === name);
     const params = {};
     if (t && t.schema && t.schema.parameters && t.schema.parameters.properties) {
-      Object.keys(t.schema.parameters.properties).forEach(p => {
+      const props = t.schema.parameters.properties;
+      Object.keys(props).forEach(p => {
         const el = document.getElementById(`tool-param-${name}-${p}`);
-        if (el && el.value !== '') params[p] = el.value;
+        if (!el || el.value === '') return;
+        const type = props[p].type;
+        if (type === 'integer') params[p] = parseInt(el.value);
+        else if (type === 'number') params[p] = parseFloat(el.value);
+        else if (type === 'boolean') params[p] = el.value === 'true';
+        else params[p] = el.value;
       });
     }
-    const status = document.getElementById(`tool-inline-${name}`);
-    status.style.color = '#888';
-    status.textContent = 'Running…';
+    const out = document.getElementById(`tool-inline-${name}`);
+    out.innerHTML = '<span style="color:#888;">Running…</span>';
     try {
       const r = await fetch('/api/tools/run', {
         method: 'POST',
@@ -3021,16 +3036,18 @@
       });
       const data = await r.json();
       if (!r.ok) {
-        status.style.color = '#ef9a9a';
-        status.textContent = data.detail || 'Error';
+        out.innerHTML = `<span style="color:#ef9a9a;">${_esc(data.detail || 'Error')}</span>`;
         return;
       }
-      status.style.color = '#a5d6a7';
-      const resultText = data.result || 'Done';
-      status.textContent = resultText.length > 120 ? resultText.slice(0, 120) + '…' : resultText;
+      const resultText = data.result || 'Done.';
+      out.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+        <span style="font-size:0.65rem;color:#555;">result</span>
+        <button onclick="navigator.clipboard.writeText(${JSON.stringify(resultText).replace(/</g,'&lt;')})"
+          style="background:none;border:none;color:#555;font-size:0.65rem;cursor:pointer;padding:0;">⧉ copy</button>
+      </div>
+      <pre style="margin:0;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;padding:5px 7px;font-size:0.68rem;color:#a5d6a7;white-space:pre-wrap;max-height:180px;overflow-y:auto;">${_esc(resultText)}</pre>`;
     } catch(e) {
-      status.style.color = '#ef9a9a';
-      status.textContent = e.message;
+      out.innerHTML = `<span style="color:#ef9a9a;">${_esc(e.message)}</span>`;
     }
   }
   // ---- End tools panel ----
