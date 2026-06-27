@@ -3694,6 +3694,7 @@
   async function toggleProactive() {
     const btn = document.getElementById('proactiveToggleBtn');
     const current = btn.textContent.trim();
+    if (current !== 'Enable' && current !== 'Disable') return;
     try {
       const endpoint = current === 'Enable' ? '/api/proactive/enable' : '/api/proactive/disable';
       const r = await fetch(endpoint, {method: 'POST'});
