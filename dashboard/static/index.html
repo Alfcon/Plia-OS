@@ -4112,15 +4112,18 @@
       const label = isUser ? 'User' : 'Plia';
       const ts = m.ts ? new Date(m.ts).toLocaleString() : '';
       const content = _esc(m.content || '');
-      const preview = content.length > 120 ? content.slice(0, 120) + '…' : content;
-      return `<div style="border-bottom:1px solid #1a1a1a;padding:6px 10px;cursor:pointer"
-                onclick="this.querySelector('.h-full').style.display=this.querySelector('.h-full').style.display==='none'?'block':'none'">
+      const long = content.length > 120;
+      const preview = long ? content.slice(0, 120) + '…' : content;
+      const onclick = long
+        ? `var f=this.querySelector('.h-full'),p=this.querySelector('.h-preview'),open=f.style.display==='none';f.style.display=open?'block':'none';p.style.display=open?'none':'block';`
+        : '';
+      return `<div style="border-bottom:1px solid #1a1a1a;padding:6px 10px;${long?'cursor:pointer':''}" onclick="${onclick}">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
           <span style="color:${color};font-size:0.72rem;font-weight:600">${label}</span>
           <span style="color:#444;font-size:0.68rem">${ts}</span>
         </div>
         <div class="h-preview" style="color:#bbb;white-space:pre-wrap;word-break:break-word">${preview}</div>
-        <div class="h-full" style="display:none;color:#ccc;white-space:pre-wrap;word-break:break-word;margin-top:4px">${content}</div>
+        ${long ? `<div class="h-full" style="display:none;color:#ccc;white-space:pre-wrap;word-break:break-word">${content}</div>` : ''}
       </div>`;
     }).join('');
   }
