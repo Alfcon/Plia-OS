@@ -116,6 +116,11 @@ class PliaConfig:
     briefing_news_topic: str = "breaking news"
     briefing_cron_enabled: bool = False
     briefing_cron_time: str = "07:00"
+    briefing_include_weather: bool = True
+    briefing_include_reminders: bool = True
+    briefing_include_calendar: bool = True
+    briefing_include_email: bool = True
+    briefing_include_news: bool = True
 
     # Tool guard — tools in this list require user approval before execution
     tool_guard_list: list = field(default_factory=list)

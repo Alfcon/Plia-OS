@@ -723,6 +723,7 @@
         <button class="m-nav-btn" data-section="network" onclick="showMenuSection('network');loadTorStatus()">Network</button>
         <button class="m-nav-btn" data-section="cron" onclick="showMenuSection('cron');loadCronJobs()">Cron</button>
         <button class="m-nav-btn" data-section="tokens" onclick="showMenuSection('tokens');loadTokenUsage()">Tokens</button>
+        <button class="m-nav-btn" data-section="briefing" onclick="showMenuSection('briefing')">Briefing</button>
         <button class="m-nav-btn" data-section="email" onclick="showMenuSection('email');loadEmailAccounts()">Email</button>
         <button class="m-nav-btn" data-section="observer" onclick="showMenuSection('observer');loadObserverStatus()">Observer</button>
         <button class="m-nav-btn" data-section="proactive" onclick="showMenuSection('proactive');loadProactiveStatus()">Proactive</button>
@@ -1008,28 +1009,6 @@
               onchange="fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({desktop_notifications:this.checked})})">
             Desktop notifications for reminders
           </label>
-          <hr style="border-color:#222;margin:10px 0;" />
-          <div style="font-size:0.78rem;color:#aaa;margin-bottom:8px;">Weather</div>
-          <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:4px;">Default location</label>
-          <input type="text" id="cfg-weather-location" placeholder="e.g. Berlin"
-            style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;"
-            onchange="fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weather_location:this.value.trim()})})">
-          <hr style="border-color:#222;margin:10px 0;" />
-          <div style="font-size:0.78rem;color:#aaa;margin-bottom:8px;">Briefing</div>
-          <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:4px;">News topic</label>
-          <input type="text" id="cfg-briefing-topic" placeholder="e.g. breaking news"
-            style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:8px;"
-            onchange="fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({briefing_news_topic:this.value.trim()})})">
-          <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:4px;">Daily briefing time</label>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <input type="time" id="cfg-briefing-time"
-              style="padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;"
-              onchange="applyBriefingCron()">
-            <label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;color:#ccc;cursor:pointer;">
-              <input type="checkbox" id="cfg-briefing-enabled" onchange="applyBriefingCron()">
-              Enable
-            </label>
-          </div>
         </div>
         <div id="m-section-reminders" class="m-pane" style="display:none">
           <div style="margin-bottom:10px;">
@@ -1260,6 +1239,55 @@
               <button onclick="loadTokenUsage()" style="padding:4px 12px;background:#1a1a1a;color:#888;border:1px solid #333;border-radius:3px;font-size:0.75rem;cursor:pointer">↻ Refresh</button>
               <button onclick="resetTokenUsage()" style="padding:4px 12px;background:#1a1a1a;color:#ef9a9a;border:1px solid #444;border-radius:3px;font-size:0.75rem;cursor:pointer">Reset</button>
             </div>
+          </div>
+        </div>
+
+        <!-- Briefing -->
+        <div id="m-section-briefing" class="m-pane" style="display:none">
+          <div class="settings-section">
+            <h3 style="margin:0 0 10px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">Morning Briefing</h3>
+            <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:4px;">News topic</label>
+            <input type="text" id="cfg-briefing-topic" placeholder="e.g. breaking news"
+              style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:8px;"
+              onchange="fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({briefing_news_topic:this.value.trim()})})">
+            <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:4px;">Weather location</label>
+            <input type="text" id="cfg-weather-location" placeholder="e.g. Berlin"
+              style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:8px;"
+              onchange="fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weather_location:this.value.trim()})})">
+            <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:4px;">Daily time</label>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+              <input type="time" id="cfg-briefing-time"
+                style="padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;"
+                onchange="applyBriefingCron()">
+              <label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;color:#ccc;cursor:pointer;">
+                <input type="checkbox" id="cfg-briefing-enabled" onchange="applyBriefingCron()">
+                Enable daily
+              </label>
+            </div>
+            <div style="font-size:0.78rem;color:#aaa;margin-bottom:6px;">Sections</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
+              <label style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:#ccc;cursor:pointer;">
+                <input type="checkbox" id="briefing-inc-weather" onchange="saveBriefingSection('briefing_include_weather',this.checked)"> Weather
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:#ccc;cursor:pointer;">
+                <input type="checkbox" id="briefing-inc-reminders" onchange="saveBriefingSection('briefing_include_reminders',this.checked)"> Reminders
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:#ccc;cursor:pointer;">
+                <input type="checkbox" id="briefing-inc-calendar" onchange="saveBriefingSection('briefing_include_calendar',this.checked)"> Calendar
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:#ccc;cursor:pointer;">
+                <input type="checkbox" id="briefing-inc-email" onchange="saveBriefingSection('briefing_include_email',this.checked)"> Email
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:#ccc;cursor:pointer;">
+                <input type="checkbox" id="briefing-inc-news" onchange="saveBriefingSection('briefing_include_news',this.checked)"> News
+              </label>
+            </div>
+            <button onclick="previewBriefing()"
+              style="width:100%;padding:6px;background:#1a3a1a;border:1px solid #2d5a2d;border-radius:4px;color:#81c784;font-size:0.78rem;cursor:pointer;margin-bottom:6px;">
+              ▶ Preview briefing
+            </button>
+            <div id="briefing-preview-status" style="font-size:0.72rem;color:#666;min-height:1em;margin-bottom:4px;"></div>
+            <pre id="briefing-preview-output" style="display:none;font-size:0.72rem;color:#ccc;background:#111;border:1px solid #222;border-radius:3px;padding:8px;white-space:pre-wrap;margin:0;max-height:280px;overflow-y:auto;"></pre>
           </div>
         </div>
 
@@ -1900,6 +1928,11 @@
       document.getElementById('cfg-briefing-topic').value = cfg.briefing_news_topic || 'breaking news';
       document.getElementById('cfg-briefing-time').value = cfg.briefing_cron_time || '07:00';
       document.getElementById('cfg-briefing-enabled').checked = !!cfg.briefing_cron_enabled;
+      document.getElementById('briefing-inc-weather').checked = cfg.briefing_include_weather !== false;
+      document.getElementById('briefing-inc-reminders').checked = cfg.briefing_include_reminders !== false;
+      document.getElementById('briefing-inc-calendar').checked = cfg.briefing_include_calendar !== false;
+      document.getElementById('briefing-inc-email').checked = cfg.briefing_include_email !== false;
+      document.getElementById('briefing-inc-news').checked = cfg.briefing_include_news !== false;
       // Email accounts loaded separately on panel open
       onWebProviderChange();
       onEngineChange();
@@ -3668,6 +3701,32 @@
         briefing_cron_time: document.getElementById('cfg-briefing-time').value || '07:00',
       }),
     });
+  }
+
+  function saveBriefingSection(key, val) {
+    fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({[key]:val})});
+  }
+
+  async function previewBriefing() {
+    const status = document.getElementById('briefing-preview-status');
+    const out = document.getElementById('briefing-preview-output');
+    status.textContent = 'Running…';
+    status.style.color = '#888';
+    out.style.display = 'none';
+    try {
+      const r = await fetch('/api/tools/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tool: 'morning_briefing', params: {}}),
+      });
+      const d = await r.json();
+      status.textContent = '';
+      out.textContent = d.result || d.detail || JSON.stringify(d);
+      out.style.display = 'block';
+    } catch(e) {
+      status.textContent = 'Error: ' + e.message;
+      status.style.color = '#ef9a9a';
+    }
   }
 
   function closeSettings() {
