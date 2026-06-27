@@ -127,22 +127,45 @@ async def test_search_memory_empty_query_returns_all_non_notes(app):
 
 
 @pytest.mark.asyncio
-async def test_search_memory_with_query_uses_recall(app):
+async def test_search_memory_with_query_filters_facts(app):
     mock_store = MagicMock()
-    mock_store.recall.return_value = ["user_name: Alice", "favorite_color: blue"]
+    mock_store.list_all.return_value = [
+        {"key": "user_name", "value": "Alice"},
+        {"key": "favorite_color", "value": "blue"},
+        {"key": "city", "value": "Perth"},
+    ]
     with patch("agents.memory_store.get_memory_store", return_value=mock_store):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             r = await ac.get("/api/memory/search?q=Alice")
     data = r.json()
-    assert len(data) == 2
-    assert data[0]["value"] == "user_name: Alice"
-    mock_store.recall.assert_called_once_with("Alice")
+    assert len(data) == 1
+    assert data[0]["key"] == "user_name"
+    assert data[0]["value"] == "Alice"
+    mock_store.recall.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_search_memory_matches_key_and_value(app):
+    mock_store = MagicMock()
+    mock_store.list_all.return_value = [
+        {"key": "food", "value": "pizza"},
+        {"key": "drink", "value": "water"},
+        {"key": "note_123", "value": "buy pizza"},
+    ]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            r = await ac.get("/api/memory/search?q=pizza")
+    data = r.json()
+    assert len(data) == 1  # note_ excluded, only "food" matches
+    assert data[0]["key"] == "food"
 
 
 @pytest.mark.asyncio
 async def test_search_memory_no_results(app):
     mock_store = MagicMock()
-    mock_store.recall.return_value = []
+    mock_store.list_all.return_value = [
+        {"key": "user_name", "value": "Alice"},
+    ]
     with patch("agents.memory_store.get_memory_store", return_value=mock_store):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             r = await ac.get("/api/memory/search?q=xyzzy")

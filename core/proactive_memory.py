@@ -66,7 +66,7 @@ def _get_facts(store) -> str:
         facts = store.list_all()
         if not facts:
             return ""
-        lines = [f"{k}: {v}" for k, v in list(facts.items())[:_MAX_FACTS]]
+        lines = [f"{f['key']}: {f['value']}" for f in facts[:_MAX_FACTS]]
         return "\n".join(lines)
     except Exception:
         return ""
