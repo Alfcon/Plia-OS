@@ -713,6 +713,7 @@
         <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders();loadTimers()">Reminders</button>
         <button class="m-nav-btn" data-section="calendar" onclick="showMenuSection('calendar');loadCalendar();loadGcalStatus()">Calendar</button>
         <button class="m-nav-btn" data-section="memory" onclick="showMenuSection('memory');loadMemory()">Memory</button>
+        <button class="m-nav-btn" data-section="history" onclick="showMenuSection('history');loadHistory()">History</button>
         <button class="m-nav-btn" data-section="modules" onclick="showMenuSection('modules');loadModules()">Modules</button>
         <button class="m-nav-btn" data-section="mcp" onclick="showMenuSection('mcp');loadMcpServers();loadMcpConfig()">MCP</button>
         <button class="m-nav-btn" data-section="home" onclick="showMenuSection('home');loadHassEntities()">Home</button>
@@ -1345,6 +1346,25 @@
                   style="width:100%;margin-top:4px;background:#111;border:1px solid #333;color:#ccc;border-radius:3px;padding:3px 6px"
                   onchange="saveProactiveConfig()">
               </label>
+            </div>
+          </div>
+        </div>
+
+        <div id="m-section-history" class="m-pane" style="display:none">
+          <div class="settings-section">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <span style="font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">Conversation History</span>
+              <button onclick="loadHistory()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;margin-left:auto">↻ Refresh</button>
+            </div>
+            <input id="history-search" type="text" placeholder="Filter messages…"
+              style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#ccc;border-radius:3px;padding:4px 8px;font-size:12px;margin-bottom:8px"
+              oninput="renderHistory()">
+            <div id="history-list" style="font-size:0.78rem;max-height:420px;overflow-y:auto;border:1px solid #222;border-radius:3px;padding:2px 0"></div>
+            <div style="text-align:center;margin-top:6px">
+              <button id="history-more-btn" onclick="loadMoreHistory()"
+                style="display:none;background:#1a1a1a;border:1px solid #333;color:#888;font-size:11px;padding:4px 14px;border-radius:3px;cursor:pointer">
+                Load more
+              </button>
             </div>
           </div>
         </div>
@@ -4057,6 +4077,63 @@
     document.getElementById('new-email-name').value = '';
     document.getElementById('email-add-form').removeAttribute('open');
     loadEmailAccounts();
+  }
+
+  let _historyAll = [];
+  let _historyN = 100;
+
+  async function loadHistory() {
+    _historyN = 100;
+    try {
+      const r = await fetch(`/api/history?n=${_historyN}`);
+      _historyAll = await r.json();
+    } catch(e) {
+      _historyAll = [];
+    }
+    renderHistory();
+    const btn = document.getElementById('history-more-btn');
+    if (btn) btn.style.display = _historyAll.length >= _historyN ? 'inline-block' : 'none';
+  }
+
+  function renderHistory() {
+    const q = (document.getElementById('history-search')?.value || '').toLowerCase();
+    const list = document.getElementById('history-list');
+    if (!list) return;
+    const items = q
+      ? _historyAll.filter(m => (m.content || '').toLowerCase().includes(q) || (m.role || '').toLowerCase().includes(q))
+      : _historyAll;
+    if (!items.length) {
+      list.innerHTML = '<div style="color:#555;font-size:0.75rem;padding:10px 12px">No messages.</div>';
+      return;
+    }
+    list.innerHTML = items.map((m, i) => {
+      const isUser = m.role === 'user';
+      const color = isUser ? '#4fc3f7' : '#81c784';
+      const label = isUser ? 'User' : 'Plia';
+      const ts = m.ts ? new Date(m.ts).toLocaleString() : '';
+      const content = _esc(m.content || '');
+      const preview = content.length > 120 ? content.slice(0, 120) + '…' : content;
+      return `<div style="border-bottom:1px solid #1a1a1a;padding:6px 10px;cursor:pointer"
+                onclick="this.querySelector('.h-full').style.display=this.querySelector('.h-full').style.display==='none'?'block':'none'">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
+          <span style="color:${color};font-size:0.72rem;font-weight:600">${label}</span>
+          <span style="color:#444;font-size:0.68rem">${ts}</span>
+        </div>
+        <div class="h-preview" style="color:#bbb;white-space:pre-wrap;word-break:break-word">${preview}</div>
+        <div class="h-full" style="display:none;color:#ccc;white-space:pre-wrap;word-break:break-word;margin-top:4px">${content}</div>
+      </div>`;
+    }).join('');
+  }
+
+  async function loadMoreHistory() {
+    _historyN += 100;
+    try {
+      const r = await fetch(`/api/history?n=${_historyN}`);
+      _historyAll = await r.json();
+    } catch(e) { return; }
+    renderHistory();
+    const btn = document.getElementById('history-more-btn');
+    if (btn) btn.style.display = _historyAll.length >= _historyN ? 'inline-block' : 'none';
   }
 </script>
 
