@@ -4007,15 +4007,18 @@
             </div>
           </div>
           <div style="font-size:0.72rem;color:#888;margin-bottom:4px;">${_esc(acc.provider||'—')} · ${_esc(acc.username||'—')}</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
             <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;color:#aaa;cursor:pointer;">
               <input type="checkbox" ${acc.briefing_enabled ? 'checked' : ''} onchange="emailSetBriefing('${n}', this.checked)">
               Briefing
             </label>
             ${acc.provider === 'gmail' ? `<button onclick="emailConnectGmail('${n}')"
               style="background:#1565c0;border:none;color:#eee;padding:2px 8px;border-radius:3px;font-size:0.7rem;cursor:pointer;">Connect</button>` : ''}
+            <button onclick="emailTestAccount('${n}')" id="email-test-btn-${n}"
+              style="background:none;border:1px solid #444;color:#aaa;padding:1px 7px;border-radius:3px;font-size:0.7rem;cursor:pointer;">Test</button>
           </div>
-          ${acc.provider === 'gmail' ? `<div id="gmail-status-${n}" style="font-size:0.7rem;color:#888;min-height:1em;margin-bottom:4px;word-break:break-word;"></div>` : '<div style="margin-bottom:4px;"></div>'}
+          <div id="email-test-status-${n}" style="font-size:0.7rem;min-height:1em;margin-bottom:2px;"></div>
+          ${acc.provider === 'gmail' ? `<div id="gmail-status-${n}" style="font-size:0.7rem;color:#888;min-height:1em;margin-bottom:4px;word-break:break-word;"></div>` : '<div style="margin-bottom:2px;"></div>'}
           <!-- inline edit form -->
           <div id="${editId}" style="display:none;border-top:1px solid #2a2a2a;padding-top:8px;margin-top:4px;">
             ${imapFields}
@@ -4085,7 +4088,27 @@
       if (statusEl) { statusEl.textContent = e.detail || 'Save failed.'; statusEl.style.color = '#ef9a9a'; }
       return;
     }
-    loadEmailAccounts();
+    if (statusEl) { statusEl.textContent = 'Saved.'; statusEl.style.color = '#a5d6a7'; }
+    setTimeout(() => loadEmailAccounts(), 600);
+  }
+
+  async function emailTestAccount(name) {
+    const btn = document.getElementById(`email-test-btn-${name}`);
+    const statusEl = document.getElementById(`email-test-status-${name}`);
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    if (statusEl) { statusEl.textContent = 'Testing…'; statusEl.style.color = '#888'; }
+    try {
+      const r = await fetch(`/api/email/accounts/${encodeURIComponent(name)}/test`, {method: 'POST'});
+      const d = await r.json();
+      if (statusEl) {
+        statusEl.textContent = d.message;
+        statusEl.style.color = d.ok ? '#a5d6a7' : '#ef9a9a';
+      }
+    } catch (e) {
+      if (statusEl) { statusEl.textContent = 'Request failed.'; statusEl.style.color = '#ef9a9a'; }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Test'; }
+    }
   }
 
   async function emailRemoveAccount(name) {
@@ -4167,7 +4190,10 @@
       statusEl.textContent = e.detail || 'Error adding account.'; statusEl.style.color = '#ef9a9a'; return;
     }
     statusEl.textContent = `Added "${name}".`; statusEl.style.color = '#a5d6a7';
-    document.getElementById('new-email-name').value = '';
+    ['new-email-name','new-email-imap-host','new-email-smtp-host',
+     'new-email-username','new-email-password','new-email-gmail-username','new-email-creds-file']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('new-email-briefing').checked = false;
     document.getElementById('email-add-form').removeAttribute('open');
     loadEmailAccounts();
   }

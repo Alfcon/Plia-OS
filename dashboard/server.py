@@ -593,6 +593,26 @@ async def email_account_callback(name: str, request: Request, code: str = "", st
     )
 
 
+@router.post("/api/email/accounts/{name}/test")
+async def email_account_test(name: str):
+    from agents.email_store import get_account
+    from agents.email_client import imap_connection
+    acc = await asyncio.to_thread(get_account, name)
+    if acc is None:
+        raise HTTPException(status_code=404, detail="account not found")
+    def _test():
+        with imap_connection(acc) as mb:
+            count = mb.folder.status("INBOX").get("UNSEEN", 0)
+            return count
+    try:
+        unread = await asyncio.wait_for(asyncio.to_thread(_test), timeout=15.0)
+        return {"ok": True, "message": f"Connected. {unread} unread."}
+    except asyncio.TimeoutError:
+        return {"ok": False, "message": "Connection timed out."}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}
+
+
 @router.get("/api/email/accounts/{name}/status")
 async def email_account_status(name: str):
     from agents.email_store import get_account
