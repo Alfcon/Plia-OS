@@ -8,7 +8,7 @@ A local AI voice assistant with a web dashboard and a multi-agent backend.
 2. **STT** — faster-whisper transcribes speech to text
 3. **Agents** — a LangGraph supervisor routes the request to specialist agents
 4. **TTS** — Kokoro, Chatterbox, or Dramabox speaks the response
-5. **Dashboard** — full-width top bar with system metrics, menu-based settings, persistent chat history
+5. **Dashboard** — full-width top bar with system metrics, media controls, menu-based settings, persistent chat history
 
 ## Requirements
 
@@ -57,28 +57,47 @@ Dashboard at `http://localhost:8000`. Voice pipeline starts automatically; dashb
 
 | Area | What's there |
 |------|-------------|
-| Top bar | Status badge, OS, CPU %, RAM, VRAM bar (clickable), Disk |
-| Chat pane | Persistent conversation history, text input (Enter to send) |
+| Top bar | Status badge, OS, CPU %, RAM, VRAM bar (clickable), Disk, **media player** (track, ⏮▶⏭, volume) |
+| Chat pane | Persistent conversation history, text input (Enter to send, Shift+Enter for newline) |
 | ☰ Menu → Voice | TTS engine, STT model, wake word, voice cloning, clip generation |
-| ☰ Menu → LLM | Ollama model, AirLLM, compression, fallback cloud provider |
+| ☰ Menu → LLM | Ollama model, AirLLM model picker + VRAM estimate, compression, fallback cloud provider, system prompt |
 | ☰ Menu → Web | Web search provider and Google API keys |
 | ☰ Menu → Agents | Live agent routing badges and log |
-| ☰ Menu → System | CPU/RAM/GPU stats, tool modules list |
+| ☰ Menu → System | CPU/RAM/GPU stats, pipeline start/stop, config export/import, tool modules list |
 | ☰ Menu → Reminders | Pending reminders and timers |
 | ☰ Menu → Calendar | Upcoming events, Google Calendar link |
-| ☰ Menu → Memory | Stored facts viewer and search |
+| ☰ Menu → Memory | Stored facts viewer, search, notes |
 | ☰ Menu → History | Conversation history viewer with search and expand |
 | ☰ Menu → Modules | Enable/disable tool modules |
 | ☰ Menu → MCP | Model Context Protocol server config |
 | ☰ Menu → Home | Home Assistant entity list and toggles |
-| ☰ Menu → Permissions | Per-tool execution approval settings |
-| ☰ Menu → Network | MAC randomisation, Tor routing |
-| ☰ Menu → Cron | Scheduled proactive tasks |
+| ☰ Menu → Permissions | Per-tool execution approval, tool guard list |
+| ☰ Menu → News | DDG news search by topic, RSS feed reader |
+| ☰ Menu → Network | Tor toggle, WiFi scan (signal/security/channel), MAC randomise/restore |
+| ☰ Menu → Cron | Scheduled tasks with presets, next-run display, `tool:` invocation |
 | ☰ Menu → Tokens | LLM token usage and cost tracking |
-| ☰ Menu → Email | IMAP account management, connection test |
+| ☰ Menu → Briefing | Morning briefing config: section toggles, time, preview button |
+| ☰ Menu → Docs | Document index: index directories, search chunks, manage sources |
+| ☰ Menu → Email | IMAP account management, Gmail OAuth, connection test |
 | ☰ Menu → Observer | Live app tracker, focus timeline, activity profile |
 | ☰ Menu → Proactive | Proactive assistant enable/disable, quiet hours |
+| 🔧 Tools | Run any registered tool directly with auto-generated param inputs and full output |
 | ☰ Exit | Graceful shutdown via SIGTERM |
+| `?` key | Keyboard shortcuts overlay |
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `/` | Focus chat input |
+| `Enter` | Send message |
+| `Shift+Enter` | New line in message |
+| `Ctrl+K` | Open Tools panel |
+| `Ctrl+,` | Open Settings panel |
+| `Esc` | Close open panel |
+| `Enter` | Allow tool call (tool guard modal) |
+| `Esc` | Deny tool call (tool guard modal) |
+| `?` | Keyboard shortcuts overlay |
 
 ## Agents
 
@@ -112,6 +131,14 @@ All conversations persist to `data/chat_history.db` (SQLite). Loaded on every pa
 
 The `set_reminder` tool (available to the LLM) persists reminders to SQLite. A background loop polls every 30 seconds and fires overdue reminders as dashboard notifications via the WebSocket. Reminders survive restarts.
 
+## Cron
+
+Recurring scheduled tasks stored in `~/.plia/cron.db`. Messages can be plain text (announced via TTS) or `tool:tool_name` to invoke any registered tool directly. Dashboard shows next-run time relative to now. Expression presets available (Daily 8am, Weekdays 8am, Hourly, etc.).
+
+## Document Index
+
+`index_documents(directory, glob)` chunks files and stores embeddings in ChromaDB at `~/.plia/doc_index`. Supports `.txt`, `.md`, `.pdf`, `.docx`, `.json`, `.yaml`, `.csv`. Search via `query_documents(query)`. Manage indexed sources from ☰ Menu → Docs.
+
 ## Observer
 
 When enabled, tracks foreground app focus durations and (optionally) screen OCR and keystrokes. Data stored in `~/.plia/observer.db`. Dashboard shows live current app, top-apps bar chart, focus timeline, and an AI-generated activity profile.
@@ -120,9 +147,17 @@ When enabled, tracks foreground app focus durations and (optionally) screen OCR 
 
 IMAP accounts configured in the dashboard (☰ Menu → Email). Each account has a **Test** button to verify connectivity without fetching messages (uses the IMAP STATUS command — fast even on large inboxes). Used by the morning briefing to surface unread counts.
 
+## Morning Briefing
+
+`morning_briefing()` tool assembles a spoken briefing from configurable sections: weather, today's reminders, calendar events, email unread counts, and news headlines. Configure from ☰ Menu → Briefing: choose sections, set news topic, location, and daily schedule time. **Preview** button runs the briefing live in the panel.
+
 ## Proactive Assistant
 
 Background loop (configurable interval) that monitors memory, reminders, observer data, and email to surface proactive suggestions. Respects quiet hours. Managed via ☰ Menu → Proactive or `POST /api/proactive/enable`.
+
+## AirLLM
+
+Layer-by-layer inference for large models (~4 GB VRAM for 70B+). Configure from ☰ Menu → LLM → AirLLM: pick a HuggingFace model ID (autocomplete with 15 popular models), select compression (4bit/8bit/none), see live VRAM estimate, and apply. Unload button frees VRAM on demand.
 
 ## Configuration
 
@@ -143,6 +178,16 @@ All config in `core/config.py` as a `PliaConfig` dataclass, persisted to `~/.pli
 | `hass_token` | _(empty)_ | Home Assistant long-lived access token |
 | `gcal_credentials_file` | _(empty)_ | Path to Google OAuth credentials JSON |
 | `observer_enabled` | `false` | Enable activity observer |
+| `weather_location` | _(empty)_ | Default location for weather (e.g. `Berlin`) |
+| `briefing_news_topic` | `breaking news` | News topic for morning briefing |
+| `briefing_cron_enabled` | `false` | Auto-deliver briefing daily |
+| `briefing_cron_time` | `07:00` | Daily briefing time (HH:MM) |
+| `briefing_include_weather` | `true` | Include weather in briefing |
+| `briefing_include_reminders` | `true` | Include reminders in briefing |
+| `briefing_include_calendar` | `true` | Include calendar in briefing |
+| `briefing_include_email` | `true` | Include email counts in briefing |
+| `briefing_include_news` | `true` | Include news headlines in briefing |
+| `tool_guard_list` | `[]` | Tools requiring user approval before execution |
 | `memory_dir` | `~/.plia` | Memory DB, calendar ICS, and observer DB location |
 | `disabled_modules` | `[]` | Module filenames to skip at load |
 
@@ -162,7 +207,7 @@ Settings can be changed live from the dashboard without restarting.
 | POST | `/api/modules/{name}/disable` | Disable a module |
 | GET | `/api/tools` | Registered tools list |
 | GET | `/api/tools/schemas` | Full tool JSON schemas |
-| POST | `/api/tools/run` | Run a tool by name |
+| POST | `/api/tools/run` | Run a tool by name with params |
 | GET | `/api/permissions` | Per-tool permission settings |
 | POST | `/api/permissions/tools` | Update tool permissions |
 | GET | `/api/token-usage` | LLM token usage and cost |
@@ -209,7 +254,7 @@ Settings can be changed live from the dashboard without restarting.
 | DELETE | `/api/reminders/{id}` | Delete a reminder |
 | GET | `/api/timers` | List active timers |
 | DELETE | `/api/timers/{id}` | Delete a timer |
-| GET | `/api/cron` | List cron jobs |
+| GET | `/api/cron` | List cron jobs (includes `next_run`) |
 | POST | `/api/cron` | Create a cron job |
 | PATCH | `/api/cron/{name}` | Update a cron job |
 | DELETE | `/api/cron/{name}` | Delete a cron job |
@@ -224,6 +269,30 @@ Settings can be changed live from the dashboard without restarting.
 | POST | `/api/calendar/google/auth` | Start Google OAuth flow |
 | GET | `/api/calendar/google/callback` | Google OAuth callback |
 
+### Documents
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/documents/sources` | List indexed document sources |
+| POST | `/api/documents/index` | Index a directory (`{directory, glob}`) |
+| POST | `/api/documents/remove` | Remove a source (`{source}`) |
+| POST | `/api/documents/search` | Semantic search (`{query, n_results}`) |
+
+### News
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/news/search` | DDG news search (`{query, max_items}`) |
+| POST | `/api/news/rss` | Fetch and parse RSS feed (`{url, max_items}`) |
+
+### Media & Audio
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/media/status` | Now-playing track and playback state |
+| POST | `/api/media/{action}` | Transport control: `play`, `pause`, `next`, `previous`, `stop` |
+| GET | `/api/media/volume` | Current volume and mute state |
+| POST | `/api/media/volume` | Set volume (`{percent}`) |
+| POST | `/api/media/mute` | Mute audio |
+| POST | `/api/media/unmute` | Unmute audio |
+
 ### Email
 | Method | Path | Description |
 |--------|------|-------------|
@@ -235,6 +304,14 @@ Settings can be changed live from the dashboard without restarting.
 | GET | `/api/email/accounts/{name}/callback` | Gmail OAuth callback |
 | GET | `/api/email/accounts/{name}/status` | Gmail OAuth status |
 
+### Network
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/network/wifi` | WiFi scan + current connection |
+| GET | `/api/network/mac` | List network interface MACs |
+| POST | `/api/network/mac/randomize` | Randomize MAC address |
+| POST | `/api/network/mac/restore` | Restore original MAC address |
+
 ### Home Assistant & VRAM
 | Method | Path | Description |
 |--------|------|-------------|
@@ -242,6 +319,12 @@ Settings can be changed live from the dashboard without restarting.
 | POST | `/api/hass/toggle/{entity_id}` | Toggle entity |
 | GET | `/api/vram/status` | VRAM broker state |
 | POST | `/api/vram/release` | Release a loaded model |
+
+### AirLLM
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/airllm/status` | AirLLM load state and model ID |
+| POST | `/api/airllm/unload` | Unload AirLLM model from VRAM |
 
 ### System Prompt
 | Method | Path | Description |
@@ -296,4 +379,4 @@ pytest --tb=short -q          # terse output
 pytest tests/test_foo.py -v   # single file
 ```
 
-923 tests, all passing.
+935 tests, all passing.
