@@ -742,6 +742,7 @@
         <button class="m-nav-btn" data-section="observer" onclick="showMenuSection('observer');loadObserverStatus()">Observer</button>
         <button class="m-nav-btn" data-section="proactive" onclick="showMenuSection('proactive');loadProactiveStatus()">Proactive</button>
         <button class="m-nav-btn" data-section="files" onclick="showMenuSection('files');loadFileBrowser()">Files</button>
+        <button class="m-nav-btn" data-section="logs" onclick="showMenuSection('logs');loadLogs()">Logs</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1599,6 +1600,31 @@
               </button>
             </div>
           </div>
+        </div>
+
+        <div id="m-section-logs" class="m-pane" style="display:none;flex-direction:column;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-shrink:0;flex-wrap:wrap;">
+            <select id="log-level-filter" onchange="loadLogs()"
+              style="background:#1a1a1a;border:1px solid #333;color:#ccc;font-size:0.72rem;padding:3px 6px;border-radius:3px;cursor:pointer;">
+              <option value="DEBUG">All</option>
+              <option value="INFO">INFO+</option>
+              <option value="WARNING">WARNING+</option>
+              <option value="ERROR">ERROR+</option>
+            </select>
+            <input id="log-search" type="text" placeholder="Filter…"
+              oninput="_renderLogs()"
+              style="flex:1;min-width:80px;background:#111;border:1px solid #333;color:#ccc;border-radius:3px;padding:3px 7px;font-size:0.72rem;font-family:monospace;">
+            <label style="display:flex;align-items:center;gap:4px;font-size:0.7rem;color:#555;cursor:pointer;">
+              <input type="checkbox" id="log-autoscroll" checked style="cursor:pointer;"> Auto-scroll
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:0.7rem;color:#555;cursor:pointer;">
+              <input type="checkbox" id="log-autorefresh" onchange="_toggleLogAutoRefresh()" style="cursor:pointer;"> Live
+            </label>
+            <button onclick="loadLogs()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
+            <button onclick="clearLogs()" style="background:#2a0d0d;border:1px solid #5e1b1b;color:#ef5350;font-size:0.7rem;padding:3px 8px;border-radius:3px;cursor:pointer;">Clear</button>
+          </div>
+          <div id="log-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-family:monospace;font-size:0.7rem;"></div>
+          <div id="log-count" style="margin-top:4px;font-size:0.65rem;color:#444;flex-shrink:0;"></div>
         </div>
 
         <div id="m-section-files" class="m-pane" style="display:none;flex-direction:column;">
@@ -5031,6 +5057,67 @@
       return;
     }
   });
+
+  // ── System log viewer ────────────────────────────────────────────────────
+
+  let _logRecords = [];
+  let _logAutoRefreshTimer = null;
+
+  const _LOG_COLORS = {
+    DEBUG:    { fg: '#555',    bg: '' },
+    INFO:     { fg: '#ccc',    bg: '' },
+    WARNING:  { fg: '#ffd54f', bg: '#1a1600' },
+    ERROR:    { fg: '#ef5350', bg: '#1a0505' },
+    CRITICAL: { fg: '#ff1744', bg: '#200000' },
+  };
+
+  async function loadLogs() {
+    const level = document.getElementById('log-level-filter').value;
+    try {
+      const r = await fetch(`/api/logs?n=500&level=${level}`);
+      if (!r.ok) return;
+      const data = await r.json();
+      _logRecords = data.records;
+      _renderLogs();
+    } catch(e) {}
+  }
+
+  function _renderLogs() {
+    const q = (document.getElementById('log-search').value || '').toLowerCase();
+    const list = document.getElementById('log-list');
+    const records = q
+      ? _logRecords.filter(r => r.msg.toLowerCase().includes(q) || r.name.toLowerCase().includes(q))
+      : _logRecords;
+    list.innerHTML = records.map(r => {
+      const c = _LOG_COLORS[r.level] || _LOG_COLORS.INFO;
+      const ts = new Date(r.ts * 1000).toLocaleTimeString('en-GB', {hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      const badge = `<span style="display:inline-block;width:52px;text-align:right;flex-shrink:0;color:${c.fg};font-weight:600;">${_esc(r.level)}</span>`;
+      const name = `<span style="color:#444;flex-shrink:0;width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.name)}">${_esc(r.name)}</span>`;
+      const msg = `<span style="color:${c.fg};word-break:break-all;white-space:pre-wrap;">${_esc(r.msg)}</span>`;
+      return `<div style="display:flex;gap:6px;padding:2px 6px;border-bottom:1px solid #111;background:${c.bg};align-items:baseline;">
+        <span style="color:#333;flex-shrink:0;">${ts}</span>
+        ${badge}
+        ${name}
+        ${msg}
+      </div>`;
+    }).join('');
+    document.getElementById('log-count').textContent = `${records.length} records`;
+    if (document.getElementById('log-autoscroll').checked) {
+      list.scrollTop = list.scrollHeight;
+    }
+  }
+
+  function _toggleLogAutoRefresh() {
+    const on = document.getElementById('log-autorefresh').checked;
+    if (_logAutoRefreshTimer) { clearInterval(_logAutoRefreshTimer); _logAutoRefreshTimer = null; }
+    if (on) _logAutoRefreshTimer = setInterval(loadLogs, 2000);
+  }
+
+  async function clearLogs() {
+    await fetch('/api/logs/clear', {method:'POST'}).catch(()=>{});
+    _logRecords = [];
+    _renderLogs();
+  }
 
   // ── File browser ──────────────────────────────────────────────────────────
 

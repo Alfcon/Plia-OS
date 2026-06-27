@@ -3,6 +3,8 @@ import logging
 from contextlib import asynccontextmanager
 
 logging.basicConfig(level=logging.INFO, format="%(name)s: %(message)s")
+from core.log_buffer import install as _install_log_buffer
+_install_log_buffer()
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path

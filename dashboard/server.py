@@ -1495,6 +1495,26 @@ async def files_rename(body: dict):
     return {"ok": True}
 
 
+# ── Log buffer ────────────────────────────────────────────────────────────────
+
+_LEVEL_MAP = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
+
+
+@router.get("/api/logs")
+async def get_logs(n: int = 200, level: str = "DEBUG"):
+    from core.log_buffer import get_log_buffer
+    min_level = _LEVEL_MAP.get(level.upper(), 0)
+    records = await asyncio.to_thread(get_log_buffer().get, n, min_level)
+    return {"records": records}
+
+
+@router.post("/api/logs/clear")
+async def clear_logs():
+    from core.log_buffer import get_log_buffer
+    await asyncio.to_thread(get_log_buffer().clear)
+    return {"ok": True}
+
+
 @router.get("/api/token-usage")
 async def get_token_usage():
     from core.token_usage import get_stats
