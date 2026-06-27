@@ -732,6 +732,7 @@
         <button class="m-nav-btn" data-section="mcp" onclick="showMenuSection('mcp');loadMcpServers();loadMcpConfig()">MCP</button>
         <button class="m-nav-btn" data-section="home" onclick="showMenuSection('home');loadHassEntities()">Home</button>
         <button class="m-nav-btn" data-section="permissions" onclick="showMenuSection('permissions');loadPermissions()">Permissions</button>
+        <button class="m-nav-btn" data-section="news" onclick="showMenuSection('news')">News</button>
         <button class="m-nav-btn" data-section="network" onclick="showMenuSection('network');loadTorStatus();loadNetworkPanel()">Network</button>
         <button class="m-nav-btn" data-section="cron" onclick="showMenuSection('cron');loadCronJobs()">Cron</button>
         <button class="m-nav-btn" data-section="tokens" onclick="showMenuSection('tokens');loadTokenUsage()">Tokens</button>
@@ -1193,6 +1194,42 @@
               <button onclick="copyPermCmd()" style="background:#1a2e1a;border:1px solid #2e4d2e;color:#a5d6a7;padding:3px 10px;border-radius:3px;font-size:0.72rem;cursor:pointer;">Copy</button>
               <button onclick="document.getElementById('perm-cmd-modal').style.display='none'" style="background:none;border:1px solid #333;color:#666;padding:3px 8px;border-radius:3px;font-size:0.72rem;cursor:pointer;">Close</button>
             </div>
+          </div>
+        </div>
+
+        <!-- News pane -->
+        <div id="m-section-news" class="m-pane" style="display:none">
+          <div class="settings-section">
+            <h3 style="margin:0 0 10px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">News Search</h3>
+            <div style="display:flex;gap:5px;margin-bottom:6px;">
+              <input type="text" id="news-query" placeholder="Topic…"
+                style="flex:1;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;"
+                onkeydown="if(event.key==='Enter')newsSearch()">
+              <input type="number" id="news-max" value="8" min="1" max="20"
+                style="width:44px;padding:4px 5px;background:#1a1a1a;border:1px solid #333;color:#aaa;border-radius:4px;font-size:0.78rem;text-align:center;">
+              <button onclick="newsSearch()"
+                style="padding:4px 10px;background:#1a2a3a;border:1px solid #2a4a6a;border-radius:4px;color:#4fc3f7;font-size:0.78rem;cursor:pointer;">
+                Search
+              </button>
+            </div>
+            <div id="news-search-status" style="font-size:0.72rem;color:#666;min-height:1em;margin-bottom:4px;"></div>
+            <div id="news-search-results"></div>
+          </div>
+
+          <div class="settings-section">
+            <h3 style="margin:0 0 10px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">RSS Feed</h3>
+            <div style="display:flex;gap:5px;margin-bottom:6px;">
+              <input type="url" id="rss-url" placeholder="https://feeds.bbci.co.uk/news/rss.xml"
+                style="flex:1;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.75rem;"
+                onkeydown="if(event.key==='Enter')rssFetch()">
+              <button onclick="rssFetch()"
+                style="padding:4px 10px;background:#1a2a3a;border:1px solid #2a4a6a;border-radius:4px;color:#4fc3f7;font-size:0.78rem;cursor:pointer;">
+                Fetch
+              </button>
+            </div>
+            <div id="rss-status" style="font-size:0.72rem;color:#666;min-height:1em;margin-bottom:4px;"></div>
+            <div id="rss-feed-title" style="font-size:0.72rem;color:#555;margin-bottom:6px;"></div>
+            <div id="rss-results"></div>
           </div>
         </div>
 
@@ -4101,6 +4138,64 @@
       fetch('/api/stop-recording', { method: 'POST', keepalive: true });
     }
   });
+
+  function _newsCard(title, meta, url) {
+    const safeUrl = url ? url.replace(/'/g, '%27') : '';
+    return `<div style="border-bottom:1px solid #111;padding:5px 0;">
+      ${url
+        ? `<a href="${safeUrl}" target="_blank" rel="noopener" style="color:#ccc;font-size:0.75rem;text-decoration:none;line-height:1.4;display:block;">${_esc(title)}</a>`
+        : `<span style="color:#ccc;font-size:0.75rem;">${_esc(title)}</span>`}
+      <div style="font-size:0.65rem;color:#555;margin-top:2px;">${_esc(meta)}</div>
+    </div>`;
+  }
+
+  async function newsSearch() {
+    const q = document.getElementById('news-query').value.trim();
+    const max = parseInt(document.getElementById('news-max').value) || 8;
+    const status = document.getElementById('news-search-status');
+    const results = document.getElementById('news-search-results');
+    if (!q) return;
+    status.textContent = 'Searching…'; status.style.color = '#888';
+    results.innerHTML = '';
+    try {
+      const r = await fetch('/api/news/search', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({query: q, max_items: max}),
+      });
+      const d = await r.json();
+      if (!r.ok) { status.textContent = d.detail || 'Error'; status.style.color = '#ef9a9a'; return; }
+      status.textContent = `${d.items.length} result${d.items.length !== 1 ? 's' : ''}`;
+      status.style.color = '#555';
+      if (!d.items.length) { results.innerHTML = '<div style="color:#555;font-size:0.75rem;">No results.</div>'; return; }
+      results.innerHTML = d.items.map(i => _newsCard(i.title, `${i.date}  ${i.source}`, i.url)).join('');
+    } catch(e) { status.textContent = e.message; status.style.color = '#ef9a9a'; }
+  }
+
+  async function rssFetch() {
+    const url = document.getElementById('rss-url').value.trim();
+    const status = document.getElementById('rss-status');
+    const feedTitle = document.getElementById('rss-feed-title');
+    const results = document.getElementById('rss-results');
+    if (!url) return;
+    status.textContent = 'Fetching…'; status.style.color = '#888';
+    feedTitle.textContent = '';
+    results.innerHTML = '';
+    try {
+      const r = await fetch('/api/news/rss', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url, max_items: 15}),
+      });
+      const d = await r.json();
+      if (!r.ok) { status.textContent = d.detail || 'Error'; status.style.color = '#ef9a9a'; return; }
+      status.textContent = `${d.items.length} item${d.items.length !== 1 ? 's' : ''}`;
+      status.style.color = '#555';
+      feedTitle.textContent = d.feed_title || '';
+      feedTitle.style.color = '#4fc3f7';
+      results.innerHTML = d.items.map(i => _newsCard(i.title, i.published, i.link)).join('');
+    } catch(e) { status.textContent = e.message; status.style.color = '#ef9a9a'; }
+  }
 
   async function loadNetworkPanel() {
     // WiFi status

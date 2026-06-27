@@ -985,6 +985,55 @@ async def put_mcp_config(request: Request):
     return {"ok": True}
 
 
+@router.post("/api/news/search")
+async def news_search(body: dict):
+    query = body.get("query", "").strip()
+    max_items = max(1, min(int(body.get("max_items", 10)), 20))
+    if not query:
+        raise HTTPException(status_code=400, detail="'query' is required")
+    try:
+        from ddgs import DDGS
+    except ImportError:
+        try:
+            from duckduckgo_search import DDGS
+        except ImportError:
+            raise HTTPException(status_code=503, detail="ddgs not installed")
+    try:
+        results = await asyncio.to_thread(lambda: list(DDGS().news(query, max_results=max_items)))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    items = [
+        {"title": r.get("title", ""), "date": r.get("date", "")[:10],
+         "source": r.get("source", ""), "url": r.get("url", "")}
+        for r in results if r.get("title")
+    ]
+    return {"query": query, "items": items}
+
+
+@router.post("/api/news/rss")
+async def news_rss(body: dict):
+    url = body.get("url", "").strip()
+    max_items = max(1, min(int(body.get("max_items", 10)), 50))
+    if not url:
+        raise HTTPException(status_code=400, detail="'url' is required")
+    try:
+        import feedparser
+    except ImportError:
+        raise HTTPException(status_code=503, detail="feedparser not installed")
+    try:
+        feed = await asyncio.to_thread(feedparser.parse, url)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    feed_title = feed.feed.get("title", url)
+    entries = [
+        {"title": e.get("title", "(no title)"),
+         "published": e.get("published", "")[:16],
+         "link": e.get("link", "")}
+        for e in feed.entries[:max_items]
+    ]
+    return {"feed_title": feed_title, "url": url, "items": entries}
+
+
 # ── Tor / VPN ───────────────────────────────────────────────────────────────
 
 @router.get("/api/tor/status")
