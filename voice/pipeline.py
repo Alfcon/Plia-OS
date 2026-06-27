@@ -76,6 +76,15 @@ class VoicePipeline:
                     logger.info("Queued speak announcement: %s", message)
                 except asyncio.QueueFull:
                     logger.warning("Announcement queue full; dropping speak: %s", message)
+        elif payload.get("type") == "proactive_message":
+            if payload.get("voice", True):
+                message = payload.get("text") or ""
+                if message:
+                    try:
+                        self._announcement_queue.put_nowait(message)
+                        logger.info("Queued proactive announcement: %s", message)
+                    except asyncio.QueueFull:
+                        logger.warning("Announcement queue full; dropping proactive: %s", message)
 
     def _set_wake_mute(self, audio_out: np.ndarray) -> None:
         self._wake_muted_until = time.monotonic() + len(audio_out) / _TTS_SAMPLE_RATE + 4.0

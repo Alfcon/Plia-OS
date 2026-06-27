@@ -206,3 +206,25 @@ async def test_generate_message_returns_empty_on_error(pro):
     with patch('agents.llm.call_llm', side_effect=fail_llm):
         text = await pro._generate_message('checkin', {'trigger': 'checkin', 'app': 'code', 'window': 'x', 'profile': ''})
     assert text == ''
+
+
+@pytest.mark.asyncio
+async def test_pipeline_enqueues_proactive_voice():
+    import asyncio
+    from voice.pipeline import VoicePipeline
+    vp = VoicePipeline.__new__(VoicePipeline)
+    vp._announcement_queue = asyncio.Queue(maxsize=50)
+    await vp._on_event({'type': 'proactive_message', 'text': 'hello', 'voice': True})
+    assert not vp._announcement_queue.empty()
+    msg = vp._announcement_queue.get_nowait()
+    assert msg == 'hello'
+
+
+@pytest.mark.asyncio
+async def test_pipeline_skips_proactive_when_voice_false():
+    import asyncio
+    from voice.pipeline import VoicePipeline
+    vp = VoicePipeline.__new__(VoicePipeline)
+    vp._announcement_queue = asyncio.Queue(maxsize=50)
+    await vp._on_event({'type': 'proactive_message', 'text': 'hello', 'voice': False})
+    assert vp._announcement_queue.empty()

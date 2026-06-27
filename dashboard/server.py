@@ -1017,6 +1017,47 @@ async def post_observer_disable():
     return {"success": True, "message": "Observer disabled"}
 
 
+@router.get("/api/proactive/status")
+async def get_proactive_status():
+    import core.proactive as pro_mod
+    pro = pro_mod.get_proactive()
+    cfg = get_config()
+    return {
+        "enabled": cfg.proactive_enabled,
+        "running": pro.is_running(),
+        "last_message_ts": pro.last_message_ts(),
+        "last_trigger_type": pro.last_trigger_type(),
+        "quiet_hours_start": cfg.proactive_quiet_hours_start,
+        "quiet_hours_end": cfg.proactive_quiet_hours_end,
+        "distraction_threshold": cfg.proactive_distraction_threshold,
+        "checkin_interval": cfg.proactive_checkin_interval,
+    }
+
+
+@router.post("/api/proactive/enable")
+async def post_proactive_enable():
+    import core.proactive as pro_mod
+    import core.config as cfg_mod
+    pro = pro_mod.get_proactive()
+    if not pro.is_running():
+        asyncio.create_task(pro.start())
+    cfg_mod.update_config(proactive_enabled=True)
+    await events.emit("proactive_status", {"enabled": True, "running": True})
+    return {"success": True, "message": "Proactive assistant enabled"}
+
+
+@router.post("/api/proactive/disable")
+async def post_proactive_disable():
+    import core.proactive as pro_mod
+    import core.config as cfg_mod
+    pro = pro_mod.get_proactive()
+    if pro.is_running():
+        asyncio.create_task(pro.stop())
+    cfg_mod.update_config(proactive_enabled=False)
+    await events.emit("proactive_status", {"enabled": False, "running": False})
+    return {"success": True, "message": "Proactive assistant disabled"}
+
+
 @router.get("/api/token-usage")
 async def get_token_usage():
     from core.token_usage import get_stats
