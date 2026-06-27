@@ -124,12 +124,16 @@ async def test_message_sent_updates_state(pro):
 
 @pytest.mark.asyncio
 async def test_quiet_hours_suppresses_voice(pro):
-    pro._quiet_start = 0
-    pro._quiet_end = 23  # essentially always quiet
+    # quiet_start=0, quiet_end=23 → essentially always quiet
     emitted = []
     async def fake_emit(type_, payload):
         emitted.append(payload)
-    with patch('core.proactive.events.emit', side_effect=fake_emit):
+    with patch('core.proactive.get_config') as mock_cfg, \
+         patch('core.proactive.events.emit', side_effect=fake_emit):
+        mock_cfg.return_value = MagicMock(
+            proactive_quiet_hours_start=0,
+            proactive_quiet_hours_end=23,
+        )
         await pro._emit_message('hello', 'checkin')
     assert len(emitted) == 1
     assert emitted[0]['voice'] is False
@@ -138,32 +142,56 @@ async def test_quiet_hours_suppresses_voice(pro):
 
 @pytest.mark.asyncio
 async def test_non_quiet_hours_voice_on(pro):
-    pro._quiet_start = 0
-    pro._quiet_end = 0  # zero-length window, never quiet
+    # quiet_start=0, quiet_end=0 → zero-length window, never quiet
     emitted = []
     async def fake_emit(type_, payload):
         emitted.append(payload)
-    with patch('core.proactive.events.emit', side_effect=fake_emit):
+    with patch('core.proactive.get_config') as mock_cfg, \
+         patch('core.proactive.events.emit', side_effect=fake_emit):
+        mock_cfg.return_value = MagicMock(
+            proactive_quiet_hours_start=0,
+            proactive_quiet_hours_end=0,
+        )
         await pro._emit_message('hello', 'checkin')
     assert emitted[0]['voice'] is True
 
 
 @pytest.mark.asyncio
 async def test_midnight_wrap_quiet_hours(pro):
-    # quiet from 22:00 to 07:00
-    pro._quiet_start = 22
-    pro._quiet_end = 7
+    # quiet from 22:00 to 07:00; patch datetime.now to return hour=23 (inside quiet window)
     emitted = []
     async def fake_emit(type_, payload):
         emitted.append(payload)
-    # patch datetime.now to return hour=23 (inside quiet window)
     fake_now = MagicMock()
     fake_now.hour = 23
-    with patch('core.proactive.datetime') as mock_dt, \
+    with patch('core.proactive.get_config') as mock_cfg, \
+         patch('core.proactive.datetime') as mock_dt, \
          patch('core.proactive.events.emit', side_effect=fake_emit):
+        mock_cfg.return_value = MagicMock(
+            proactive_quiet_hours_start=22,
+            proactive_quiet_hours_end=7,
+        )
         mock_dt.now.return_value = fake_now
         await pro._emit_message('hello', 'checkin')
     assert emitted[0]['voice'] is False
+
+
+@pytest.mark.asyncio
+async def test_config_reload_on_check_once(pro):
+    """Changing proactive_distraction_threshold is reflected in the next _run_check_once()
+    without restarting the service (Finding 1 regression guard)."""
+    from core.config import update_config
+
+    assert pro._distraction_threshold == 20  # default
+
+    update_config(proactive_distraction_threshold=45)
+
+    # Observer not running → early return after instance-var reload
+    mock_obs = MagicMock(is_running=MagicMock(return_value=False))
+    with patch('core.proactive.get_observer', return_value=mock_obs):
+        await pro._run_check_once()
+
+    assert pro._distraction_threshold == 45
 
 
 @pytest.mark.asyncio

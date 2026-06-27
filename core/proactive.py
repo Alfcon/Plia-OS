@@ -75,6 +75,12 @@ class ProactiveService:
         if cfg.fallback_provider:
             return
 
+        self._check_interval = cfg.proactive_check_interval
+        self._distraction_threshold = cfg.proactive_distraction_threshold
+        self._checkin_interval = cfg.proactive_checkin_interval
+        self._quiet_start = cfg.proactive_quiet_hours_start
+        self._quiet_end = cfg.proactive_quiet_hours_end
+
         try:
             if not get_observer().is_running():
                 return
@@ -221,7 +227,10 @@ class ProactiveService:
             return ""
 
     async def _emit_message(self, text: str, trigger: str) -> None:
-        now_hour = datetime.now(timezone.utc).hour
+        cfg = get_config()
+        self._quiet_start = cfg.proactive_quiet_hours_start
+        self._quiet_end = cfg.proactive_quiet_hours_end
+        now_hour = datetime.now().hour
         qs, qe = self._quiet_start, self._quiet_end
         if qs <= qe:
             in_quiet = qs <= now_hour < qe
