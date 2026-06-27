@@ -9,6 +9,7 @@ from datetime import datetime
 from scipy.io import wavfile
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+import pathlib
 from pathlib import Path
 from core import events, registry, pipeline_registry
 from core.config import get_config, update_config, restore_system_prompt, reset_system_prompt_to_default
@@ -1387,6 +1388,111 @@ async def media_unmute():
         return {"muted": False}
     except FileNotFoundError:
         raise HTTPException(status_code=503, detail="wpctl not installed")
+
+
+# ── File browser ─────────────────────────────────────────────────────────────
+
+_MAX_READ_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
+def _safe_path(raw: str) -> str:
+    """Resolve and return absolute path; no traversal prevention — local assistant."""
+    return str(pathlib.Path(raw).expanduser().resolve())
+
+
+@router.get("/api/files")
+async def files_list(path: str = "~"):
+    import os, stat as _stat
+    p = _safe_path(path)
+    if not os.path.isdir(p):
+        raise HTTPException(status_code=404, detail="Not a directory")
+    entries = []
+    try:
+        for name in os.listdir(p):
+            full = os.path.join(p, name)
+            try:
+                st = os.stat(full)
+                entries.append({
+                    "name": name,
+                    "type": "dir" if _stat.S_ISDIR(st.st_mode) else "file",
+                    "size": st.st_size,
+                    "modified": int(st.st_mtime),
+                })
+            except OSError:
+                pass
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    entries.sort(key=lambda e: (0 if e["type"] == "dir" else 1, e["name"].lower()))
+    parent = str(pathlib.Path(p).parent) if p != "/" else None
+    return {"path": p, "parent": parent, "entries": entries}
+
+
+@router.get("/api/files/read")
+async def files_read(path: str):
+    import os
+    p = _safe_path(path)
+    if not os.path.isfile(p):
+        raise HTTPException(status_code=404, detail="Not a file")
+    size = os.path.getsize(p)
+    if size > _MAX_READ_BYTES:
+        raise HTTPException(status_code=413, detail=f"File too large ({size} bytes)")
+    raw = await asyncio.to_thread(pathlib.Path(p).read_bytes)
+    try:
+        content = raw.decode("utf-8")
+        binary = False
+    except UnicodeDecodeError:
+        content = ""
+        binary = True
+    return {"path": p, "content": content, "size": size, "binary": binary}
+
+
+@router.post("/api/files/write")
+async def files_write(body: dict):
+    path = body.get("path", "")
+    content = body.get("content", "")
+    if not path:
+        raise HTTPException(status_code=400, detail="path required")
+    p = pathlib.Path(_safe_path(path))
+    p.parent.mkdir(parents=True, exist_ok=True)
+    await asyncio.to_thread(p.write_text, content, encoding="utf-8")
+    return {"ok": True, "path": str(p)}
+
+
+@router.delete("/api/files")
+async def files_delete(path: str):
+    import os, shutil
+    p = _safe_path(path)
+    if not os.path.exists(p):
+        raise HTTPException(status_code=404, detail="Not found")
+    if os.path.isdir(p):
+        await asyncio.to_thread(shutil.rmtree, p)
+    else:
+        await asyncio.to_thread(os.remove, p)
+    return {"ok": True}
+
+
+@router.post("/api/files/mkdir")
+async def files_mkdir(body: dict):
+    path = body.get("path", "")
+    if not path:
+        raise HTTPException(status_code=400, detail="path required")
+    p = pathlib.Path(_safe_path(path))
+    await asyncio.to_thread(p.mkdir, parents=True, exist_ok=True)
+    return {"ok": True, "path": str(p)}
+
+
+@router.post("/api/files/rename")
+async def files_rename(body: dict):
+    src = body.get("from", "")
+    dst = body.get("to", "")
+    if not src or not dst:
+        raise HTTPException(status_code=400, detail="from and to required")
+    ps = pathlib.Path(_safe_path(src))
+    pd = pathlib.Path(_safe_path(dst))
+    if not ps.exists():
+        raise HTTPException(status_code=404, detail="Source not found")
+    await asyncio.to_thread(ps.rename, pd)
+    return {"ok": True}
 
 
 @router.get("/api/token-usage")

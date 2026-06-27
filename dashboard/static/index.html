@@ -741,6 +741,7 @@
         <button class="m-nav-btn" data-section="email" onclick="showMenuSection('email');loadEmailAccounts()">Email</button>
         <button class="m-nav-btn" data-section="observer" onclick="showMenuSection('observer');loadObserverStatus()">Observer</button>
         <button class="m-nav-btn" data-section="proactive" onclick="showMenuSection('proactive');loadProactiveStatus()">Proactive</button>
+        <button class="m-nav-btn" data-section="files" onclick="showMenuSection('files');loadFileBrowser()">Files</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1596,6 +1597,28 @@
                 style="display:none;background:#1a1a1a;border:1px solid #333;color:#888;font-size:11px;padding:4px 14px;border-radius:3px;cursor:pointer">
                 Load more
               </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="m-section-files" class="m-pane" style="display:none;flex-direction:column;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-shrink:0;">
+            <span id="fb-breadcrumb" style="font-size:0.75rem;color:#888;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;"></span>
+            <button onclick="fbNewFile()" title="New file" style="background:#1a2a1a;border:1px solid #2e5e2e;color:#81c784;font-size:0.7rem;padding:3px 8px;border-radius:3px;cursor:pointer;">+ File</button>
+            <button onclick="fbNewFolder()" title="New folder" style="background:#1a2a1a;border:1px solid #2e5e2e;color:#81c784;font-size:0.7rem;padding:3px 8px;border-radius:3px;cursor:pointer;">+ Dir</button>
+            <button onclick="loadFileBrowser(_fbCwd)" title="Refresh" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
+          </div>
+          <div style="display:flex;gap:8px;flex:1;min-height:0;overflow:hidden;">
+            <div id="fb-list" style="width:42%;min-width:0;overflow-y:auto;border:1px solid #222;border-radius:3px;font-size:0.75rem;font-family:monospace;"></div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;">
+              <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                <span id="fb-filename" style="font-size:0.72rem;color:#888;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;">(no file selected)</span>
+                <button onclick="fbSave()" id="fb-save-btn" disabled style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.7rem;padding:3px 8px;border-radius:3px;cursor:pointer;">Save</button>
+                <button onclick="fbRename()" id="fb-rename-btn" disabled style="background:#1a1a0d;border:1px solid #3e3800;color:#ffd54f;font-size:0.7rem;padding:3px 8px;border-radius:3px;cursor:pointer;">Rename</button>
+                <button onclick="fbDelete()" id="fb-delete-btn" disabled style="background:#2a0d0d;border:1px solid #5e1b1b;color:#ef5350;font-size:0.7rem;padding:3px 8px;border-radius:3px;cursor:pointer;">Delete</button>
+              </div>
+              <textarea id="fb-editor" placeholder="Select a file to view or edit…"
+                style="flex:1;min-height:0;background:#0d0d0d;border:1px solid #222;color:#e0e0e0;font-family:monospace;font-size:0.75rem;padding:6px 8px;border-radius:3px;resize:none;white-space:pre;overflow-wrap:normal;overflow-x:auto;"></textarea>
             </div>
           </div>
         </div>
@@ -5008,6 +5031,172 @@
       return;
     }
   });
+
+  // ── File browser ──────────────────────────────────────────────────────────
+
+  let _fbCwd = '~';
+  let _fbSelectedPath = null;
+  let _fbDirty = false;
+
+  async function loadFileBrowser(path) {
+    path = path || _fbCwd;
+    let data;
+    try {
+      const r = await fetch('/api/files?' + new URLSearchParams({path}));
+      if (!r.ok) { const e = await r.json(); fbStatus(e.detail || 'Error'); return; }
+      data = await r.json();
+    } catch(e) { fbStatus('Network error'); return; }
+    _fbCwd = data.path;
+    document.getElementById('fb-breadcrumb').textContent = _fbCwd;
+    const list = document.getElementById('fb-list');
+    let html = '';
+    if (data.parent) {
+      html += `<div class="fb-entry fb-dir" onclick="loadFileBrowser(${JSON.stringify(data.parent)})"
+        style="padding:4px 8px;cursor:pointer;border-bottom:1px solid #111;color:#4fc3f7;">
+        📁 ..</div>`;
+    }
+    for (const e of data.entries) {
+      const full = _fbCwd.replace(/\/$/, '') + '/' + e.name;
+      if (e.type === 'dir') {
+        html += `<div class="fb-entry fb-dir" onclick="loadFileBrowser(${JSON.stringify(full)})"
+          style="padding:4px 8px;cursor:pointer;border-bottom:1px solid #111;color:#90caf9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+          title="${_esc(full)}">📁 ${_esc(e.name)}</div>`;
+      } else {
+        const sz = e.size > 1048576 ? (e.size/1048576).toFixed(1)+'M'
+                 : e.size > 1024 ? (e.size/1024).toFixed(1)+'K'
+                 : e.size+'B';
+        html += `<div class="fb-entry fb-file" data-path="${_esc(full)}"
+          onclick="fbOpenFile(${JSON.stringify(full)})"
+          style="padding:4px 8px;cursor:pointer;border-bottom:1px solid #111;color:#e0e0e0;display:flex;gap:4px;align-items:baseline;"
+          title="${_esc(full)}">
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📄 ${_esc(e.name)}</span>
+          <span style="color:#444;font-size:0.65rem;flex-shrink:0;">${sz}</span>
+        </div>`;
+      }
+    }
+    if (!html) html = '<div style="padding:8px;color:#444;font-size:0.75rem;">Empty directory</div>';
+    list.innerHTML = html;
+    _fbHighlight();
+  }
+
+  function _fbHighlight() {
+    document.querySelectorAll('#fb-list .fb-file').forEach(el => {
+      el.style.background = el.dataset.path === _fbSelectedPath ? '#0d2a1a' : '';
+      el.style.color = el.dataset.path === _fbSelectedPath ? '#81c784' : '#e0e0e0';
+    });
+  }
+
+  async function fbOpenFile(path) {
+    if (_fbDirty && !confirm('Discard unsaved changes?')) return;
+    let data;
+    try {
+      const r = await fetch('/api/files/read?' + new URLSearchParams({path}));
+      if (!r.ok) { const e = await r.json(); fbStatus(e.detail || 'Error'); return; }
+      data = await r.json();
+    } catch(e) { fbStatus('Network error'); return; }
+    _fbSelectedPath = path;
+    _fbDirty = false;
+    document.getElementById('fb-filename').textContent = path;
+    const ed = document.getElementById('fb-editor');
+    if (data.binary) {
+      ed.value = '(binary file — cannot display)';
+      ed.disabled = true;
+    } else {
+      ed.value = data.content;
+      ed.disabled = false;
+    }
+    ['fb-save-btn','fb-rename-btn','fb-delete-btn'].forEach(id => {
+      document.getElementById(id).disabled = false;
+    });
+    ed.oninput = () => { _fbDirty = true; };
+    _fbHighlight();
+  }
+
+  async function fbSave() {
+    if (!_fbSelectedPath) return;
+    const content = document.getElementById('fb-editor').value;
+    try {
+      const r = await fetch('/api/files/write', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({path: _fbSelectedPath, content}),
+      });
+      if (!r.ok) { const e = await r.json(); fbStatus(e.detail || 'Save failed'); return; }
+      _fbDirty = false;
+      fbStatus('Saved.');
+    } catch(e) { fbStatus('Network error'); }
+  }
+
+  async function fbDelete() {
+    if (!_fbSelectedPath) return;
+    if (!confirm(`Delete ${_fbSelectedPath}?`)) return;
+    try {
+      const r = await fetch('/api/files?' + new URLSearchParams({path: _fbSelectedPath}), {method:'DELETE'});
+      if (!r.ok) { const e = await r.json(); fbStatus(e.detail || 'Delete failed'); return; }
+    } catch(e) { fbStatus('Network error'); return; }
+    _fbSelectedPath = null;
+    _fbDirty = false;
+    document.getElementById('fb-filename').textContent = '(no file selected)';
+    document.getElementById('fb-editor').value = '';
+    document.getElementById('fb-editor').disabled = false;
+    ['fb-save-btn','fb-rename-btn','fb-delete-btn'].forEach(id => {
+      document.getElementById(id).disabled = true;
+    });
+    loadFileBrowser(_fbCwd);
+  }
+
+  async function fbRename() {
+    if (!_fbSelectedPath) return;
+    const newName = prompt('New name (or full path):', _fbSelectedPath.split('/').pop());
+    if (!newName || newName === _fbSelectedPath.split('/').pop()) return;
+    const dir = _fbSelectedPath.split('/').slice(0,-1).join('/');
+    const newPath = dir + '/' + newName;
+    try {
+      const r = await fetch('/api/files/rename', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({from: _fbSelectedPath, to: newPath}),
+      });
+      if (!r.ok) { const e = await r.json(); fbStatus(e.detail || 'Rename failed'); return; }
+    } catch(e) { fbStatus('Network error'); return; }
+    _fbSelectedPath = newPath;
+    document.getElementById('fb-filename').textContent = newPath;
+    loadFileBrowser(_fbCwd);
+  }
+
+  async function fbNewFile() {
+    const name = prompt('File name:');
+    if (!name) return;
+    const path = _fbCwd.replace(/\/$/, '') + '/' + name;
+    try {
+      const r = await fetch('/api/files/write', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({path, content: ''}),
+      });
+      if (!r.ok) { const e = await r.json(); fbStatus(e.detail || 'Failed'); return; }
+    } catch(e) { fbStatus('Network error'); return; }
+    await loadFileBrowser(_fbCwd);
+    fbOpenFile(path);
+  }
+
+  async function fbNewFolder() {
+    const name = prompt('Folder name:');
+    if (!name) return;
+    const path = _fbCwd.replace(/\/$/, '') + '/' + name;
+    try {
+      const r = await fetch('/api/files/mkdir', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({path}),
+      });
+      if (!r.ok) { const e = await r.json(); fbStatus(e.detail || 'Failed'); return; }
+    } catch(e) { fbStatus('Network error'); return; }
+    loadFileBrowser(_fbCwd);
+  }
+
+  function fbStatus(msg) {
+    document.getElementById('fb-filename').textContent = msg;
+    setTimeout(() => {
+      if (_fbSelectedPath) document.getElementById('fb-filename').textContent = _fbSelectedPath;
+    }, 2500);
+  }
 </script>
 
 <!-- Keyboard shortcuts overlay -->
