@@ -724,6 +724,7 @@
         <button class="m-nav-btn" data-section="cron" onclick="showMenuSection('cron');loadCronJobs()">Cron</button>
         <button class="m-nav-btn" data-section="tokens" onclick="showMenuSection('tokens');loadTokenUsage()">Tokens</button>
         <button class="m-nav-btn" data-section="briefing" onclick="showMenuSection('briefing')">Briefing</button>
+        <button class="m-nav-btn" data-section="docs" onclick="showMenuSection('docs');loadDocSources()">Docs</button>
         <button class="m-nav-btn" data-section="email" onclick="showMenuSection('email');loadEmailAccounts()">Email</button>
         <button class="m-nav-btn" data-section="observer" onclick="showMenuSection('observer');loadObserverStatus()">Observer</button>
         <button class="m-nav-btn" data-section="proactive" onclick="showMenuSection('proactive');loadProactiveStatus()">Proactive</button>
@@ -1239,6 +1240,47 @@
               <button onclick="loadTokenUsage()" style="padding:4px 12px;background:#1a1a1a;color:#888;border:1px solid #333;border-radius:3px;font-size:0.75rem;cursor:pointer">↻ Refresh</button>
               <button onclick="resetTokenUsage()" style="padding:4px 12px;background:#1a1a1a;color:#ef9a9a;border:1px solid #444;border-radius:3px;font-size:0.75rem;cursor:pointer">Reset</button>
             </div>
+          </div>
+        </div>
+
+        <!-- Docs -->
+        <div id="m-section-docs" class="m-pane" style="display:none">
+          <div class="settings-section">
+            <h3 style="margin:0 0 10px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">Document Index</h3>
+            <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:4px;">Directory</label>
+            <input type="text" id="doc-index-dir" placeholder="e.g. ~/Documents"
+              style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:6px;">
+            <label style="display:block;font-size:0.78rem;color:#999;margin-bottom:4px;">Glob</label>
+            <input type="text" id="doc-index-glob" placeholder="**/*.txt  or  **/*.{txt,md,pdf}"
+              style="width:100%;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;box-sizing:border-box;margin-bottom:8px;">
+            <div style="display:flex;gap:5px;margin-bottom:4px;">
+              <button onclick="docIndexDir()"
+                style="flex:1;padding:5px;background:#1a2a3a;border:1px solid #2a4a6a;border-radius:4px;color:#4fc3f7;font-size:0.78rem;cursor:pointer;">
+                ↑ Index
+              </button>
+              <button onclick="loadDocSources()"
+                style="padding:5px 10px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:4px;color:#888;font-size:0.78rem;cursor:pointer;">
+                ↻
+              </button>
+            </div>
+            <div id="doc-index-status" style="font-size:0.72rem;color:#666;min-height:1.2em;margin-bottom:10px;"></div>
+
+            <div style="font-size:0.78rem;color:#aaa;margin-bottom:6px;">Indexed sources</div>
+            <div id="doc-sources-list" style="font-size:0.75rem;color:#888;margin-bottom:12px;">Loading…</div>
+
+            <hr style="border-color:#222;margin:10px 0;">
+            <div style="font-size:0.78rem;color:#aaa;margin-bottom:6px;">Search</div>
+            <div style="display:flex;gap:5px;margin-bottom:6px;">
+              <input type="text" id="doc-search-query" placeholder="Search indexed documents…"
+                style="flex:1;padding:4px 6px;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:4px;font-size:0.78rem;"
+                onkeydown="if(event.key==='Enter')docSearch()">
+              <button onclick="docSearch()"
+                style="padding:4px 10px;background:#1a2a3a;border:1px solid #2a4a6a;border-radius:4px;color:#4fc3f7;font-size:0.78rem;cursor:pointer;">
+                Search
+              </button>
+            </div>
+            <div id="doc-search-status" style="font-size:0.72rem;color:#666;min-height:1em;margin-bottom:4px;"></div>
+            <div id="doc-search-results" style="font-size:0.72rem;color:#ccc;"></div>
           </div>
         </div>
 
@@ -3701,6 +3743,98 @@
         briefing_cron_time: document.getElementById('cfg-briefing-time').value || '07:00',
       }),
     });
+  }
+
+  async function loadDocSources() {
+    const el = document.getElementById('doc-sources-list');
+    try {
+      const r = await fetch('/api/documents/sources');
+      const d = await r.json();
+      const sources = d.sources || [];
+      if (!sources.length) {
+        el.textContent = 'No documents indexed yet.';
+        return;
+      }
+      el.innerHTML = sources.map(s => {
+        const name = s.split('/').pop();
+        const safe = s.replace(/'/g, "\\'");
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1a1a1a;">
+          <span title="${s}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;color:#ccc;">${name}</span>
+          <button onclick="docRemoveSource('${safe}')"
+            style="flex-shrink:0;margin-left:6px;background:none;border:none;color:#555;cursor:pointer;font-size:0.85rem;padding:0 2px;"
+            title="Remove ${s}">✕</button>
+        </div>`;
+      }).join('');
+    } catch(e) {
+      el.textContent = 'Error loading sources.';
+    }
+  }
+
+  async function docIndexDir() {
+    const dir = document.getElementById('doc-index-dir').value.trim();
+    const glob = document.getElementById('doc-index-glob').value.trim() || '**/*.txt';
+    const status = document.getElementById('doc-index-status');
+    if (!dir) { status.textContent = 'Directory required.'; status.style.color = '#ef9a9a'; return; }
+    status.textContent = 'Indexing…'; status.style.color = '#888';
+    try {
+      const r = await fetch('/api/documents/index', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({directory: dir, glob}),
+      });
+      const d = await r.json();
+      status.textContent = d.result || d.detail || 'Done.';
+      status.style.color = d.result && !d.detail ? '#81c784' : '#ef9a9a';
+      loadDocSources();
+    } catch(e) {
+      status.textContent = 'Error: ' + e.message;
+      status.style.color = '#ef9a9a';
+    }
+  }
+
+  async function docRemoveSource(source) {
+    const status = document.getElementById('doc-index-status');
+    status.textContent = 'Removing…'; status.style.color = '#888';
+    try {
+      const r = await fetch('/api/documents/remove', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({source}),
+      });
+      const d = await r.json();
+      status.textContent = `Removed ${d.removed} chunk(s).`;
+      status.style.color = '#81c784';
+      loadDocSources();
+    } catch(e) {
+      status.textContent = 'Error: ' + e.message;
+      status.style.color = '#ef9a9a';
+    }
+  }
+
+  async function docSearch() {
+    const query = document.getElementById('doc-search-query').value.trim();
+    const status = document.getElementById('doc-search-status');
+    const results = document.getElementById('doc-search-results');
+    if (!query) return;
+    status.textContent = 'Searching…'; status.style.color = '#888';
+    results.innerHTML = '';
+    try {
+      const r = await fetch('/api/documents/search', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({query, n_results: 5}),
+      });
+      const d = await r.json();
+      status.textContent = '';
+      const text = d.result || d.detail || '';
+      results.innerHTML = text.split('\n\n---\n\n').map(chunk => {
+        const esc = chunk.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return `<div style="background:#111;border:1px solid #222;border-radius:3px;padding:6px 8px;margin-bottom:6px;white-space:pre-wrap;line-height:1.5;">${esc}</div>`;
+      }).join('');
+    } catch(e) {
+      status.textContent = 'Error: ' + e.message;
+      status.style.color = '#ef9a9a';
+    }
   }
 
   function saveBriefingSection(key, val) {

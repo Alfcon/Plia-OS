@@ -1133,6 +1133,45 @@ async def post_proactive_disable():
     return {"success": True, "message": "Proactive assistant disabled"}
 
 
+@router.get("/api/documents/sources")
+async def list_document_sources():
+    from agents.document_store import get_document_store
+    sources = await asyncio.to_thread(get_document_store().list_sources)
+    return {"sources": sources}
+
+
+@router.post("/api/documents/index")
+async def index_documents_endpoint(body: dict):
+    from agents.document_store import get_document_store
+    directory = body.get("directory", "").strip()
+    glob = body.get("glob", "**/*.txt").strip() or "**/*.txt"
+    if not directory:
+        raise HTTPException(status_code=400, detail="'directory' is required")
+    result = await asyncio.to_thread(get_document_store().index_directory, directory, glob)
+    return {"result": result}
+
+
+@router.post("/api/documents/remove")
+async def remove_document_source(body: dict):
+    from agents.document_store import get_document_store
+    source = body.get("source", "").strip()
+    if not source:
+        raise HTTPException(status_code=400, detail="'source' is required")
+    n = await asyncio.to_thread(get_document_store().delete_source, source)
+    return {"removed": n}
+
+
+@router.post("/api/documents/search")
+async def search_documents(body: dict):
+    from agents.document_store import get_document_store
+    query = body.get("query", "").strip()
+    n_results = max(1, min(int(body.get("n_results", 5)), 20))
+    if not query:
+        raise HTTPException(status_code=400, detail="'query' is required")
+    result = await asyncio.to_thread(get_document_store().query, query, n_results)
+    return {"result": result}
+
+
 @router.get("/api/token-usage")
 async def get_token_usage():
     from core.token_usage import get_stats
