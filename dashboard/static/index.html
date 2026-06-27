@@ -698,6 +698,7 @@
 <div id="tools-panel">
   <div style="padding:10px 14px 6px;border-bottom:1px solid #1a1a1a;flex-shrink:0;">
     <div style="font-size:0.78rem;color:#ffd54f;margin-bottom:6px;">Run Tools</div>
+    <div id="tool-cat-chips" style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;"></div>
     <input id="tool-search" type="text" placeholder="Search tools…" oninput="filterTools(this.value)"
       style="width:100%;background:#1a1a1a;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:4px;padding:4px 6px;font-size:0.75rem;box-sizing:border-box;" />
   </div>
@@ -2601,8 +2602,56 @@
   // ---- Tools panel ----
   let _toolSchemas = [];
 
+  const _MODULE_CATEGORY = {
+    audio_tools: 'Voice & Media', media_tools: 'Voice & Media', pipeline_tools: 'Voice & Media',
+    weather_tools: 'Information', news_tools: 'Information', web_tools: 'Information', briefing_tools: 'Information',
+    file_tools: 'Files & Code', code_tools: 'Files & Code', screenshot_tools: 'Files & Code',
+    document_tools: 'Documents', document_index_tools: 'Documents',
+    calendar_tools: 'Productivity', reminder_tools: 'Productivity', cron_tools: 'Productivity', utility_tools: 'Productivity',
+    memory_tools: 'Memory & Notes',
+    email_tools: 'Email',
+    home_tools: 'Smart Home',
+    system_tools: 'System', observer_tools: 'System', proactive_tools: 'System',
+    tor_tools: 'Privacy & Network', network_tools: 'Privacy & Network', wireless_tools: 'Privacy & Network',
+  };
+
+  const _CAT_ORDER = [
+    'Voice & Media', 'Information', 'Files & Code', 'Documents',
+    'Productivity', 'Memory & Notes', 'Email', 'Smart Home',
+    'System', 'Privacy & Network',
+  ];
+
+  const _CAT_SHORT = {
+    '': 'All', 'Voice & Media': 'Voice', 'Information': 'Info',
+    'Files & Code': 'Files', 'Documents': 'Docs', 'Productivity': 'Schedule',
+    'Memory & Notes': 'Memory', 'Email': 'Email', 'Smart Home': 'Home',
+    'System': 'System', 'Privacy & Network': 'Network',
+  };
+
+  let _activeCat = '';
+
+  function filterToolCat(cat) {
+    _activeCat = cat;
+    document.querySelectorAll('.tool-cat-chip').forEach(el => {
+      const active = el.dataset.cat === cat;
+      el.style.background = active ? '#1565c0' : '#1a1a1a';
+      el.style.color = active ? '#e0e0e0' : '#666';
+      el.style.borderColor = active ? '#1976d2' : '#2a2a2a';
+    });
+    renderToolList(document.getElementById('tool-search').value.toLowerCase());
+  }
+
+  function renderCatChips() {
+    const chips = document.getElementById('tool-cat-chips');
+    chips.innerHTML = ['', ..._CAT_ORDER].map(cat =>
+      `<button class="tool-cat-chip" data-cat="${_esc(cat)}" onclick="filterToolCat('${_esc(cat)}')"
+        style="background:${cat === _activeCat ? '#1565c0' : '#1a1a1a'};color:${cat === _activeCat ? '#e0e0e0' : '#666'};border:1px solid ${cat === _activeCat ? '#1976d2' : '#2a2a2a'};border-radius:3px;padding:2px 7px;font-size:0.67rem;cursor:pointer;white-space:nowrap;"
+      >${_esc(_CAT_SHORT[cat] || cat)}</button>`
+    ).join('');
+  }
+
   async function loadToolPanel() {
-    if (_toolSchemas.length) { renderToolList(''); return; }
+    if (_toolSchemas.length) { renderCatChips(); renderToolList(''); return; }
     const [toolDict, schemaList, modules] = await Promise.all([
       fetch('/api/tools').then(r => r.json()).catch(() => ({})),
       fetch('/api/tools/schemas').then(r => r.json()).catch(() => []),
@@ -2615,6 +2664,7 @@
       schema: schemaMap[name] || null,
       module: (modules.find(m => m.tools.includes(name)) || {name: 'other'}).name,
     }));
+    renderCatChips();
     renderToolList('');
   }
 
@@ -2622,23 +2672,27 @@
 
   function renderToolList(q) {
     const list = document.getElementById('tool-list');
+    const toolLabel = n => n.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     const grouped = {};
     _toolSchemas.forEach(t => {
-      if (q && !t.name.toLowerCase().includes(q)) return;
-      (grouped[t.module] = grouped[t.module] || []).push(t);
+      const cat = _MODULE_CATEGORY[t.module] || 'Other';
+      if (_activeCat && cat !== _activeCat) return;
+      if (q && !t.name.toLowerCase().includes(q) && !toolLabel(t.name).toLowerCase().includes(q)) return;
+      (grouped[cat] = grouped[cat] || []).push(t);
     });
     if (!Object.keys(grouped).length) {
       list.innerHTML = '<div style="padding:8px 14px;color:#555;font-size:0.75rem;">No tools found.</div>';
       return;
     }
-    const label = n => n.replace(/_tools$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    list.innerHTML = Object.entries(grouped).map(([mod, tools], i) => {
+    const orderedCats = _CAT_ORDER.filter(c => grouped[c]);
+    Object.keys(grouped).forEach(c => { if (!orderedCats.includes(c)) orderedCats.push(c); });
+    list.innerHTML = orderedCats.map((cat, i) => {
       const id = `tcat-${i}`;
-      const rows = tools.map(t => `
+      const rows = grouped[cat].map(t => `
         <div id="tool-row-${_esc(t.name)}" style="border-bottom:1px solid #111;">
           <button onclick="toggleToolForm('${_esc(t.name)}')"
             style="width:100%;background:none;border:none;color:#ccc;font-family:monospace;font-size:0.73rem;padding:5px 14px 5px 22px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
-            <span>${_esc(t.name)}</span>
+            <span>${_esc(toolLabel(t.name))}</span>
             <span id="tool-chv-${_esc(t.name)}" style="color:#555;font-size:0.65rem;">▶</span>
           </button>
           <div id="tool-form-${_esc(t.name)}" style="display:none;padding:6px 14px 10px 22px;background:#0d0d0d;">
@@ -2653,7 +2707,7 @@
       return `<div>
         <button onclick="toggleToolCat('${id}')"
           style="width:100%;background:#0d0d0d;border:none;border-bottom:1px solid #1a1a1a;padding:5px 14px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:#4fc3f7;">${_esc(label(mod))}</span>
+          <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:#4fc3f7;">${_esc(cat)}</span>
           <span id="${id}-chv" style="color:#555;font-size:0.65rem;">▼</span>
         </button>
         <div id="${id}" style="display:none">${rows}</div>
@@ -2758,12 +2812,18 @@
       ? _toolRefData.filter(t => t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q))
       : _toolRefData;
     count.textContent = `${filtered.length} tool${filtered.length !== 1 ? 's' : ''}`;
-    const label = n => n.replace(/_tools$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const toolLabel = n => n.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     const grouped = {};
-    filtered.forEach(t => (grouped[t.module] = grouped[t.module] || []).push(t));
-    container.innerHTML = Object.entries(grouped).map(([mod, tools], i) => {
+    filtered.forEach(t => {
+      const cat = _MODULE_CATEGORY[t.module] || 'Other';
+      (grouped[cat] = grouped[cat] || []).push(t);
+    });
+    const orderedCats = _CAT_ORDER.filter(c => grouped[c]);
+    Object.keys(grouped).forEach(c => { if (!orderedCats.includes(c)) orderedCats.push(c); });
+    container.innerHTML = orderedCats.map((cat, i) => {
+      const tools = grouped[cat];
       const id = `tref-${i}`;
-      const disabledBadge = !tools[0].enabled ? ' <span style="color:#ef9a9a;font-size:0.68rem;">(disabled)</span>' : '';
+      const disabledBadge = tools.some(t => !t.enabled) ? ' <span style="color:#ef9a9a;font-size:0.68rem;">(some disabled)</span>' : '';
       const rows = tools.map(t => {
         const params = t.schema && t.schema.parameters && t.schema.parameters.properties
           ? Object.entries(t.schema.parameters.properties) : [];
@@ -2780,7 +2840,7 @@
           <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.tref-chv').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼';"
             style="width:100%;background:none;border:none;padding:6px 14px 6px 18px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
             <span>
-              <span style="color:#4fc3f7;font-family:monospace;font-size:0.78rem;">${_esc(t.name)}</span>
+              <span style="color:#4fc3f7;font-family:monospace;font-size:0.78rem;">${_esc(toolLabel(t.name))}</span>
               <span style="display:block;color:#888;font-size:0.72rem;margin-top:2px;">${_esc(t.desc)}</span>
             </span>
             <span class="tref-chv" style="color:#555;font-size:0.65rem;flex-shrink:0;margin-top:2px;">▶</span>
@@ -2794,7 +2854,7 @@
       return `<div style="margin-top:10px;">
         <button onclick="const el=document.getElementById('${id}');const ch=this.querySelector('.tref-gchv');const h=el.style.display!=='none';el.style.display=h?'none':'';ch.textContent=h?'▼':'▲';"
           style="width:100%;background:#0d0d0d;border:none;border-bottom:1px solid #1a1a1a;padding:5px 14px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:#81c784;">${_esc(label(mod))}${disabledBadge}</span>
+          <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:#81c784;">${_esc(cat)}${disabledBadge}</span>
           <span class="tref-gchv" style="color:#555;font-size:0.65rem;">▲</span>
         </button>
         <div id="${id}">${rows}</div>
