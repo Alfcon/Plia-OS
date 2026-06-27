@@ -101,6 +101,14 @@ class PliaConfig:
     observer_profile_interval: int = 300
     observer_retention_hours: int = 24
 
+    # Proactive assistant — observer-triggered suggestions
+    proactive_enabled: bool = False
+    proactive_check_interval: int = 60          # seconds between trigger checks
+    proactive_distraction_threshold: int = 20   # minutes before distraction trigger
+    proactive_checkin_interval: int = 120       # minutes between scheduled check-ins
+    proactive_quiet_hours_start: int = 0        # hour 0-23, voice silenced from
+    proactive_quiet_hours_end: int = 7          # hour 0-23, voice silenced until
+
     # Weather
     weather_location: str = ""
 

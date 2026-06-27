@@ -101,3 +101,31 @@ def test_get_observer_store_singleton(tmp_path):
         assert s1 is s2
     finally:
         mod._store = old_store
+
+
+def test_get_app_hour_history_empty(tmp_path):
+    from agents.observer_store import ObserverStore
+    s = ObserverStore(str(tmp_path / "obs.db"))
+    assert s.get_app_hour_history(days=7) == []
+
+
+def test_get_app_hour_history_returns_tuples(tmp_path):
+    from agents.observer_store import ObserverStore
+    from datetime import datetime, timezone
+    s = ObserverStore(str(tmp_path / "obs.db"))
+    ts = datetime.now(timezone.utc).isoformat()
+    s.add_focus_event(ts, "Terminal", "firefox", 10.0)
+    result = s.get_app_hour_history(days=7)
+    assert len(result) == 1
+    app_name, hour = result[0]
+    assert app_name == "firefox"
+    assert 0 <= hour <= 23
+
+
+def test_get_app_hour_history_filters_old(tmp_path):
+    from agents.observer_store import ObserverStore
+    from datetime import datetime, timezone, timedelta
+    s = ObserverStore(str(tmp_path / "obs.db"))
+    old_ts = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+    s.add_focus_event(old_ts, "Window", "firefox", 10.0)
+    assert s.get_app_hour_history(days=7) == []

@@ -121,6 +121,16 @@ class ObserverStore:
             ).fetchone()
         return row[0] if row else None
 
+    def get_app_hour_history(self, days: int = 7) -> list[tuple[str, int]]:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT app_name, CAST(strftime('%H', ts) AS INTEGER) "
+                "FROM focus_events WHERE ts >= ? AND app_name IS NOT NULL",
+                (cutoff,),
+            ).fetchall()
+        return [(row[0], row[1]) for row in rows]
+
     def prune_old(self, retention_hours: int = 24) -> None:
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=retention_hours)).isoformat()
         profile_cutoff = (
