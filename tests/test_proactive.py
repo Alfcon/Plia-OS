@@ -131,6 +131,7 @@ async def test_quiet_hours_suppresses_voice(pro):
     with patch('core.proactive.get_config') as mock_cfg, \
          patch('core.proactive.events.emit', side_effect=fake_emit):
         mock_cfg.return_value = MagicMock(
+            fallback_provider='',
             proactive_quiet_hours_start=0,
             proactive_quiet_hours_end=23,
         )
@@ -168,6 +169,7 @@ async def test_midnight_wrap_quiet_hours(pro):
          patch('core.proactive.datetime') as mock_dt, \
          patch('core.proactive.events.emit', side_effect=fake_emit):
         mock_cfg.return_value = MagicMock(
+            fallback_provider='',
             proactive_quiet_hours_start=22,
             proactive_quiet_hours_end=7,
         )
