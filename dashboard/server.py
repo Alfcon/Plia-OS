@@ -1011,6 +1011,74 @@ async def post_tor_disable():
     return {"success": success, "message": message}
 
 
+@router.get("/api/network/wifi")
+async def network_wifi():
+    import subprocess
+    status: dict = {}
+    try:
+        r = await asyncio.to_thread(
+            subprocess.run,
+            ["nmcli", "-t", "-f", "TYPE,STATE,CONNECTION,DEVICE", "--escape", "no", "dev", "status"],
+            capture_output=True, text=True, timeout=5,
+        )
+        for line in r.stdout.splitlines():
+            parts = line.split(":")
+            if len(parts) >= 4 and parts[0] == "wifi" and "connected" in parts[1] and parts[2]:
+                status = {"ssid": parts[2], "device": parts[3], "connected": True}
+                break
+    except Exception:
+        pass
+    networks: list = []
+    try:
+        r = await asyncio.to_thread(
+            subprocess.run,
+            ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY,CHAN", "--escape", "no", "dev", "wifi", "list"],
+            capture_output=True, text=True, timeout=15,
+        )
+        seen: set = set()
+        for line in r.stdout.strip().splitlines():
+            parts = line.rsplit(":", 3)
+            if len(parts) < 4:
+                continue
+            ssid, signal, security, chan = parts
+            ssid = ssid or "<hidden>"
+            key = (ssid, chan)
+            if key in seen:
+                continue
+            seen.add(key)
+            networks.append({
+                "ssid": ssid,
+                "signal": int(signal) if signal.isdigit() else 0,
+                "security": security or "open",
+                "chan": chan,
+            })
+        networks.sort(key=lambda n: -n["signal"])
+    except Exception:
+        pass
+    return {"status": status, "networks": networks}
+
+
+@router.get("/api/network/mac")
+async def network_mac_list():
+    from modules.network_tools import list_macs
+    result = await asyncio.to_thread(list_macs)
+    return {"result": result}
+
+
+@router.post("/api/network/mac/randomize")
+async def network_mac_randomize(body: dict):
+    from modules.network_tools import randomize_mac
+    result = await asyncio.to_thread(randomize_mac, body.get("interface", ""))
+    return {"result": result}
+
+
+@router.post("/api/network/mac/restore")
+async def network_mac_restore(body: dict):
+    from modules.network_tools import restore_mac
+    result = await asyncio.to_thread(restore_mac, body.get("interface", ""))
+    return {"result": result}
+
+
 # ── Observer ─────────────────────────────────────────────────────────────────
 
 @router.get("/api/observer/status")

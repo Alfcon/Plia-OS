@@ -732,7 +732,7 @@
         <button class="m-nav-btn" data-section="mcp" onclick="showMenuSection('mcp');loadMcpServers();loadMcpConfig()">MCP</button>
         <button class="m-nav-btn" data-section="home" onclick="showMenuSection('home');loadHassEntities()">Home</button>
         <button class="m-nav-btn" data-section="permissions" onclick="showMenuSection('permissions');loadPermissions()">Permissions</button>
-        <button class="m-nav-btn" data-section="network" onclick="showMenuSection('network');loadTorStatus()">Network</button>
+        <button class="m-nav-btn" data-section="network" onclick="showMenuSection('network');loadTorStatus();loadNetworkPanel()">Network</button>
         <button class="m-nav-btn" data-section="cron" onclick="showMenuSection('cron');loadCronJobs()">Cron</button>
         <button class="m-nav-btn" data-section="tokens" onclick="showMenuSection('tokens');loadTokenUsage()">Tokens</button>
         <button class="m-nav-btn" data-section="briefing" onclick="showMenuSection('briefing')">Briefing</button>
@@ -1209,6 +1209,37 @@
               </button>
             </div>
             <div id="torStatus" style="font-size:12px;color:#888;padding-left:2px">Checking…</div>
+          </div>
+
+          <!-- WiFi -->
+          <div class="settings-section">
+            <h3 style="margin:0 0 8px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">WiFi</h3>
+            <div id="net-wifi-status" style="font-size:0.78rem;color:#888;margin-bottom:8px;">—</div>
+            <div style="display:flex;gap:6px;margin-bottom:8px;">
+              <button onclick="netWifiScan()"
+                style="padding:4px 12px;background:#1a2a3a;border:1px solid #2a4a6a;border-radius:3px;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">
+                ↻ Scan
+              </button>
+              <span id="net-wifi-scanning" style="display:none;font-size:0.72rem;color:#888;align-self:center;">Scanning…</span>
+            </div>
+            <div id="net-wifi-list" style="font-size:0.72rem;"></div>
+          </div>
+
+          <!-- MAC -->
+          <div class="settings-section">
+            <h3 style="margin:0 0 8px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">MAC Address</h3>
+            <pre id="net-mac-info" style="margin:0 0 8px;font-size:0.7rem;color:#888;background:#111;border:1px solid #1a1a1a;border-radius:3px;padding:5px 7px;white-space:pre-wrap;">—</pre>
+            <div style="display:flex;gap:6px;margin-bottom:6px;">
+              <button onclick="netMacRandomize()"
+                style="padding:4px 10px;background:#2a1a1a;border:1px solid #5a2a2a;border-radius:3px;color:#ef9a9a;font-size:0.75rem;cursor:pointer;">
+                ⚄ Randomize
+              </button>
+              <button onclick="netMacRestore()"
+                style="padding:4px 10px;background:#1a2a1a;border:1px solid #2a5a2a;border-radius:3px;color:#81c784;font-size:0.75rem;cursor:pointer;">
+                ↩ Restore
+              </button>
+            </div>
+            <div id="net-mac-status" style="font-size:0.72rem;color:#666;min-height:1em;"></div>
           </div>
         </div>
 
@@ -4070,6 +4101,90 @@
       fetch('/api/stop-recording', { method: 'POST', keepalive: true });
     }
   });
+
+  async function loadNetworkPanel() {
+    // WiFi status
+    const wifiStatus = document.getElementById('net-wifi-status');
+    try {
+      const r = await fetch('/api/network/wifi');
+      const d = await r.json();
+      if (d.status && d.status.connected) {
+        wifiStatus.textContent = `Connected: ${d.status.ssid} (${d.status.device})`;
+        wifiStatus.style.color = '#81c784';
+      } else {
+        wifiStatus.textContent = 'Not connected';
+        wifiStatus.style.color = '#888';
+      }
+      _renderWifiList(d.networks || []);
+    } catch(_) { wifiStatus.textContent = 'nmcli unavailable'; }
+    // MAC info
+    try {
+      const r = await fetch('/api/network/mac');
+      const d = await r.json();
+      document.getElementById('net-mac-info').textContent = d.result || '—';
+    } catch(_) {}
+  }
+
+  async function netWifiScan() {
+    const scanning = document.getElementById('net-wifi-scanning');
+    const list = document.getElementById('net-wifi-list');
+    scanning.style.display = 'inline';
+    list.innerHTML = '';
+    try {
+      const r = await fetch('/api/network/wifi');
+      const d = await r.json();
+      scanning.style.display = 'none';
+      _renderWifiList(d.networks || []);
+    } catch(_) { scanning.style.display = 'none'; }
+  }
+
+  function _sigColor(s) {
+    return s >= 75 ? '#81c784' : s >= 50 ? '#ffd54f' : s >= 25 ? '#ffb74d' : '#ef9a9a';
+  }
+
+  function _sigBars(s) {
+    const filled = Math.round(s / 25);
+    return '▉'.repeat(filled) + '░'.repeat(4 - filled);
+  }
+
+  function _renderWifiList(networks) {
+    const list = document.getElementById('net-wifi-list');
+    if (!networks.length) { list.innerHTML = '<div style="color:#555;">No networks found.</div>'; return; }
+    list.innerHTML = networks.map(n => {
+      const col = _sigColor(n.signal);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #111;">
+        <span style="color:${col};font-size:0.68rem;font-family:monospace;flex-shrink:0;">${_sigBars(n.signal)}</span>
+        <span style="color:${col};font-size:0.68rem;flex-shrink:0;min-width:28px;">${n.signal}%</span>
+        <span style="flex:1;color:#ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(n.ssid)}">${_esc(n.ssid)}</span>
+        <span style="color:#666;font-size:0.65rem;flex-shrink:0;">${_esc(n.security)}</span>
+        <span style="color:#555;font-size:0.65rem;flex-shrink:0;">ch${_esc(n.chan)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  async function netMacRandomize() {
+    const st = document.getElementById('net-mac-status');
+    st.textContent = 'Randomizing…'; st.style.color = '#888';
+    try {
+      const r = await fetch('/api/network/mac/randomize', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+      const d = await r.json();
+      st.textContent = d.result || 'Done.';
+      st.style.color = d.result && d.result.toLowerCase().includes('error') ? '#ef9a9a' : '#ffd54f';
+      setTimeout(loadNetworkPanel, 800);
+    } catch(e) { st.textContent = e.message; st.style.color = '#ef9a9a'; }
+  }
+
+  async function netMacRestore() {
+    const st = document.getElementById('net-mac-status');
+    st.textContent = 'Restoring…'; st.style.color = '#888';
+    try {
+      const r = await fetch('/api/network/mac/restore', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+      const d = await r.json();
+      st.textContent = d.result || 'Done.';
+      st.style.color = d.result && d.result.toLowerCase().includes('error') ? '#ef9a9a' : '#81c784';
+      setTimeout(loadNetworkPanel, 800);
+    } catch(e) { st.textContent = e.message; st.style.color = '#ef9a9a'; }
+  }
 
   async function loadTorStatus() {
     try {
