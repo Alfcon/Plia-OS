@@ -1149,7 +1149,16 @@ async def reset_token_usage():
 @router.get("/api/cron")
 async def list_cron_jobs():
     from agents.cron_store import get_cron_store
-    return await asyncio.to_thread(get_cron_store().list_all)
+    from croniter import croniter
+    from datetime import datetime, timezone
+    jobs = await asyncio.to_thread(get_cron_store().list_all)
+    now = datetime.now(timezone.utc)
+    for job in jobs:
+        try:
+            job["next_run"] = croniter(job["expr"], now).get_next(datetime).isoformat()
+        except Exception:
+            job["next_run"] = None
+    return jobs
 
 
 @router.post("/api/cron")

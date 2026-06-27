@@ -107,6 +107,8 @@
     .m-pane select, .m-pane input[type=range], .m-pane input[type=text], .m-pane input[type=password] { width: 100%; background: #1a1a1a; color: #e0e0e0; border: 1px solid #2a2a2a; border-radius: 4px; padding: 4px 6px; margin-bottom: 2px; }
     .m-pane .apply-btn { margin-top: 8px; background: #1a1a2e; color: #4fc3f7; border: 1px solid #1e3a5f; border-radius: 4px; padding: 5px 10px; font-size: 0.78rem; cursor: pointer; width: 100%; }
     .m-pane .apply-btn:hover { background: #1e3a5f; }
+    .cron-preset { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:3px; color:#888; font-size:0.68rem; padding:2px 7px; cursor:pointer; }
+    .cron-preset:hover { border-color:#555; color:#ccc; }
   </style>
 </head>
 <body>
@@ -1221,13 +1223,21 @@
         <!-- Cron -->
         <div id="m-section-cron" class="m-pane" style="display:none">
           <div class="settings-section">
-            <h3 style="margin:0 0 8px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">Recurring Schedules</h3>
-            <p style="font-size:11px;color:#666;margin:0 0 10px">Standard 5-field cron: minute hour day month weekday. E.g. <code>0 8 * * 1-5</code> = weekdays 8am.</p>
+            <h3 style="margin:0 0 6px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">Recurring Schedules</h3>
+            <p style="font-size:11px;color:#555;margin:0 0 6px">5-field cron (min hr day mon wday). Message: plain text or <code style="color:#4fc3f7">tool:tool_name</code> to invoke a tool.</p>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
+              <button onclick="setCronPreset('0 8 * * *')"    class="cron-preset">Daily 8am</button>
+              <button onclick="setCronPreset('0 8 * * 1-5')"  class="cron-preset">Weekdays 8am</button>
+              <button onclick="setCronPreset('0 */4 * * *')"  class="cron-preset">Every 4h</button>
+              <button onclick="setCronPreset('0 * * * *')"    class="cron-preset">Hourly</button>
+              <button onclick="setCronPreset('0 9 * * 1')"    class="cron-preset">Mon 9am</button>
+              <button onclick="setCronPreset('0 20 * * *')"   class="cron-preset">Daily 8pm</button>
+            </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px">
               <input id="cron-name" placeholder="Name" style="background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:4px 6px;font-size:0.75rem;" />
-              <input id="cron-expr" placeholder="0 8 * * *" style="background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:4px 6px;font-size:0.75rem;" />
+              <input id="cron-expr" placeholder="0 8 * * *" style="background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:4px 6px;font-family:monospace;font-size:0.75rem;" />
             </div>
-            <input id="cron-msg" placeholder="Message to announce" style="width:100%;background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:4px 6px;font-size:0.75rem;box-sizing:border-box;margin-bottom:6px;" />
+            <input id="cron-msg" placeholder="Message to announce  (or tool:morning_briefing)" style="width:100%;background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:4px 6px;font-size:0.75rem;box-sizing:border-box;margin-bottom:6px;" />
             <div style="display:flex;gap:6px;align-items:center">
               <button onclick="addCronJob()" style="padding:4px 12px;background:#1b5e20;color:#a5d6a7;border:1px solid #2e7d32;border-radius:3px;font-size:0.75rem;cursor:pointer">Add</button>
               <button onclick="loadCronJobs()" style="padding:4px 12px;background:#1a1a1a;color:#888;border:1px solid #333;border-radius:3px;font-size:0.75rem;cursor:pointer">↻</button>
@@ -4009,26 +4019,58 @@
   }
 
   // ---- Cron ----
+  function _fmtNextRun(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = d - now;
+    if (diffMs < 0) return 'overdue';
+    const diffM = Math.floor(diffMs / 60000);
+    if (diffM < 60) return `in ${diffM}m`;
+    const diffH = Math.floor(diffM / 60);
+    if (diffH < 24) return `in ${diffH}h ${diffM % 60}m`;
+    const diffD = Math.floor(diffH / 24);
+    return `in ${diffD}d`;
+  }
+
   async function loadCronJobs() {
     const list = document.getElementById('cron-list');
     try {
       const r = await fetch('/api/cron');
       const jobs = await r.json();
       if (!jobs.length) { list.innerHTML = '<span style="color:#555">No cron jobs.</span>'; return; }
-      list.innerHTML = jobs.map(j => `
-        <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #222">
-          <span style="color:${j.enabled ? '#a5d6a7' : '#555'};font-size:0.7rem;width:8px">${j.enabled ? '●' : '○'}</span>
-          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_esc(j.message)}">
-            <b>${_esc(j.name)}</b> <span style="color:#888;font-size:0.68rem">${_esc(j.expr)}</span>
-          </span>
-          <button onclick="toggleCron('${_esc(j.name)}',${j.enabled ? 0 : 1})"
-            style="padding:2px 6px;background:#1a1a1a;color:#aaa;border:1px solid #333;border-radius:3px;font-size:0.68rem;cursor:pointer">
-            ${j.enabled ? 'Pause' : 'Resume'}
-          </button>
-          <button onclick="deleteCron('${_esc(j.name)}')"
-            style="padding:2px 6px;background:#1a1a1a;color:#ef9a9a;border:1px solid #444;border-radius:3px;font-size:0.68rem;cursor:pointer">✕</button>
-        </div>`).join('');
+      list.innerHTML = jobs.map(j => {
+        const isTool = j.message.startsWith('tool:');
+        const msgLabel = isTool
+          ? `<span style="color:#4fc3f7;font-family:monospace;">${_esc(j.message)}</span>`
+          : `<span style="color:#888;">${_esc(j.message)}</span>`;
+        const nextLabel = j.next_run
+          ? `<span style="color:#555;font-size:0.65rem;margin-left:4px;" title="${_esc(j.next_run)}">${_fmtNextRun(j.next_run)}</span>`
+          : '';
+        return `<div style="padding:6px 0;border-bottom:1px solid #1e1e1e;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="color:${j.enabled ? '#a5d6a7' : '#555'};font-size:0.7rem;flex-shrink:0;">${j.enabled ? '●' : '○'}</span>
+            <span style="flex:1;min-width:0;">
+              <b style="color:#e0e0e0;">${_esc(j.name)}</b>
+              <code style="color:#666;font-size:0.68rem;margin-left:5px;">${_esc(j.expr)}</code>
+              ${nextLabel}
+            </span>
+            <button onclick="toggleCron('${_esc(j.name)}',${j.enabled ? 0 : 1})"
+              style="padding:2px 6px;background:#1a1a1a;color:#aaa;border:1px solid #333;border-radius:3px;font-size:0.68rem;cursor:pointer;flex-shrink:0;">
+              ${j.enabled ? 'Pause' : 'Resume'}
+            </button>
+            <button onclick="deleteCron('${_esc(j.name)}')"
+              style="padding:2px 6px;background:#1a1a1a;color:#ef9a9a;border:1px solid #444;border-radius:3px;font-size:0.68rem;cursor:pointer;flex-shrink:0;">✕</button>
+          </div>
+          <div style="margin-left:16px;margin-top:2px;font-size:0.7rem;word-break:break-word;">${msgLabel}</div>
+        </div>`;
+      }).join('');
     } catch(e) { list.textContent = 'Load failed'; }
+  }
+
+  function setCronPreset(expr) {
+    const el = document.getElementById('cron-expr');
+    if (el) { el.value = expr; el.focus(); }
   }
 
   async function addCronJob() {
