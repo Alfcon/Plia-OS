@@ -1172,6 +1172,106 @@ async def search_documents(body: dict):
     return {"result": result}
 
 
+@router.get("/api/media/status")
+async def media_status():
+    import subprocess, re
+    try:
+        meta = await asyncio.to_thread(
+            subprocess.run,
+            ["playerctl", "metadata", "--format", "{{artist}} - {{title}}"],
+            capture_output=True, text=True, timeout=5,
+        )
+        stat = await asyncio.to_thread(
+            subprocess.run,
+            ["playerctl", "status"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return {"text": "", "playing": False, "status": "unknown"}
+    status = stat.stdout.strip() if stat.returncode == 0 else "unknown"
+    track = meta.stdout.strip() if meta.returncode == 0 else ""
+    if not track or re.fullmatch(r"\s*-\s*", track):
+        track = ""
+    playing = status == "Playing" and bool(track)
+    return {"text": track, "playing": playing, "status": status}
+
+
+@router.post("/api/media/{action}")
+async def media_action(action: str):
+    import subprocess
+    if action not in {"play", "pause", "next", "previous", "stop"}:
+        raise HTTPException(status_code=404, detail=f"Unknown action: {action}")
+    try:
+        r = await asyncio.to_thread(
+            subprocess.run, ["playerctl", action],
+            capture_output=True, text=True, timeout=5,
+        )
+        return {"result": "ok" if r.returncode == 0 else r.stderr.strip()}
+    except FileNotFoundError:
+        raise HTTPException(status_code=503, detail="playerctl not installed")
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="playerctl timed out")
+
+
+@router.get("/api/media/volume")
+async def media_volume_get():
+    import subprocess, re
+    try:
+        r = await asyncio.to_thread(
+            subprocess.run, ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"],
+            capture_output=True, text=True, timeout=5,
+        )
+        m = re.search(r"[\d.]+", r.stdout)
+        if not m:
+            return {"percent": 50, "muted": False}
+        return {"percent": round(float(m.group()) * 100), "muted": "[MUTED]" in r.stdout}
+    except Exception:
+        return {"percent": 50, "muted": False}
+
+
+@router.post("/api/media/volume")
+async def media_volume_set(body: dict):
+    import subprocess
+    percent = max(0, min(100, int(body.get("percent", 50))))
+    try:
+        await asyncio.to_thread(
+            subprocess.run,
+            ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{percent / 100:.2f}"],
+            check=True, capture_output=True, timeout=5,
+        )
+        return {"percent": percent}
+    except FileNotFoundError:
+        raise HTTPException(status_code=503, detail="wpctl not installed")
+    except subprocess.CalledProcessError as exc:
+        raise HTTPException(status_code=500, detail=exc.stderr.decode().strip())
+
+
+@router.post("/api/media/mute")
+async def media_mute():
+    import subprocess
+    try:
+        await asyncio.to_thread(
+            subprocess.run, ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "1"],
+            check=True, capture_output=True, timeout=5,
+        )
+        return {"muted": True}
+    except FileNotFoundError:
+        raise HTTPException(status_code=503, detail="wpctl not installed")
+
+
+@router.post("/api/media/unmute")
+async def media_unmute():
+    import subprocess
+    try:
+        await asyncio.to_thread(
+            subprocess.run, ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0"],
+            check=True, capture_output=True, timeout=5,
+        )
+        return {"muted": False}
+    except FileNotFoundError:
+        raise HTTPException(status_code=503, detail="wpctl not installed")
+
+
 @router.get("/api/token-usage")
 async def get_token_usage():
     from core.token_usage import get_stats

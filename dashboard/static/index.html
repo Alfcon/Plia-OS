@@ -136,6 +136,18 @@
     </div>
   </div>
   <span class="tb-chip"><span class="tb-label">Disk</span><span id="tb-disk">—</span></span>
+  <span style="flex:1;"></span>
+  <div id="media-widget" style="display:flex;align-items:center;gap:5px;padding:2px 8px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;flex-shrink:0;">
+    <span id="media-track" style="font-size:0.72rem;color:#444;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="">♪ —</span>
+    <button onclick="mediaAction('previous')" style="background:none;border:none;color:#444;cursor:pointer;font-size:0.82rem;padding:0 1px;line-height:1;" title="Previous">⏮</button>
+    <button id="media-pp-btn" onclick="mediaTogglePlay()" style="background:none;border:none;color:#666;cursor:pointer;font-size:0.82rem;padding:0 1px;line-height:1;" title="Play/Pause">▶</button>
+    <button onclick="mediaAction('next')" style="background:none;border:none;color:#444;cursor:pointer;font-size:0.82rem;padding:0 1px;line-height:1;" title="Next">⏭</button>
+    <span style="color:#2a2a2a;font-size:0.7rem;margin:0 1px;">|</span>
+    <span id="media-vol-icon" style="font-size:0.72rem;color:#444;cursor:pointer;" onclick="mediaToggleMute()" title="Mute/unmute">🔊</span>
+    <input type="range" id="media-vol-slider" min="0" max="100" value="50"
+      style="width:56px;accent-color:#4fc3f7;cursor:pointer;height:3px;"
+      oninput="mediaSetVolume(this.value)" title="Volume">
+  </div>
 </header>
 
 <div id="app-body">
@@ -1980,6 +1992,7 @@
       onEngineChange();
       startVramPolling();
       loadAirLLMStatus();
+      loadMediaWidget();
     });
 
   let _reminderCountdownInterval = null;
@@ -3744,6 +3757,78 @@
       }),
     });
   }
+
+  let _mediaPlayStatus = 'unknown';
+  let _mediaVolTimer = null;
+  let _mediaMuted = false;
+
+  async function loadMediaWidget() {
+    try {
+      const [sr, vr] = await Promise.all([
+        fetch('/api/media/status'),
+        fetch('/api/media/volume'),
+      ]);
+      const s = await sr.json();
+      const v = await vr.json();
+      const track = document.getElementById('media-track');
+      const ppBtn = document.getElementById('media-pp-btn');
+      const volSlider = document.getElementById('media-vol-slider');
+      const volIcon = document.getElementById('media-vol-icon');
+      _mediaPlayStatus = s.status || 'unknown';
+      _mediaMuted = v.muted || false;
+      if (s.playing && s.text) {
+        track.textContent = '♪ ' + s.text;
+        track.title = s.text;
+        track.style.color = '#ccc';
+      } else {
+        track.textContent = '♪ —';
+        track.title = '';
+        track.style.color = '#444';
+      }
+      const isPlaying = _mediaPlayStatus === 'Playing';
+      ppBtn.textContent = isPlaying ? '⏸' : '▶';
+      ppBtn.style.color = isPlaying ? '#4fc3f7' : '#666';
+      document.querySelector('#media-widget button[title="Previous"]').style.color = s.playing ? '#888' : '#444';
+      document.querySelector('#media-widget button[title="Next"]').style.color = s.playing ? '#888' : '#444';
+      if (v.percent !== undefined && document.activeElement !== volSlider) {
+        volSlider.value = v.percent;
+      }
+      volIcon.textContent = v.muted ? '🔇' : '🔊';
+      volIcon.style.color = v.muted ? '#ef9a9a' : (v.percent < 10 ? '#444' : '#888');
+      volSlider.title = `Volume: ${v.percent ?? '?'}%${v.muted ? ' (muted)' : ''}`;
+    } catch(_) {}
+  }
+
+  async function mediaAction(action) {
+    try {
+      await fetch(`/api/media/${action}`, {method: 'POST'});
+      setTimeout(loadMediaWidget, 400);
+    } catch(_) {}
+  }
+
+  function mediaTogglePlay() {
+    mediaAction(_mediaPlayStatus === 'Playing' ? 'pause' : 'play');
+  }
+
+  async function mediaToggleMute() {
+    try {
+      await fetch(_mediaMuted ? '/api/media/unmute' : '/api/media/mute', {method: 'POST'});
+      setTimeout(loadMediaWidget, 300);
+    } catch(_) {}
+  }
+
+  function mediaSetVolume(val) {
+    clearTimeout(_mediaVolTimer);
+    _mediaVolTimer = setTimeout(() => {
+      fetch('/api/media/volume', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({percent: parseInt(val)}),
+      }).then(() => loadMediaWidget());
+    }, 200);
+  }
+
+  setInterval(loadMediaWidget, 5000);
 
   async function loadDocSources() {
     const el = document.getElementById('doc-sources-list');
