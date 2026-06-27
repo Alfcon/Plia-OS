@@ -280,3 +280,12 @@ python-pptx==1.0.2
 croniter==6.2.2
 mss==10.2.0
 feedparser==6.0.12
+# observer extras
+airllm==2.11.0
+pytesseract==0.3.13
+evdev==1.9.3
+# cloud LLM fallbacks
+openai>=1.0
+anthropic>=0.25
+# MCP
+mcp>=1.0
