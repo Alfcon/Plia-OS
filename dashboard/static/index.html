@@ -4973,6 +4973,96 @@
     const btn = document.getElementById('history-more-btn');
     if (btn) btn.style.display = _historyAll.length >= _historyN ? 'inline-block' : 'none';
   }
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+
+  function toggleShortcuts() {
+    const el = document.getElementById('shortcuts-overlay');
+    const visible = el.style.display === 'flex';
+    el.style.display = visible ? 'none' : 'flex';
+  }
+  function closeShortcuts() {
+    document.getElementById('shortcuts-overlay').style.display = 'none';
+  }
+
+  // Add Ctrl+K, Ctrl+,, ? to the existing global handler
+  document.addEventListener('keydown', e => {
+    const tag = document.activeElement.tagName;
+    const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement.isContentEditable;
+    if (e.key === '?' && !inInput && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      toggleShortcuts();
+      return;
+    }
+    if (e.key === 'Escape') {
+      closeShortcuts();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      openTools();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+      e.preventDefault();
+      openSettings();
+      return;
+    }
+  });
+</script>
+
+<!-- Keyboard shortcuts overlay -->
+<div id="shortcuts-overlay" onclick="if(event.target===this)closeShortcuts()"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center;">
+  <div style="background:#111;border:1px solid #2a2a2a;border-radius:6px;padding:20px 28px;min-width:340px;max-width:460px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <span style="font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em;">Keyboard Shortcuts</span>
+      <button onclick="closeShortcuts()" style="background:none;border:none;color:#555;font-size:1rem;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+      <thead>
+        <tr><th style="text-align:left;color:#555;font-weight:normal;padding:2px 0;font-size:0.65rem;text-transform:uppercase;letter-spacing:.06em;">Key</th>
+            <th style="text-align:left;color:#555;font-weight:normal;padding:2px 0 2px 16px;font-size:0.65rem;text-transform:uppercase;letter-spacing:.06em;">Action</th></tr>
+      </thead>
+      <tbody id="shortcuts-body">
+        <tr><td colspan="2" style="padding:4px 0;border-bottom:1px solid #1a1a1a;"></td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:10px;font-size:0.68rem;color:#444;text-align:center;">
+      Click outside or press <kbd style="background:#1a1a1a;border:1px solid #333;border-radius:3px;padding:1px 5px;font-size:0.68rem;color:#888;">Esc</kbd> to close
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const _shortcuts = [
+    { group: 'Chat' },
+    { key: '/', desc: 'Focus chat input' },
+    { key: 'Enter', desc: 'Send message' },
+    { key: 'Shift + Enter', desc: 'New line in message' },
+    { group: 'Panels' },
+    { key: 'Ctrl + K', desc: 'Open Tools panel' },
+    { key: 'Ctrl + ,', desc: 'Open Settings panel' },
+    { key: 'Esc', desc: 'Close open panel' },
+    { group: 'Tool guard' },
+    { key: 'Enter', desc: 'Allow pending tool call' },
+    { key: 'Esc', desc: 'Deny pending tool call' },
+    { group: 'General' },
+    { key: '?', desc: 'Show / hide this overlay' },
+  ];
+  const tbody = document.getElementById('shortcuts-body');
+  tbody.innerHTML = _shortcuts.map(s => {
+    if (s.group) {
+      return `<tr><td colspan="2" style="padding:8px 0 3px;font-size:0.65rem;text-transform:uppercase;letter-spacing:.06em;color:#555;">${s.group}</td></tr>`;
+    }
+    return `<tr>
+      <td style="padding:3px 0;border-bottom:1px solid #111;white-space:nowrap;">
+        <kbd style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;padding:1px 6px;font-size:0.72rem;color:#4fc3f7;font-family:monospace;">${s.key}</kbd>
+      </td>
+      <td style="padding:3px 0 3px 16px;border-bottom:1px solid #111;color:#aaa;">${s.desc}</td>
+    </tr>`;
+  }).join('');
+})();
 </script>
 
 </body>
