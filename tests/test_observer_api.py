@@ -70,3 +70,55 @@ async def test_observer_status_endpoint_stopped():
     data = resp.json()
     assert data["running"] is False
     assert data["profile_preview"] == ""
+
+
+@pytest.mark.asyncio
+async def test_observer_activity_endpoint():
+    obs = _make_obs(running=True, profile="User focused on coding.")
+    obs._current_app = "code"
+    obs._current_window = "main.py — VSCode"
+    mock_store = MagicMock()
+    mock_store.get_recent_obs.return_value = {
+        "focus": [
+            {"ts": "2026-06-27T10:00:00+00:00", "app_name": "code", "window_title": "main.py", "duration_seconds": 300.0},
+            {"ts": "2026-06-27T10:05:00+00:00", "app_name": "firefox", "window_title": "MDN", "duration_seconds": 120.0},
+            {"ts": "2026-06-27T10:07:00+00:00", "app_name": "code", "window_title": "test.py", "duration_seconds": 180.0},
+        ],
+        "screen": [],
+        "keys": [],
+    }
+    with patch("core.observer.get_observer", return_value=obs), \
+         patch("agents.observer_store.get_observer_store", return_value=mock_store):
+        from core.main import create_app
+        async with AsyncClient(transport=ASGITransport(app=create_app()), base_url="http://test") as client:
+            resp = await client.get("/api/observer/activity?minutes=60")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["current_app"] == "code"
+    assert data["current_window"] == "main.py — VSCode"
+    assert data["profile"] == "User focused on coding."
+    # top apps: code=480s, firefox=120s
+    top = {x["app"]: x["seconds"] for x in data["top_apps"]}
+    assert top["code"] == 480
+    assert top["firefox"] == 120
+    assert data["top_apps"][0]["app"] == "code"  # sorted descending
+    assert len(data["timeline"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_observer_activity_empty():
+    obs = _make_obs(running=False, profile="")
+    obs._current_app = ""
+    obs._current_window = ""
+    mock_store = MagicMock()
+    mock_store.get_recent_obs.return_value = {"focus": [], "screen": [], "keys": []}
+    with patch("core.observer.get_observer", return_value=obs), \
+         patch("agents.observer_store.get_observer_store", return_value=mock_store):
+        from core.main import create_app
+        async with AsyncClient(transport=ASGITransport(app=create_app()), base_url="http://test") as client:
+            resp = await client.get("/api/observer/activity")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["top_apps"] == []
+    assert data["timeline"] == []
+    assert data["current_app"] == ""

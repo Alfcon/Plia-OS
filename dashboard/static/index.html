@@ -1295,19 +1295,51 @@
         <!-- Observer -->
         <div id="m-section-observer" class="m-pane" style="display:none">
           <div class="settings-section">
-            <h3 style="margin:0 0 8px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">User Activity Observer</h3>
-            <p style="font-size:11px;color:#666;margin:0 0 10px">Captures screen, window focus, and keystrokes to build a real-time user profile. Requires: <code>pip install -e ".[observer]"</code> + <code>sudo apt install tesseract-ocr</code> + user in <code>input</code> group.</p>
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-              <span style="font-size:13px;color:#ccc">Observer</span>
-              <button id="observerToggleBtn" onclick="toggleObserver()"
-                style="padding:4px 14px;border-radius:4px;border:1px solid #444;background:#222;color:#ccc;cursor:pointer;font-size:12px">
-                Loading…
-              </button>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <h3 style="margin:0;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">User Activity Observer</h3>
+              <div style="display:flex;gap:6px;align-items:center">
+                <button onclick="loadObserverStatus()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer">↻</button>
+                <button id="observerToggleBtn" onclick="toggleObserver()"
+                  style="padding:3px 12px;border-radius:4px;border:1px solid #444;background:#222;color:#ccc;cursor:pointer;font-size:12px">
+                  Loading…
+                </button>
+              </div>
             </div>
-            <div id="observerStatus" style="font-size:12px;color:#888;padding-left:2px;margin-bottom:6px">Checking…</div>
-            <div style="font-size:11px;color:#666;margin-bottom:4px">Last capture: <span id="observerLastCapture">—</span></div>
-            <div style="font-size:11px;color:#666;margin-bottom:8px">Last profile: <span id="observerLastProfile">—</span></div>
-            <div id="observerProfilePreview" style="font-size:11px;color:#999;background:#111;border:1px solid #2a2a2a;border-radius:4px;padding:8px;min-height:40px;white-space:pre-wrap;display:none"></div>
+            <div id="observerStatus" style="font-size:11px;color:#888;margin-bottom:8px">Checking…</div>
+
+            <!-- Live now -->
+            <div style="background:#111;border:1px solid #222;border-radius:4px;padding:8px 10px;margin-bottom:8px">
+              <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Now</div>
+              <div style="display:flex;gap:6px;align-items:baseline">
+                <span id="obsCurrentApp" style="font-size:13px;color:#4fc3f7;font-weight:600">—</span>
+                <span id="obsCurrentWindow" style="font-size:11px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:440px">—</span>
+              </div>
+              <div style="display:flex;gap:12px;margin-top:4px;font-size:10px;color:#555">
+                <span>Last capture: <span id="observerLastCapture" style="color:#666">—</span></span>
+                <span>Last profile: <span id="observerLastProfile" style="color:#666">—</span></span>
+              </div>
+            </div>
+
+            <!-- Top apps bar chart -->
+            <div style="margin-bottom:8px">
+              <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Top apps — last 60 min</div>
+              <div id="obsTopApps" style="font-size:11px;color:#aaa"></div>
+            </div>
+
+            <!-- Focus timeline -->
+            <div style="margin-bottom:8px">
+              <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Focus timeline</div>
+              <div id="obsTimeline" style="display:flex;gap:2px;height:18px;border-radius:3px;overflow:hidden;background:#111"></div>
+              <div id="obsTimelineLabels" style="display:flex;justify-content:space-between;font-size:9px;color:#444;margin-top:2px"></div>
+            </div>
+
+            <!-- Profile -->
+            <div>
+              <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Activity profile</div>
+              <div id="observerProfilePreview" style="font-size:11px;color:#888;background:#0d0d0d;border:1px solid #1e1e1e;border-radius:3px;padding:8px;max-height:140px;overflow-y:auto;white-space:pre-wrap;word-break:break-word">—</div>
+            </div>
+
+            <p style="font-size:10px;color:#444;margin:8px 0 0">Requires: <code>pip install -e ".[observer]"</code> · <code>sudo apt install tesseract-ocr</code> · user in <code>input</code> group</p>
           </div>
         </div>
 
@@ -3623,9 +3655,16 @@
 
   async function loadObserverStatus() {
     try {
-      const r = await fetch('/api/observer/status');
-      const s = await r.json();
+      const [sr, ar] = await Promise.all([
+        fetch('/api/observer/status'),
+        fetch('/api/observer/activity?minutes=60'),
+      ]);
+      const s = await sr.json();
       updateObserverUI(s);
+      if (ar.ok) {
+        const a = await ar.json();
+        updateObserverActivity(a);
+      }
     } catch (e) {
       document.getElementById('observerStatus').textContent = 'Status unavailable';
     }
@@ -3636,7 +3675,6 @@
     const status = document.getElementById('observerStatus');
     const lastCap = document.getElementById('observerLastCapture');
     const lastProf = document.getElementById('observerLastProfile');
-    const preview = document.getElementById('observerProfilePreview');
     if (!btn) return;
     if (s.running) {
       btn.textContent = 'Disable';
@@ -3653,14 +3691,69 @@
       status.textContent = 'Stopped';
       status.style.color = '#888';
     }
-    lastCap.textContent = s.last_capture || '—';
-    lastProf.textContent = s.last_profile || '—';
-    if (s.profile_preview) {
-      preview.textContent = s.profile_preview;
-      preview.style.display = 'block';
-    } else {
-      preview.style.display = 'none';
+    if (lastCap) lastCap.textContent = s.last_capture ? new Date(s.last_capture).toLocaleTimeString() : '—';
+    if (lastProf) lastProf.textContent = s.last_profile ? new Date(s.last_profile).toLocaleTimeString() : '—';
+  }
+
+  const _OBS_COLORS = ['#4fc3f7','#81c784','#ffb74d','#ce93d8','#f48fb1','#80cbc4','#fff59d','#bcaaa4'];
+  function _obsColor(app, palette) {
+    if (!palette[app]) {
+      const idx = Object.keys(palette).length % _OBS_COLORS.length;
+      palette[app] = _OBS_COLORS[idx];
     }
+    return palette[app];
+  }
+
+  function updateObserverActivity(a) {
+    const appEl = document.getElementById('obsCurrentApp');
+    const winEl = document.getElementById('obsCurrentWindow');
+    const topEl = document.getElementById('obsTopApps');
+    const tlEl = document.getElementById('obsTimeline');
+    const tlLbl = document.getElementById('obsTimelineLabels');
+    const profEl = document.getElementById('observerProfilePreview');
+    if (!appEl) return;
+
+    appEl.textContent = a.current_app || '—';
+    winEl.textContent = a.current_window || '—';
+
+    const palette = {};
+
+    // Top apps bar chart
+    const maxSec = a.top_apps[0]?.seconds || 1;
+    topEl.innerHTML = a.top_apps.length
+      ? a.top_apps.map(x => {
+          const pct = Math.round((x.seconds / maxSec) * 100);
+          const mins = Math.round(x.seconds / 60);
+          const col = _obsColor(x.app, palette);
+          return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span style="width:110px;font-size:11px;color:#bbb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">${_esc(x.app)}</span>
+            <div style="flex:1;background:#1a1a1a;border-radius:2px;height:10px">
+              <div style="width:${pct}%;background:${col};height:10px;border-radius:2px;transition:width .3s"></div>
+            </div>
+            <span style="font-size:10px;color:#555;width:36px;text-align:right;flex-shrink:0">${mins}m</span>
+          </div>`;
+        }).join('')
+      : '<span style="color:#444;font-size:11px">No activity recorded yet.</span>';
+
+    // Focus timeline
+    if (a.timeline.length) {
+      const total = a.timeline.reduce((s, e) => s + e.duration, 0) || 1;
+      tlEl.innerHTML = a.timeline.map(e => {
+        const pct = Math.max(1, (e.duration / total) * 100).toFixed(1);
+        const col = _obsColor(e.app, palette);
+        const tip = `${_esc(e.app)} (${Math.round(e.duration)}s)`;
+        return `<div title="${tip}" style="width:${pct}%;background:${col};height:18px;min-width:2px"></div>`;
+      }).join('');
+      const first = new Date(a.timeline[0].ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      const last = new Date(a.timeline[a.timeline.length-1].ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      tlLbl.innerHTML = `<span>${first}</span><span>${last}</span>`;
+    } else {
+      tlEl.innerHTML = '<span style="color:#333;font-size:10px;padding:2px 6px">No focus events</span>';
+      tlLbl.innerHTML = '';
+    }
+
+    // Profile
+    profEl.textContent = a.profile || '—';
   }
 
   async function toggleObserver() {

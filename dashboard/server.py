@@ -1018,6 +1018,40 @@ async def post_observer_disable():
     return {"success": True, "message": "Observer disabled"}
 
 
+@router.get("/api/observer/activity")
+async def get_observer_activity(minutes: int = 60):
+    import core.observer as obs_mod
+    from agents.observer_store import get_observer_store
+    obs = obs_mod.get_observer()
+    store = get_observer_store()
+    recent = await asyncio.to_thread(store.get_recent_obs, minutes)
+    focus = recent.get("focus", [])
+
+    # Aggregate seconds per app
+    app_seconds: dict[str, float] = {}
+    for e in focus:
+        app = e["app_name"] or "unknown"
+        app_seconds[app] = app_seconds.get(app, 0) + e["duration_seconds"]
+    top_apps = sorted(
+        [{"app": k, "seconds": round(v)} for k, v in app_seconds.items()],
+        key=lambda x: x["seconds"], reverse=True
+    )[:8]
+
+    timeline = [
+        {"ts": e["ts"], "app": e["app_name"] or "unknown",
+         "window": e["window_title"] or "", "duration": round(e["duration_seconds"])}
+        for e in focus[-30:]
+    ]
+
+    return {
+        "current_app": obs._current_app or "",
+        "current_window": obs._current_window or "",
+        "top_apps": top_apps,
+        "timeline": timeline,
+        "profile": obs.get_profile(),
+    }
+
+
 @router.get("/api/proactive/status")
 async def get_proactive_status():
     import core.proactive as pro_mod
