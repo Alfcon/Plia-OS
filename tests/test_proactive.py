@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone, timedelta
@@ -240,7 +241,6 @@ async def test_generate_message_returns_empty_on_error(pro):
 
 @pytest.mark.asyncio
 async def test_pipeline_enqueues_proactive_voice():
-    import asyncio
     from voice.pipeline import VoicePipeline
     vp = VoicePipeline.__new__(VoicePipeline)
     vp._announcement_queue = asyncio.Queue(maxsize=50)
@@ -252,7 +252,6 @@ async def test_pipeline_enqueues_proactive_voice():
 
 @pytest.mark.asyncio
 async def test_pipeline_skips_proactive_when_voice_false():
-    import asyncio
     from voice.pipeline import VoicePipeline
     vp = VoicePipeline.__new__(VoicePipeline)
     vp._announcement_queue = asyncio.Queue(maxsize=50)
