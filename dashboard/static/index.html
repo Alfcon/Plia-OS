@@ -3466,7 +3466,17 @@
   async function exitApp() {
     if (!confirm('Exit Plia-OS?')) return;
     await fetch('/api/shutdown', { method: 'POST' }).catch(() => {});
-    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#555;font-family:monospace;font-size:0.9rem;">Shutting down…</div>';
+    const msg = document.createElement('div');
+    msg.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100vh;color:#555;font-family:monospace;font-size:0.9rem;';
+    msg.textContent = 'Shutting down…';
+    document.body.innerHTML = '';
+    document.body.appendChild(msg);
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      try { await fetch('/api/pipeline/status', {cache: 'no-store'}); }
+      catch { msg.textContent = 'Shutdown complete.'; return; }
+    }
+    msg.textContent = 'Shutdown complete.';
   }
 
   window.addEventListener('beforeunload', () => {
