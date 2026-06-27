@@ -120,14 +120,23 @@ def _news_section() -> str:
 
 @tool("Get the morning briefing: today's weather, reminders, calendar events, and top news headlines.")
 def morning_briefing() -> str:
-    cfg = get_config()
-    section_map = [
-        (cfg.briefing_include_weather, _weather_section),
-        (cfg.briefing_include_reminders, _reminders_section),
-        (cfg.briefing_include_calendar, _calendar_section),
-        (cfg.briefing_include_email, _email_section),
-        (cfg.briefing_include_news, _news_section),
-    ]
+    try:
+        cfg = get_config()
+        section_map = [
+            (cfg.briefing_include_weather, _weather_section),
+            (cfg.briefing_include_reminders, _reminders_section),
+            (cfg.briefing_include_calendar, _calendar_section),
+            (cfg.briefing_include_email, _email_section),
+            (cfg.briefing_include_news, _news_section),
+        ]
+    except Exception:
+        section_map = [
+            (True, _weather_section),
+            (True, _reminders_section),
+            (True, _calendar_section),
+            (True, _email_section),
+            (True, _news_section),
+        ]
     sections = []
     for enabled, helper in section_map:
         if not enabled:
