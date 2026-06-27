@@ -67,7 +67,7 @@ async def test_observer_not_running_skips(pro):
     mock_obs = MagicMock(is_running=MagicMock(return_value=False))
     mock_evaluate = AsyncMock(return_value=['checkin'])
     with patch('core.proactive.get_config') as mock_cfg, \
-         patch('core.proactive.get_observer', return_value=mock_obs):
+         patch('core.observer.get_observer', return_value=mock_obs):
         mock_cfg.return_value = MagicMock(fallback_provider='')
         with patch.object(pro, '_evaluate_triggers', mock_evaluate):
             await pro._run_check_once()
@@ -80,7 +80,7 @@ async def test_global_cooldown_blocks(pro):
     mock_obs = MagicMock(is_running=MagicMock(return_value=True))
     mock_evaluate = AsyncMock(return_value=['checkin'])
     with patch('core.proactive.get_config') as mock_cfg, \
-         patch('core.proactive.get_observer', return_value=mock_obs):
+         patch('core.observer.get_observer', return_value=mock_obs):
         mock_cfg.return_value = MagicMock(fallback_provider='')
         with patch.object(pro, '_evaluate_triggers', mock_evaluate):
             await pro._run_check_once()
@@ -94,7 +94,7 @@ async def test_per_trigger_cooldown_blocks(pro):
     mock_obs = MagicMock(is_running=MagicMock(return_value=True))
     mock_emit = AsyncMock()
     with patch('core.proactive.get_config') as mock_cfg, \
-         patch('core.proactive.get_observer', return_value=mock_obs), \
+         patch('core.observer.get_observer', return_value=mock_obs), \
          patch.object(pro, '_evaluate_triggers', AsyncMock(return_value=['checkin'])), \
          patch.object(pro, '_generate_message', AsyncMock(return_value='hi')), \
          patch.object(pro, '_emit_message', mock_emit):
@@ -110,7 +110,7 @@ async def test_message_sent_updates_state(pro):
     mock_obs = MagicMock(is_running=MagicMock(return_value=True))
     mock_emit = AsyncMock()
     with patch('core.proactive.get_config') as mock_cfg, \
-         patch('core.proactive.get_observer', return_value=mock_obs), \
+         patch('core.observer.get_observer', return_value=mock_obs), \
          patch.object(pro, '_evaluate_triggers', AsyncMock(return_value=['checkin'])), \
          patch.object(pro, '_build_context', AsyncMock(return_value={'trigger': 'checkin', 'app': 'code', 'window': 'x', 'profile': ''})), \
          patch.object(pro, '_generate_message', AsyncMock(return_value='Time for a break!')), \
@@ -190,7 +190,7 @@ async def test_config_reload_on_check_once(pro):
 
     # Observer not running → early return after instance-var reload
     mock_obs = MagicMock(is_running=MagicMock(return_value=False))
-    with patch('core.proactive.get_observer', return_value=mock_obs):
+    with patch('core.observer.get_observer', return_value=mock_obs):
         await pro._run_check_once()
 
     assert pro._distraction_threshold == 45

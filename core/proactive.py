@@ -4,7 +4,6 @@ import logging
 from datetime import datetime, timezone
 
 from core.config import get_config
-from core.observer import get_observer
 from core import events
 
 logger = logging.getLogger(__name__)
@@ -23,7 +22,6 @@ _CONTEXT_SWITCH_HOLD = 30 # seconds on new app before context_switch fires
 
 class ProactiveService:
     def __init__(self) -> None:
-        from core.config import get_config
         cfg = get_config()
         self._check_interval: int = cfg.proactive_check_interval
         self._distraction_threshold: int = cfg.proactive_distraction_threshold
@@ -82,6 +80,7 @@ class ProactiveService:
         self._quiet_end = cfg.proactive_quiet_hours_end
 
         try:
+            from core.observer import get_observer
             if not get_observer().is_running():
                 return
         except Exception:
@@ -118,6 +117,7 @@ class ProactiveService:
 
     async def _evaluate_triggers(self) -> list[str]:
         try:
+            from core.observer import get_observer
             obs = get_observer()
             app = obs._current_app or ""
         except Exception:
@@ -190,6 +190,7 @@ class ProactiveService:
 
     async def _build_context(self, trigger: str) -> dict:
         try:
+            from core.observer import get_observer
             obs = get_observer()
             return {
                 "trigger": trigger,
