@@ -3332,9 +3332,9 @@
       const color = fits ? '#4ade80' : tight ? '#f59e0b' : '#ef4444';
       const tag = fits ? 'fits' : `needs ${(needed - _vramFreeGb).toFixed(1)} GB more`;
       return `<div style="display:flex;gap:6px;margin-bottom:2px;align-items:center;">
-        <span style="color:${color};width:10px;">${dot}</span>
-        <span style="color:#888;width:30px;">${labels[id]}</span>
-        <span style="color:#ccc;width:42px;">${needed.toFixed(1)} GB</span>
+        <span style="color:${color};min-width:10px;flex-shrink:0;">${dot}</span>
+        <span style="color:#888;min-width:34px;flex-shrink:0;">${labels[id]}</span>
+        <span style="color:#ccc;min-width:56px;flex-shrink:0;">${needed.toFixed(1)} GB</span>
         <span style="color:${color};font-size:0.68rem;">${tag}</span>
       </div>`;
     }).join('');
@@ -3546,8 +3546,12 @@
       }),
     });
     if (btn) { btn.disabled = false; btn.textContent = 'Load / Apply'; }
-    if (msg) { msg.textContent = 'Saved.'; msg.style.color = '#81c784'; setTimeout(() => { if (msg.textContent === 'Saved.') msg.textContent = ''; }, 2000); }
     await loadAirLLMStatus();
+    if (msg) {
+      const prev = { text: msg.textContent, color: msg.style.color };
+      msg.textContent = 'Saved.'; msg.style.color = '#81c784';
+      setTimeout(() => { msg.textContent = prev.text; msg.style.color = prev.color; }, 1500);
+    }
   }
 
   function onWebProviderChange() {
