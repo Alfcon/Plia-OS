@@ -708,7 +708,7 @@
       <div id="m-nav">
         <button class="m-nav-btn active" data-section="voice" onclick="showMenuSection('voice')">Voice</button>
         <button class="m-nav-btn" data-section="web" onclick="showMenuSection('web')">Web</button>
-        <button class="m-nav-btn" data-section="llm" onclick="showMenuSection('llm')">LLM</button>
+        <button class="m-nav-btn" data-section="llm" onclick="showMenuSection('llm');loadAirLLMStatus()">LLM</button>
         <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system');loadPipelineStatus();loadSystemStats()">System</button>
         <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders();loadTimers()">Reminders</button>
         <button class="m-nav-btn" data-section="calendar" onclick="showMenuSection('calendar');loadCalendar();loadGcalStatus()">Calendar</button>
@@ -906,9 +906,28 @@
           </label>
           <button class="apply-btn" onclick="applyFallbackConfig()">Apply</button>
           <hr style="border:none;border-top:1px solid #222;margin:10px 0;">
-          <div style="font-size:0.78rem;color:#aaa;margin-bottom:6px;">AirLLM <span style="font-size:0.7rem;color:#555;">— large models via layer sharding</span></div>
+          <div style="font-size:0.78rem;color:#aaa;margin-bottom:6px;display:flex;align-items:center;gap:8px;">AirLLM <span style="font-size:0.7rem;color:#555;">— large models via layer sharding</span>
+            <span id="airllm-loaded-chip" style="display:none;background:#1e2a1e;border:1px solid #2e4d2e;border-radius:3px;padding:1px 7px;color:#81c784;font-size:0.68rem;">loaded</span>
+          </div>
           <label>Model <span style="font-size:0.7rem;color:#555;">— HuggingFace ID or local path</span>
-            <input type="text" id="airllm-model" placeholder="e.g. meta-llama/Llama-3-70B-Instruct" oninput="updateCompressionDots()" />
+            <input type="text" id="airllm-model" placeholder="e.g. meta-llama/Llama-3.1-70B-Instruct" list="airllm-model-list" oninput="updateCompressionDots()" />
+            <datalist id="airllm-model-list">
+              <option value="meta-llama/Llama-3.2-1B-Instruct" />
+              <option value="meta-llama/Llama-3.2-3B-Instruct" />
+              <option value="meta-llama/Llama-3.1-8B-Instruct" />
+              <option value="mistralai/Mistral-7B-Instruct-v0.3" />
+              <option value="mistralai/Mistral-Nemo-Instruct-2407" />
+              <option value="Qwen/Qwen2.5-7B-Instruct" />
+              <option value="Qwen/Qwen2.5-14B-Instruct" />
+              <option value="Qwen/Qwen2.5-72B-Instruct" />
+              <option value="google/gemma-2-9b-it" />
+              <option value="google/gemma-2-27b-it" />
+              <option value="microsoft/Phi-3-medium-4k-instruct" />
+              <option value="microsoft/phi-4" />
+              <option value="meta-llama/Llama-3.1-70B-Instruct" />
+              <option value="meta-llama/Meta-Llama-3-70B-Instruct" />
+              <option value="deepseek-ai/DeepSeek-R1-Distill-Llama-70B" />
+            </datalist>
           </label>
           <label>Compression
             <div class="comp-select" id="airllm-compression-wrap">
@@ -933,7 +952,16 @@
               </div>
             </div>
           </label>
-          <button class="apply-btn" onclick="applyAirLLMConfig()">Apply</button>
+          <div id="airllm-vram-estimate" style="display:none;margin:6px 0 8px;font-size:0.72rem;">
+            <div style="color:#666;margin-bottom:4px;">Estimated VRAM:</div>
+            <div id="airllm-vram-rows"></div>
+            <div id="airllm-vram-avail" style="color:#555;margin-top:3px;font-size:0.68rem;"></div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+            <button class="apply-btn" onclick="applyAirLLMConfig()" id="airllm-apply-btn">Load / Apply</button>
+            <button id="airllm-unload-btn" onclick="unloadAirLLM()" style="display:none;background:#2e1e1e;border:1px solid #4d2e2e;border-radius:4px;color:#ef9a9a;font-size:0.75rem;padding:5px 12px;cursor:pointer;">Unload</button>
+            <span id="airllm-status-msg" style="font-size:0.72rem;color:#888;"></span>
+          </div>
           <hr style="border:none;border-top:1px solid #222;margin:10px 0;">
           <label style="font-size:0.78rem;color:#aaa;display:block;margin-bottom:4px;">System Prompt</label>
           <textarea id="system-prompt" rows="5" style="width:100%;box-sizing:border-box;background:#1e1e1e;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:0.75rem;padding:6px 8px;resize:vertical;font-family:inherit;"></textarea>
@@ -1833,6 +1861,7 @@
       onWebProviderChange();
       onEngineChange();
       startVramPolling();
+      loadAirLLMStatus();
     });
 
   let _reminderCountdownInterval = null;
@@ -3286,6 +3315,60 @@
     }
     const activeDot = document.getElementById(`comp-dot-${_airllmCompression}`);
     if (activeDot) document.getElementById('comp-dot-selected').style.color = activeDot.style.color;
+
+    // VRAM estimate block
+    const est = document.getElementById('airllm-vram-estimate');
+    const rows = document.getElementById('airllm-vram-rows');
+    const avail = document.getElementById('airllm-vram-avail');
+    if (!est) return;
+    if (sizeB === null) { est.style.display = 'none'; return; }
+    est.style.display = '';
+    const labels = { '4bit': '4-bit', '8bit': '8-bit', 'none': 'fp16' };
+    rows.innerHTML = Object.entries(_compFactor).map(([id, factor]) => {
+      const needed = sizeB * factor;
+      const fits = _vramFreeGb > 0 && needed <= _vramFreeGb;
+      const tight = _vramFreeGb > 0 && !fits && needed <= _vramFreeGb * 1.25;
+      const dot = fits ? '●' : tight ? '●' : '●';
+      const color = fits ? '#4ade80' : tight ? '#f59e0b' : '#ef4444';
+      const tag = fits ? 'fits' : `needs ${(needed - _vramFreeGb).toFixed(1)} GB more`;
+      return `<div style="display:flex;gap:6px;margin-bottom:2px;align-items:center;">
+        <span style="color:${color};width:10px;">${dot}</span>
+        <span style="color:#888;width:30px;">${labels[id]}</span>
+        <span style="color:#ccc;width:42px;">${needed.toFixed(1)} GB</span>
+        <span style="color:${color};font-size:0.68rem;">${tag}</span>
+      </div>`;
+    }).join('');
+    if (_vramFreeGb > 0)
+      avail.textContent = `Available: ${_vramFreeGb.toFixed(1)} GB`;
+    else
+      avail.textContent = '';
+  }
+
+  async function loadAirLLMStatus() {
+    const r = await fetch('/api/airllm/status').catch(() => null);
+    if (!r || !r.ok) return;
+    const d = await r.json();
+    const chip = document.getElementById('airllm-loaded-chip');
+    const unloadBtn = document.getElementById('airllm-unload-btn');
+    const msg = document.getElementById('airllm-status-msg');
+    if (chip) chip.style.display = d.loaded ? '' : 'none';
+    if (unloadBtn) unloadBtn.style.display = d.configured ? '' : 'none';
+    if (msg) {
+      if (d.loaded) { msg.textContent = `active: ${d.model_id} (${d.compression})`; msg.style.color = '#81c784'; }
+      else if (d.configured) { msg.textContent = 'configured (not loaded)'; msg.style.color = '#888'; }
+      else { msg.textContent = ''; }
+    }
+  }
+
+  async function unloadAirLLM() {
+    const btn = document.getElementById('airllm-unload-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Unloading…'; }
+    await fetch('/api/airllm/unload', { method: 'POST' });
+    document.getElementById('airllm-model').value = '';
+    const est = document.getElementById('airllm-vram-estimate');
+    if (est) est.style.display = 'none';
+    if (btn) { btn.disabled = false; btn.textContent = 'Unload'; }
+    await loadAirLLMStatus();
   }
 
   document.addEventListener('click', e => {
@@ -3450,8 +3533,11 @@
     });
   }
 
-  function applyAirLLMConfig() {
-    fetch('/api/config', {
+  async function applyAirLLMConfig() {
+    const btn = document.getElementById('airllm-apply-btn');
+    const msg = document.getElementById('airllm-status-msg');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    await fetch('/api/config', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
@@ -3459,6 +3545,9 @@
         airllm_compression: _airllmCompression,
       }),
     });
+    if (btn) { btn.disabled = false; btn.textContent = 'Load / Apply'; }
+    if (msg) { msg.textContent = 'Saved.'; msg.style.color = '#81c784'; setTimeout(() => { if (msg.textContent === 'Saved.') msg.textContent = ''; }, 2000); }
+    await loadAirLLMStatus();
   }
 
   function onWebProviderChange() {

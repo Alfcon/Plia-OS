@@ -916,6 +916,26 @@ async def vram_release(body: dict):
     return get_vram_broker().status()
 
 
+@router.get("/api/airllm/status")
+async def airllm_status():
+    import agents.airllm_backend as be
+    cfg = get_config()
+    return {
+        "loaded": be._model is not None,
+        "model_id": be._model_id or "",
+        "compression": cfg.airllm_compression,
+        "configured": bool(cfg.airllm_model),
+    }
+
+
+@router.post("/api/airllm/unload")
+async def airllm_unload():
+    import agents.airllm_backend as be
+    be.unload()
+    update_config(airllm_model="")
+    return {"ok": True}
+
+
 @router.get("/api/mcp/servers")
 async def get_mcp_servers():
     return get_mcp_status()
