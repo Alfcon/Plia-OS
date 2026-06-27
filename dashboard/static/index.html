@@ -721,6 +721,7 @@
         <button class="m-nav-btn" data-section="tokens" onclick="showMenuSection('tokens');loadTokenUsage()">Tokens</button>
         <button class="m-nav-btn" data-section="email" onclick="showMenuSection('email');loadEmailAccounts()">Email</button>
         <button class="m-nav-btn" data-section="observer" onclick="showMenuSection('observer');loadObserverStatus()">Observer</button>
+        <button class="m-nav-btn" data-section="proactive" onclick="showMenuSection('proactive');loadProactiveStatus()">Proactive</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1308,6 +1309,45 @@
           </div>
         </div>
 
+        <div id="m-section-proactive" class="m-pane" style="display:none">
+          <div class="settings-section">
+            <h3 style="margin:0 0 8px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">Proactive Assistant</h3>
+            <p style="font-size:11px;color:#666;margin:0 0 10px">Monitors activity and sends helpful suggestions via voice and chat. Requires Observer running.</p>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+              <span style="font-size:13px;color:#ccc">Proactive</span>
+              <button id="proactiveToggleBtn" onclick="toggleProactive()"
+                style="padding:4px 14px;border-radius:4px;border:1px solid #444;background:#222;color:#ccc;cursor:pointer;font-size:12px">
+                Loading…
+              </button>
+            </div>
+            <div id="proactiveStatus" style="font-size:12px;color:#888;padding-left:2px;margin-bottom:6px">Checking…</div>
+            <div style="font-size:11px;color:#666;margin-bottom:4px">Last trigger: <span id="proactiveLastTrigger">—</span></div>
+            <div style="font-size:11px;color:#666;margin-bottom:10px">Last message: <span id="proactiveLastMessage">—</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:#aaa">
+              <label>Quiet start (0-23)
+                <input type="number" id="proactiveQuietStart" min="0" max="23"
+                  style="width:100%;margin-top:4px;background:#111;border:1px solid #333;color:#ccc;border-radius:3px;padding:3px 6px"
+                  onchange="saveProactiveConfig()">
+              </label>
+              <label>Quiet end (0-23)
+                <input type="number" id="proactiveQuietEnd" min="0" max="23"
+                  style="width:100%;margin-top:4px;background:#111;border:1px solid #333;color:#ccc;border-radius:3px;padding:3px 6px"
+                  onchange="saveProactiveConfig()">
+              </label>
+              <label>Distraction threshold (min)
+                <input type="number" id="proactiveDistractionThreshold" min="5" max="120"
+                  style="width:100%;margin-top:4px;background:#111;border:1px solid #333;color:#ccc;border-radius:3px;padding:3px 6px"
+                  onchange="saveProactiveConfig()">
+              </label>
+              <label>Check-in interval (min)
+                <input type="number" id="proactiveCheckinInterval" min="30" max="480"
+                  style="width:100%;margin-top:4px;background:#111;border:1px solid #333;color:#ccc;border-radius:3px;padding:3px 6px"
+                  onchange="saveProactiveConfig()">
+              </label>
+            </div>
+          </div>
+        </div>
+
       </div>
 </div>
 <div id="chat-wrap">
@@ -1421,6 +1461,12 @@
     }
     if (msg.type === 'observer_status') {
       updateObserverUI(msg);
+    }
+    if (msg.type === 'proactive_status') {
+      updateProactiveUI(msg);
+    }
+    if (msg.type === 'proactive_message') {
+      _appendMsg('assistant', '[Proactive] ' + msg.text);
     }
     if (msg.type === 'tool_approval_request') {
       showToolApprovalModal(msg);
@@ -3544,6 +3590,68 @@
       document.getElementById('observerStatus').textContent = 'Request failed';
     } finally {
       btn.disabled = false;
+    }
+  }
+
+  async function loadProactiveStatus() {
+    try {
+      const r = await fetch('/api/proactive/status');
+      const s = await r.json();
+      updateProactiveUI(s);
+      document.getElementById('proactiveQuietStart').value = s.quiet_hours_start ?? 0;
+      document.getElementById('proactiveQuietEnd').value = s.quiet_hours_end ?? 7;
+      document.getElementById('proactiveDistractionThreshold').value = s.distraction_threshold ?? 20;
+      document.getElementById('proactiveCheckinInterval').value = s.checkin_interval ?? 120;
+    } catch(e) {
+      const el = document.getElementById('proactiveStatus');
+      if (el) el.textContent = 'Status unavailable';
+    }
+  }
+
+  function updateProactiveUI(s) {
+    const btn = document.getElementById('proactiveToggleBtn');
+    const status = document.getElementById('proactiveStatus');
+    if (!btn) return;
+    btn.textContent = s.enabled ? 'Disable' : 'Enable';
+    status.textContent = s.running ? 'Running' : 'Stopped';
+    status.style.color = s.running ? '#a6e3a1' : '#888';
+    const lastTrig = document.getElementById('proactiveLastTrigger');
+    const lastMsg = document.getElementById('proactiveLastMessage');
+    if (lastTrig) lastTrig.textContent = s.last_trigger_type || '—';
+    if (lastMsg) lastMsg.textContent = s.last_message_ts || '—';
+  }
+
+  async function toggleProactive() {
+    const btn = document.getElementById('proactiveToggleBtn');
+    const current = btn.textContent.trim();
+    try {
+      const endpoint = current === 'Enable' ? '/api/proactive/enable' : '/api/proactive/disable';
+      const r = await fetch(endpoint, {method: 'POST'});
+      const data = await r.json();
+      if (!data.success) {
+        document.getElementById('proactiveStatus').textContent = data.message || 'Request failed';
+        document.getElementById('proactiveStatus').style.color = '#e74c3c';
+        return;
+      }
+      await loadProactiveStatus();
+    } catch(e) {
+      document.getElementById('proactiveStatus').textContent = 'Request failed';
+    }
+  }
+
+  async function saveProactiveConfig() {
+    const fields = {
+      proactive_quiet_hours_start: parseInt(document.getElementById('proactiveQuietStart').value) || 0,
+      proactive_quiet_hours_end: parseInt(document.getElementById('proactiveQuietEnd').value) || 7,
+      proactive_distraction_threshold: parseInt(document.getElementById('proactiveDistractionThreshold').value) || 20,
+      proactive_checkin_interval: parseInt(document.getElementById('proactiveCheckinInterval').value) || 120,
+    };
+    for (const [k, v] of Object.entries(fields)) {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({[k]: v})
+      });
     }
   }
 

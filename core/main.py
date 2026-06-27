@@ -29,6 +29,16 @@ async def _start_observer() -> None:
         logger.warning("Observer startup failed, disabled: %s", exc)
 
 
+async def _start_proactive() -> None:
+    try:
+        import core.proactive as pro_mod
+        await pro_mod.get_proactive().start()
+    except Exception as exc:
+        from core.config import update_config
+        await asyncio.to_thread(update_config, proactive_enabled=False)
+        logger.warning("Proactive assistant startup failed, disabled: %s", exc)
+
+
 async def _start_tor_if_enabled() -> None:
     import core.tor_manager as tm
     result = await asyncio.to_thread(tm.enable)
@@ -71,6 +81,10 @@ def create_app() -> FastAPI:
         observer_task = None
         if get_config().observer_enabled:
             observer_task = asyncio.create_task(_start_observer())
+        # Start Proactive assistant if previously enabled
+        proactive_activity_task = None
+        if get_config().proactive_enabled:
+            proactive_activity_task = asyncio.create_task(_start_proactive())
         yield
         pipeline_task.cancel()
         reminder_task.cancel()
@@ -80,7 +94,9 @@ def create_app() -> FastAPI:
             tor_task.cancel()
         if observer_task and not observer_task.done():
             observer_task.cancel()
-        for task in filter(None, (pipeline_task, reminder_task, cron_task, proactive_task, tor_task, observer_task)):
+        if proactive_activity_task and not proactive_activity_task.done():
+            proactive_activity_task.cancel()
+        for task in filter(None, (pipeline_task, reminder_task, cron_task, proactive_task, tor_task, observer_task, proactive_activity_task)):
             try:
                 await task
             except asyncio.CancelledError:

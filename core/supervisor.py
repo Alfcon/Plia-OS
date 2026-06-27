@@ -113,7 +113,9 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
                 "give me a briefing", "good morning", "what's today",
                 "what's on today", "what do i have today",
                 "enable observer", "start observer", "disable observer", "stop observer",
-                "observer status", "what am i doing", "what are you tracking"],
+                "observer status", "what am i doing", "what are you tracking",
+                "enable proactive", "start proactive", "disable proactive", "stop proactive",
+                "proactive status", "stop interrupting", "pause suggestions", "resume suggestions"],
 }
 
 
