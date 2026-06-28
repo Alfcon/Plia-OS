@@ -271,6 +271,35 @@ async def list_modules():
     return result
 
 
+@router.post("/api/modules/reload/{name}")
+async def reload_single_module(name: str):
+    import importlib
+    import sys
+    from core.registry import _tools
+    mod_key = f"modules.{name}"
+    # unregister tools for this module only
+    to_remove = [k for k, v in list(_tools.items()) if v.get("module") == name]
+    for k in to_remove:
+        del _tools[k]
+    # force reimport
+    if mod_key in sys.modules:
+        del sys.modules[mod_key]
+    mod_path = _MODULES_DIR / f"{name}.py"
+    if not mod_path.exists():
+        raise HTTPException(status_code=404, detail=f"Module {name!r} not found on disk")
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(mod_key, mod_path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[mod_key] = mod
+        spec.loader.exec_module(mod)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Reload error: {exc}")
+    registered = registry.list_modules()
+    tools = registered.get(name, [])
+    return {"ok": True, "name": name, "tools": tools}
+
+
 @router.post("/api/modules/reload")
 async def reload_modules():
     from core.registry import _tools
@@ -2679,6 +2708,27 @@ async def clear_logs():
     return {"ok": True}
 
 
+@router.get("/api/logs/tail")
+async def log_tail(level: str = "DEBUG"):
+    from core.log_buffer import get_log_buffer
+    min_level = _LEVEL_MAP.get(level.upper(), 0)
+    buf = get_log_buffer()
+    with buf._lock:
+        seq = buf._seq
+
+    async def _stream():
+        nonlocal seq
+        while True:
+            records = await asyncio.to_thread(buf.get_since, seq - 1, min_level)
+            if records:
+                for r in records:
+                    yield f"data: {json.dumps(r)}\n\n"
+                seq = records[-1]["seq"] + 1
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(_stream(), media_type="text/event-stream")
+
+
 # ── Workflows ─────────────────────────────────────────────────────────────────
 
 @router.get("/api/workflows/history")
@@ -3767,6 +3817,51 @@ async def recent_traces(n: int = 50):
 async def clear_traces():
     _TURN_TRACES.clear()
     return {"ok": True}
+
+
+import collections as _notif_collections
+_NOTIFY_HISTORY: _notif_collections.deque = _notif_collections.deque(maxlen=50)
+
+
+@router.post("/api/notify")
+async def send_notification(body: dict):
+    import time
+    title = (body.get("title") or "Plia").strip()
+    message = (body.get("message") or "").strip()
+    urgency = (body.get("urgency") or "normal").strip().lower()
+    if urgency not in ("low", "normal", "critical"):
+        urgency = "normal"
+    if not message:
+        raise HTTPException(status_code=422, detail="message required")
+
+    proc = await asyncio.create_subprocess_exec(
+        "notify-send", "-u", urgency, title, message,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+    entry = {"ts": time.time(), "title": title, "message": message, "urgency": urgency, "ok": proc.returncode == 0}
+    if proc.returncode != 0:
+        entry["error"] = stderr.decode().strip()
+    _NOTIFY_HISTORY.appendleft(entry)
+    return entry
+
+
+@router.get("/api/notify/history")
+async def notify_history(n: int = 20):
+    return {"history": list(_NOTIFY_HISTORY)[:n]}
+
+
+@router.get("/api/benchmark/chart")
+async def benchmark_chart_data(n: int = 50):
+    history = list(_BENCH_HISTORY)[:n]
+    history.reverse()
+    return {
+        "labels": [h["ts"] for h in history],
+        "latency_ms": [h["latency_ms"] for h in history],
+        "tokens_per_sec": [h["tokens_per_sec"] for h in history],
+        "models": [h["model"] for h in history],
+    }
 
 
 @router.websocket("/ws")

@@ -794,6 +794,9 @@
         <button class="m-nav-btn" data-section="micviz" onclick="showMenuSection('micviz')">Mic Viz</button>
         <button class="m-nav-btn" data-section="cfgpresets" onclick="showMenuSection('cfgpresets');loadCfgPresets()">Presets</button>
         <button class="m-nav-btn" data-section="remindersbulk" onclick="showMenuSection('remindersbulk');loadBulkReminders()">Rem Bulk</button>
+        <button class="m-nav-btn" data-section="notify" onclick="showMenuSection('notify');loadNotifyHistory()">Notify</button>
+        <button class="m-nav-btn" data-section="logtail" onclick="showMenuSection('logtail');startLogTail()">Log Tail</button>
+        <button class="m-nav-btn" data-section="benchchart" onclick="showMenuSection('benchchart');loadBenchChart()">Bench Chart</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2257,6 +2260,60 @@
           <div id="cronnext-list" style="flex:1;min-height:0;overflow-y:auto;font-size:0.72rem;font-family:monospace;color:#aaa;display:flex;flex-direction:column;gap:3px;"></div>
         </div>
 
+        <!-- System Notify -->
+        <div id="m-section-notify" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Send OS desktop notifications via notify-send. Requires a running notification daemon.</div>
+          <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
+            <input id="notif-title" type="text" placeholder="Title" value="Plia"
+              style="background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 8px;font-size:0.72rem;">
+            <textarea id="notif-msg" rows="2" placeholder="Message…"
+              style="background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 8px;font-size:0.72rem;resize:vertical;"></textarea>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <select id="notif-urgency" style="background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 6px;font-size:0.72rem;">
+                <option value="low">low</option>
+                <option value="normal" selected>normal</option>
+                <option value="critical">critical</option>
+              </select>
+              <button onclick="sendNotification()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 12px;border-radius:3px;cursor:pointer;">Send</button>
+            </div>
+          </div>
+          <div id="notif-status" style="font-size:0.7rem;color:#888;min-height:1rem;flex-shrink:0;"></div>
+          <div style="font-size:0.68rem;color:#444;flex-shrink:0;">Recent</div>
+          <div id="notif-history" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;font-size:0.7rem;font-family:monospace;"></div>
+        </div>
+
+        <!-- Log Tail -->
+        <div id="m-section-logtail" class="m-pane" style="display:none;flex-direction:column;gap:6px;">
+          <div style="display:flex;gap:5px;align-items:center;flex-shrink:0;flex-wrap:wrap;">
+            <select id="logtail-level" onchange="stopLogTail();startLogTail()"
+              style="background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:2px 6px;font-size:0.72rem;">
+              <option value="DEBUG">DEBUG</option>
+              <option value="INFO" selected>INFO</option>
+              <option value="WARNING">WARNING</option>
+              <option value="ERROR">ERROR</option>
+            </select>
+            <span id="logtail-status" style="font-size:0.68rem;color:#555;">—</span>
+            <span style="flex:1;"></span>
+            <button onclick="clearLogTailDisplay()" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;">Clear</button>
+            <button onclick="stopLogTail()" style="background:none;border:none;color:#ef9a9a;font-size:0.7rem;cursor:pointer;">■ Stop</button>
+          </div>
+          <div id="logtail-log" style="flex:1;min-height:0;overflow-y:auto;font-size:0.66rem;font-family:monospace;border:1px solid #1a1a1a;border-radius:3px;display:flex;flex-direction:column;gap:1px;padding:4px;"></div>
+        </div>
+
+        <!-- Bench Chart -->
+        <div id="m-section-benchchart" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Latency and tokens/sec from past benchmark runs.</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+            <button onclick="loadBenchChart()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻ Refresh</button>
+            <span id="benchchart-summary" style="font-size:0.68rem;color:#555;"></span>
+          </div>
+          <canvas id="benchchart-canvas" width="600" height="160"
+            style="width:100%;height:160px;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;display:block;flex-shrink:0;"></canvas>
+          <canvas id="benchchart-tps-canvas" width="600" height="80"
+            style="width:100%;height:80px;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;display:block;flex-shrink:0;"></canvas>
+          <div id="benchchart-legend" style="font-size:0.65rem;font-family:monospace;color:#555;flex-shrink:0;"></div>
+        </div>
+
         <!-- Ollama Pull -->
         <div id="m-section-ollamapull" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
           <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Pull a model from Ollama registry. Streams download progress in real time.</div>
@@ -3670,7 +3727,12 @@
             style="background:#1e1e1e;border:1px solid #333;border-radius:3px;color:${m.loaded?'#aaa':'#333'};font-size:0.7rem;padding:2px 6px;cursor:${m.loaded?'pointer':'default'};flex-shrink:0;width:56px;">
             ${actionLabel}
           </button>
-          <div style="min-width:0;">
+          <button onclick="reloadSingleModule('${_esc(m.name)}')" title="Hot-reload this module"
+            ${!m.on_disk ? 'disabled' : ''}
+            style="background:#0d1b2a;border:1px solid #1b3a5e;border-radius:3px;color:#4fc3f7;font-size:0.68rem;padding:2px 5px;cursor:${m.on_disk?'pointer':'default'};flex-shrink:0;">
+            ↺
+          </button>
+          <div style="min-width:0;flex:1;">
             <span style="color:#e0e0e0;font-size:0.75rem;font-family:monospace;">${_esc(m.name)}.py</span>
             <span style="color:${statusColor};font-size:0.68rem;margin-left:5px;">${statusLabel}</span>
             ${!m.on_disk ? '<span style="color:#f9a825;font-size:0.65rem;margin-left:4px;">(removed from disk)</span>' : ''}
@@ -6576,6 +6638,196 @@
         <span style="color:#4fc3f7;margin-left:auto;">in ${_esc(diffStr)}</span>
       </div>`;
     }).join('');
+  }
+
+  // ── System Notifications ─────────────────────────────────────────────────
+
+  async function sendNotification() {
+    const title = document.getElementById('notif-title')?.value || 'Plia';
+    const message = (document.getElementById('notif-msg')?.value || '').trim();
+    const urgency = document.getElementById('notif-urgency')?.value || 'normal';
+    const status = document.getElementById('notif-status');
+    if (!message) { status.textContent = 'Message required.'; return; }
+    status.textContent = 'Sending…';
+    const r = await fetch('/api/notify', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({title, message, urgency}),
+    });
+    const d = await r.json();
+    status.textContent = d.ok ? '✓ Sent' : `✗ Failed: ${d.error || r.status}`;
+    await loadNotifyHistory();
+  }
+
+  async function loadNotifyHistory() {
+    const r = await fetch('/api/notify/history');
+    if (!r.ok) return;
+    const {history} = await r.json();
+    const el = document.getElementById('notif-history');
+    if (!el) return;
+    if (!history.length) { el.innerHTML = '<div style="color:#333;">No notifications sent.</div>'; return; }
+    const _URGENCY_COLORS = {low:'#555',normal:'#4fc3f7',critical:'#ef5350'};
+    el.innerHTML = history.map(h => {
+      const t = new Date(h.ts * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      return `<div style="display:flex;gap:6px;padding:3px 0;border-bottom:1px solid #111;align-items:baseline;">
+        <span style="color:#333;font-size:0.62rem;flex-shrink:0;">${_esc(t)}</span>
+        <span style="color:${_URGENCY_COLORS[h.urgency]||'#555'};font-size:0.65rem;flex-shrink:0;">${_esc(h.urgency)}</span>
+        <span style="color:#aaa;flex-shrink:0;">${_esc(h.title)}</span>
+        <span style="color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${_esc(h.message)}</span>
+        ${h.ok ? '' : '<span style="color:#ef5350;font-size:0.62rem;">✗</span>'}
+      </div>`;
+    }).join('');
+  }
+
+  // ── Log Tail ──────────────────────────────────────────────────────────────
+
+  let _logTailReader = null;
+
+  async function startLogTail() {
+    stopLogTail();
+    const level = document.getElementById('logtail-level')?.value || 'INFO';
+    const log = document.getElementById('logtail-log');
+    const status = document.getElementById('logtail-status');
+    if (status) status.textContent = 'Connecting…';
+    const _LEVEL_COLORS = {DEBUG:'#444',INFO:'#4fc3f7',WARNING:'#ffb74d',ERROR:'#ef5350',CRITICAL:'#e040fb'};
+
+    try {
+      const resp = await fetch(`/api/logs/tail?level=${encodeURIComponent(level)}`);
+      const reader = resp.body.getReader();
+      _logTailReader = reader;
+      if (status) status.textContent = `live (${level})`;
+      const dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, {stream: true});
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          let obj;
+          try { obj = JSON.parse(line.slice(6)); } catch { continue; }
+          const t = new Date(obj.ts * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+          const color = _LEVEL_COLORS[obj.level] || '#555';
+          const entry = document.createElement('div');
+          entry.style.cssText = 'padding:1px 0;border-bottom:1px solid #0d0d0d;display:flex;gap:6px;';
+          entry.innerHTML = `<span style="color:#333;flex-shrink:0;font-size:0.62rem;">${_esc(t)}</span>
+            <span style="color:${color};flex-shrink:0;min-width:52px;font-size:0.62rem;">${_esc(obj.level)}</span>
+            <span style="color:#555;flex-shrink:0;font-size:0.62rem;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(obj.name)}</span>
+            <span style="color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${_esc(obj.msg)}</span>`;
+          if (log) { log.appendChild(entry); log.scrollTop = log.scrollHeight; }
+        }
+      }
+    } catch(e) {
+      if (e.name !== 'AbortError' && status) status.textContent = `Error: ${e.message}`;
+    } finally {
+      _logTailReader = null;
+      if (status && status.textContent.startsWith('live')) status.textContent = 'stopped';
+    }
+  }
+
+  function stopLogTail() {
+    if (_logTailReader) { _logTailReader.cancel(); _logTailReader = null; }
+  }
+
+  function clearLogTailDisplay() {
+    const log = document.getElementById('logtail-log');
+    if (log) log.innerHTML = '';
+  }
+
+  // ── Benchmark Chart ───────────────────────────────────────────────────────
+
+  async function loadBenchChart() {
+    const r = await fetch('/api/benchmark/chart?n=50');
+    if (!r.ok) return;
+    const data = await r.json();
+    _drawBenchChart(data);
+  }
+
+  function _drawBenchChart(data) {
+    const summary = document.getElementById('benchchart-summary');
+    if (!data.labels.length) {
+      if (summary) summary.textContent = 'No runs yet. Run a benchmark first.';
+      return;
+    }
+    if (summary) summary.textContent = `${data.labels.length} run(s)`;
+
+    // latency canvas
+    const cvs = document.getElementById('benchchart-canvas');
+    if (cvs) _drawLineChart(cvs, data.latency_ms, '#4fc3f7', 'Latency (ms)', true);
+
+    // tps canvas
+    const cvs2 = document.getElementById('benchchart-tps-canvas');
+    if (cvs2) _drawLineChart(cvs2, data.tokens_per_sec, '#81c784', 'tok/s', false);
+
+    // legend
+    const legend = document.getElementById('benchchart-legend');
+    if (legend && data.labels.length) {
+      const last = data.labels.length - 1;
+      legend.textContent = `Latest: ${new Date(data.labels[last]*1000).toLocaleString()} · model: ${data.models[last]} · ${data.latency_ms[last]}ms · ${data.tokens_per_sec[last]} tok/s`;
+    }
+  }
+
+  function _drawLineChart(canvas, values, color, label, showValues) {
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const pad = {top: 18, right: 12, bottom: 20, left: 42};
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, W, H);
+    if (!values.length) return;
+    const minV = Math.min(...values), maxV = Math.max(...values);
+    const range = maxV - minV || 1;
+    const toX = i => pad.left + (i / (values.length - 1 || 1)) * (W - pad.left - pad.right);
+    const toY = v => pad.top + (1 - (v - minV) / range) * (H - pad.top - pad.bottom);
+
+    // grid
+    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = pad.top + i * (H - pad.top - pad.bottom) / 4;
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+      const val = maxV - i * range / 4;
+      ctx.fillStyle = '#333'; ctx.font = '9px monospace'; ctx.textAlign = 'right';
+      ctx.fillText(Math.round(val), pad.left - 4, y + 3);
+    }
+
+    // line
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    values.forEach((v, i) => {
+      const x = toX(i), y = toY(v);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // dots
+    ctx.fillStyle = color;
+    values.forEach((v, i) => {
+      ctx.beginPath(); ctx.arc(toX(i), toY(v), 2.5, 0, Math.PI * 2); ctx.fill();
+    });
+
+    // label
+    ctx.fillStyle = '#444'; ctx.font = '9px monospace'; ctx.textAlign = 'left';
+    ctx.fillText(label, pad.left, 10);
+  }
+
+  // ── Module hot-reload ─────────────────────────────────────────────────────
+
+  async function reloadSingleModule(name) {
+    const status = document.getElementById('mod-status');
+    if (status) status.textContent = `Reloading ${name}…`;
+    try {
+      const r = await fetch(`/api/modules/reload/${encodeURIComponent(name)}`, {method: 'POST'});
+      if (!r.ok) {
+        const d = await r.json();
+        if (status) status.textContent = `✗ ${name}: ${d.detail || r.status}`;
+        return;
+      }
+      const d = await r.json();
+      if (status) status.textContent = `✓ ${name} reloaded (${d.tools.length} tool${d.tools.length!==1?'s':''})`;
+      await loadModules();
+    } catch(e) {
+      if (status) status.textContent = `✗ ${name}: ${e.message}`;
+    }
   }
 
   // ── Ollama Pull ───────────────────────────────────────────────────────────

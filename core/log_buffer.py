@@ -23,9 +23,14 @@ class LogBuffer(logging.Handler):
         super().__init__(level=logging.DEBUG)
         self._buf: collections.deque[dict] = collections.deque(maxlen=capacity)
         self._lock = threading.Lock()
+        self._seq: int = 0
 
     def emit(self, record: logging.LogRecord) -> None:
+        with self._lock:
+            seq = self._seq
+            self._seq += 1
         entry = {
+            "seq": seq,
             "ts": record.created,
             "level": _LEVEL_NAMES.get(record.levelno, record.levelname),
             "levelno": record.levelno,
@@ -40,6 +45,11 @@ class LogBuffer(logging.Handler):
             records = list(self._buf)
         filtered = [r for r in records if r["levelno"] >= min_level]
         return filtered[-n:]
+
+    def get_since(self, seq: int, min_level: int = logging.DEBUG) -> list[dict]:
+        with self._lock:
+            records = list(self._buf)
+        return [r for r in records if r["levelno"] >= min_level and r["seq"] > seq]
 
     def clear(self) -> None:
         with self._lock:
