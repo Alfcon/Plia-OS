@@ -56,8 +56,8 @@ def delete_workflow(name: str) -> bool:
     return True
 
 
-def _interpolate(value: Any, results: list[str]) -> Any:
-    """Substitute {{prev}} and {{step_N}} in string values."""
+def _interpolate(value: Any, results: list[str], payload: dict | None = None) -> Any:
+    """Substitute {{prev}}, {{step_N}}, {{payload}}, {{payload.key}} in string values."""
     if not isinstance(value, str):
         return value
     prev = results[-1] if results else ""
@@ -67,17 +67,29 @@ def _interpolate(value: Any, results: list[str]) -> Any:
         idx = int(m.group(1))
         return results[idx] if 0 <= idx < len(results) else m.group(0)
 
-    return re.sub(r"\{\{step_(\d+)\}\}", _sub_step, value)
+    value = re.sub(r"\{\{step_(\d+)\}\}", _sub_step, value)
+
+    if payload is not None:
+        value = value.replace("{{payload}}", json.dumps(payload))
+
+        def _sub_payload(m: re.Match) -> str:
+            key = m.group(1)
+            v = payload.get(key, m.group(0))
+            return str(v)
+
+        value = re.sub(r"\{\{payload\.([^}]+)\}\}", _sub_payload, value)
+
+    return value
 
 
-def _interpolate_params(params: dict, results: list[str]) -> dict:
-    return {k: _interpolate(v, results) for k, v in params.items()}
+def _interpolate_params(params: dict, results: list[str], payload: dict | None = None) -> dict:
+    return {k: _interpolate(v, results, payload) for k, v in params.items()}
 
 
 from core.registry import call_tool_async
 
 
-async def run_workflow(name: str) -> list[dict]:
+async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
     wf = get_workflow(name)
     if wf is None:
         raise KeyError(f"Workflow {name!r} not found")
@@ -89,7 +101,7 @@ async def run_workflow(name: str) -> list[dict]:
         tool = step.get("tool", "")
         raw_params = step.get("params", {})
         note = step.get("note", "")
-        params = _interpolate_params(raw_params, step_results)
+        params = _interpolate_params(raw_params, step_results, payload)
         t0 = time.monotonic()
         try:
             result = await call_tool_async(tool, params)

@@ -1556,6 +1556,64 @@ async def run_workflow_endpoint(name: str):
     return {"name": name, "steps": results}
 
 
+# ── Webhooks ──────────────────────────────────────────────────────────────────
+
+@router.get("/api/webhooks")
+async def list_webhooks_endpoint():
+    from agents.webhook_store import list_webhooks
+    return {"webhooks": await asyncio.to_thread(list_webhooks)}
+
+
+@router.post("/api/webhooks")
+async def save_webhook_endpoint(body: dict):
+    from agents.webhook_store import save_webhook
+    slug = body.get("slug", "").strip().replace(" ", "-")
+    target = body.get("target", "").strip()
+    if not slug:
+        raise HTTPException(status_code=400, detail="slug required")
+    if not target:
+        raise HTTPException(status_code=400, detail="target required")
+    await asyncio.to_thread(
+        save_webhook, slug,
+        name=body.get("name", ""),
+        target_type=body.get("target_type", "workflow"),
+        target=target,
+        params=body.get("params", {}),
+        description=body.get("description", ""),
+        secret=body.get("secret", ""),
+    )
+    return {"ok": True, "slug": slug}
+
+
+@router.delete("/api/webhooks/{slug}")
+async def delete_webhook_endpoint(slug: str):
+    from agents.webhook_store import delete_webhook
+    deleted = await asyncio.to_thread(delete_webhook, slug)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    return {"ok": True}
+
+
+@router.post("/api/webhooks/trigger/{slug}")
+async def trigger_webhook(slug: str, request: Request):
+    from agents.webhook_store import get_webhook, fire_webhook
+    wh = await asyncio.to_thread(get_webhook, slug)
+    if wh is None:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    secret = wh.get("secret", "")
+    if secret:
+        provided = request.headers.get("X-Webhook-Secret", "")
+        if provided != secret:
+            raise HTTPException(status_code=401, detail="Invalid secret")
+    try:
+        body = await request.json()
+        payload = body if isinstance(body, dict) else {"body": body}
+    except Exception:
+        payload = {}
+    result = await fire_webhook(slug, payload)
+    return result
+
+
 @router.get("/api/token-usage")
 async def get_token_usage():
     from core.token_usage import get_stats

@@ -744,6 +744,7 @@
         <button class="m-nav-btn" data-section="files" onclick="showMenuSection('files');loadFileBrowser()">Files</button>
         <button class="m-nav-btn" data-section="logs" onclick="showMenuSection('logs');loadLogs()">Logs</button>
         <button class="m-nav-btn" data-section="flows" onclick="showMenuSection('flows');loadWorkflows()">Flows</button>
+        <button class="m-nav-btn" data-section="hooks" onclick="showMenuSection('hooks');loadWebhooks()">Hooks</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1601,6 +1602,35 @@
               </button>
             </div>
           </div>
+        </div>
+
+        <div id="m-section-hooks" class="m-pane" style="display:none;flex-direction:column;">
+          <!-- Create form -->
+          <div style="border:1px solid #1a1a1a;border-radius:3px;padding:8px;margin-bottom:8px;flex-shrink:0;">
+            <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:6px;">New Webhook</div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px;">
+              <input id="hook-slug" placeholder="slug (url key)" style="flex:1;min-width:90px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 7px;font-size:0.75rem;font-family:monospace;">
+              <input id="hook-name" placeholder="Display name" style="flex:1;min-width:90px;background:#111;border:1px solid #333;color:#888;border-radius:3px;padding:3px 7px;font-size:0.72rem;">
+            </div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px;">
+              <select id="hook-type" onchange="hookTypeChanged()"
+                style="background:#1a1a1a;border:1px solid #333;color:#ccc;font-size:0.72rem;padding:3px 6px;border-radius:3px;">
+                <option value="workflow">Workflow</option>
+                <option value="tool">Tool</option>
+              </select>
+              <select id="hook-target-wf" style="flex:1;min-width:100px;background:#111;border:1px solid #333;color:#ccc;font-size:0.72rem;padding:3px 6px;border-radius:3px;font-family:monospace;"></select>
+              <select id="hook-target-tool" style="flex:1;min-width:100px;display:none;background:#111;border:1px solid #333;color:#ccc;font-size:0.72rem;padding:3px 6px;border-radius:3px;font-family:monospace;"></select>
+            </div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px;">
+              <input id="hook-secret" placeholder="Secret (optional — sent as X-Webhook-Secret)" style="flex:1;min-width:100px;background:#111;border:1px solid #333;color:#888;border-radius:3px;padding:3px 7px;font-size:0.72rem;font-family:monospace;">
+              <input id="hook-desc" placeholder="Description" style="flex:1;min-width:100px;background:#111;border:1px solid #333;color:#888;border-radius:3px;padding:3px 7px;font-size:0.72rem;">
+            </div>
+            <div style="display:flex;justify-content:flex-end;">
+              <button onclick="hookSave()" style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.7rem;padding:3px 12px;border-radius:3px;cursor:pointer;">Save</button>
+            </div>
+          </div>
+          <!-- List -->
+          <div id="hook-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;"></div>
         </div>
 
         <div id="m-section-flows" class="m-pane" style="display:none;flex-direction:column;">
@@ -5086,6 +5116,124 @@
       return;
     }
   });
+
+  // ── Webhook triggers ─────────────────────────────────────────────────────
+
+  let _hookWorkflows = [];
+  let _hookTools = [];
+
+  async function loadWebhooks() {
+    if (!_hookTools.length) {
+      try {
+        const r = await fetch('/api/tools');
+        if (r.ok) _hookTools = Object.keys(await r.json());
+      } catch(e) {}
+    }
+    if (!_hookWorkflows.length) {
+      try {
+        const r = await fetch('/api/workflows');
+        if (r.ok) _hookWorkflows = (await r.json()).workflows.map(w => w.name);
+      } catch(e) {}
+    }
+    _hookPopulateTargets();
+    let data;
+    try {
+      const r = await fetch('/api/webhooks');
+      if (!r.ok) return;
+      data = await r.json();
+    } catch(e) { return; }
+    const list = document.getElementById('hook-list');
+    if (!data.webhooks.length) {
+      list.innerHTML = '<div style="padding:10px 8px;color:#333;font-size:0.72rem;">No webhooks yet.</div>';
+      return;
+    }
+    const base = window.location.origin;
+    list.innerHTML = data.webhooks.map(wh => {
+      const url = `${base}/api/webhooks/trigger/${_esc(wh.slug)}`;
+      const secretBadge = wh.secret
+        ? `<span style="font-size:0.62rem;color:#ffb74d;background:#1a1000;border:1px solid #3a2500;border-radius:2px;padding:0 4px;">🔒 secret</span>`
+        : '';
+      return `<div style="padding:6px 8px;border-bottom:1px solid #111;display:flex;flex-direction:column;gap:3px;">
+        <div style="display:flex;align-items:center;gap:5px;">
+          <span style="color:#e0e0e0;font-family:monospace;font-size:0.75rem;font-weight:600;">${_esc(wh.slug)}</span>
+          ${secretBadge}
+          <span style="color:#444;font-size:0.68rem;margin-left:2px;">${_esc(wh.target_type)} → <span style="color:#888;">${_esc(wh.target)}</span></span>
+          <span style="flex:1;"></span>
+          <button onclick="hookTest(${JSON.stringify(wh.slug)})" title="Send test POST"
+            style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.65rem;padding:2px 6px;border-radius:3px;cursor:pointer;">Test</button>
+          <button onclick="hookDelete(${JSON.stringify(wh.slug)})"
+            style="background:#2a0d0d;border:1px solid #5e1b1b;color:#ef5350;font-size:0.65rem;padding:2px 6px;border-radius:3px;cursor:pointer;">✕</button>
+        </div>
+        ${wh.description ? `<div style="color:#555;font-size:0.65rem;">${_esc(wh.description)}</div>` : ''}
+        <div style="display:flex;align-items:center;gap:4px;">
+          <code style="color:#555;font-size:0.65rem;font-family:monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">POST ${url}</code>
+          <button onclick="navigator.clipboard.writeText(${JSON.stringify(url)})"
+            style="background:none;border:none;color:#444;font-size:0.7rem;cursor:pointer;flex-shrink:0;" title="Copy URL">⎘</button>
+        </div>
+        <div id="hook-result-${_esc(wh.slug)}" style="display:none;font-size:0.68rem;font-family:monospace;color:#aaa;white-space:pre-wrap;word-break:break-all;max-height:80px;overflow-y:auto;background:#050505;padding:3px 5px;border-radius:2px;"></div>
+      </div>`;
+    }).join('');
+  }
+
+  function _hookPopulateTargets() {
+    const wfSel = document.getElementById('hook-target-wf');
+    const toolSel = document.getElementById('hook-target-tool');
+    wfSel.innerHTML = _hookWorkflows.map(n => `<option value="${_esc(n)}">${_esc(n)}</option>`).join('') || '<option value="">— no workflows —</option>';
+    toolSel.innerHTML = _hookTools.map(n => `<option value="${_esc(n)}">${_esc(n)}</option>`).join('');
+  }
+
+  function hookTypeChanged() {
+    const t = document.getElementById('hook-type').value;
+    document.getElementById('hook-target-wf').style.display = t === 'workflow' ? '' : 'none';
+    document.getElementById('hook-target-tool').style.display = t === 'tool' ? '' : 'none';
+  }
+
+  async function hookSave() {
+    const slug = document.getElementById('hook-slug').value.trim();
+    const name = document.getElementById('hook-name').value.trim();
+    const type = document.getElementById('hook-type').value;
+    const target = type === 'workflow'
+      ? document.getElementById('hook-target-wf').value
+      : document.getElementById('hook-target-tool').value;
+    const secret = document.getElementById('hook-secret').value.trim();
+    const desc = document.getElementById('hook-desc').value.trim();
+    if (!slug) { alert('Slug required'); return; }
+    if (!target) { alert('Target required'); return; }
+    try {
+      const r = await fetch('/api/webhooks', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({slug, name, target_type: type, target, secret, description: desc}),
+      });
+      if (!r.ok) { const e = await r.json(); alert(e.detail || 'Save failed'); return; }
+      document.getElementById('hook-slug').value = '';
+      document.getElementById('hook-name').value = '';
+      document.getElementById('hook-secret').value = '';
+      document.getElementById('hook-desc').value = '';
+      _hookWorkflows = [];
+      loadWebhooks();
+    } catch(e) { alert('Network error'); }
+  }
+
+  async function hookTest(slug) {
+    const el = document.getElementById(`hook-result-${slug}`);
+    if (el) { el.style.display = 'block'; el.textContent = 'Firing…'; }
+    try {
+      const r = await fetch(`/api/webhooks/trigger/${encodeURIComponent(slug)}`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({test: true}),
+      });
+      const data = await r.json();
+      if (el) el.textContent = JSON.stringify(data, null, 2);
+    } catch(e) {
+      if (el) el.textContent = 'Error: ' + e.message;
+    }
+  }
+
+  async function hookDelete(slug) {
+    if (!confirm(`Delete webhook "${slug}"?`)) return;
+    await fetch(`/api/webhooks/${encodeURIComponent(slug)}`, {method:'DELETE'}).catch(()=>{});
+    loadWebhooks();
+  }
 
   // ── Workflow chains ───────────────────────────────────────────────────────
 
