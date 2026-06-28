@@ -809,6 +809,10 @@
         <button class="m-nav-btn" data-section="qrcode" onclick="showMenuSection('qrcode')">QR Code</button>
         <button class="m-nav-btn" data-section="filewatcher" onclick="showMenuSection('filewatcher')">File Watch</button>
         <button class="m-nav-btn" data-section="textdiff" onclick="showMenuSection('textdiff')">Diff</button>
+        <button class="m-nav-btn" data-section="passgen" onclick="showMenuSection('passgen')">Passwords</button>
+        <button class="m-nav-btn" data-section="timestamp" onclick="showMenuSection('timestamp');convertTimestampNow()">Timestamp</button>
+        <button class="m-nav-btn" data-section="jsonformat" onclick="showMenuSection('jsonformat')">JSON</button>
+        <button class="m-nav-btn" data-section="netif" onclick="showMenuSection('netif');loadNetworkInterfaces()">Net Ifaces</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2550,6 +2554,59 @@
             <span id="diff-summary" style="font-size:0.68rem;color:#555;"></span>
           </div>
           <div id="diff-output" style="flex:1;min-height:0;overflow-y:auto;font-size:0.68rem;font-family:monospace;border:1px solid #1a1a1a;border-radius:3px;padding:4px;display:flex;flex-direction:column;gap:0;"></div>
+        </div>
+
+        <!-- Password Generator -->
+        <div id="m-section-passgen" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Generate cryptographically secure passwords.</div>
+          <div style="display:flex;gap:8px;flex-shrink:0;align-items:center;flex-wrap:wrap;">
+            <label style="font-size:0.68rem;color:#888;">Length<input id="pg-length" type="number" value="16" min="4" max="128" style="width:50px;margin-left:4px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:2px 5px;font-size:0.72rem;text-align:center;"></label>
+            <label style="font-size:0.68rem;color:#888;">Count<input id="pg-count" type="number" value="5" min="1" max="20" style="width:40px;margin-left:4px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:2px 5px;font-size:0.72rem;text-align:center;"></label>
+            <label style="font-size:0.68rem;color:#888;"><input id="pg-upper" type="checkbox" checked> A-Z</label>
+            <label style="font-size:0.68rem;color:#888;"><input id="pg-lower" type="checkbox" checked> a-z</label>
+            <label style="font-size:0.68rem;color:#888;"><input id="pg-digits" type="checkbox" checked> 0-9</label>
+            <label style="font-size:0.68rem;color:#888;"><input id="pg-symbols" type="checkbox" checked> !@#…</label>
+            <button onclick="generatePasswords()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Generate</button>
+          </div>
+          <div id="pg-entropy" style="font-size:0.65rem;color:#555;flex-shrink:0;"></div>
+          <div id="pg-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;font-family:monospace;font-size:0.72rem;"></div>
+        </div>
+
+        <!-- Timestamp Converter -->
+        <div id="m-section-timestamp" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Convert between unix timestamps, ISO 8601, and human-readable formats.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;flex-wrap:wrap;">
+            <input id="ts-input" type="text" placeholder="unix / ISO 8601 / blank = now" style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 8px;font-size:0.72rem;"
+              onkeydown="if(event.key==='Enter')convertTimestamp()">
+            <button onclick="convertTimestampNow()" style="background:none;border:1px solid #333;color:#aaa;font-size:0.72rem;padding:4px 8px;border-radius:3px;cursor:pointer;">Now</button>
+            <button onclick="convertTimestamp()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Convert</button>
+          </div>
+          <div id="ts-result" style="flex:1;display:flex;flex-direction:column;gap:4px;font-size:0.72rem;font-family:monospace;"></div>
+        </div>
+
+        <!-- JSON Formatter -->
+        <div id="m-section-jsonformat" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Validate, format, and minify JSON.</div>
+          <textarea id="jf-input" rows="8" placeholder="Paste JSON here…" style="flex:0 0 auto;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:6px;font-size:0.68rem;font-family:monospace;resize:none;"></textarea>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <button onclick="jsonFormat()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Format</button>
+            <button onclick="jsonMinify()" style="background:none;border:1px solid #333;color:#aaa;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Minify</button>
+            <label style="font-size:0.68rem;color:#888;">indent<input id="jf-indent" type="number" value="2" min="1" max="8" style="width:36px;margin-left:4px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:2px 4px;font-size:0.72rem;text-align:center;"></label>
+            <span id="jf-info" style="font-size:0.65rem;color:#555;margin-left:auto;"></span>
+            <button onclick="copyJsonOutput()" style="background:none;border:none;color:#555;font-size:0.72rem;cursor:pointer;">⎘ Copy</button>
+          </div>
+          <div id="jf-error" style="font-size:0.68rem;color:#ef9a9a;flex-shrink:0;min-height:1rem;"></div>
+          <textarea id="jf-output" rows="8" readonly style="flex:1;min-height:0;background:#080808;border:1px solid #1a1a1a;color:#a5d6a7;border-radius:3px;padding:6px;font-size:0.68rem;font-family:monospace;resize:none;"></textarea>
+        </div>
+
+        <!-- Network Interfaces -->
+        <div id="m-section-netif" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Network interfaces and assigned addresses from <code style="font-size:0.68rem;">ip addr</code>.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <button onclick="loadNetworkInterfaces()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻ Refresh</button>
+            <span id="netif-total" style="font-size:0.68rem;color:#555;margin-left:auto;"></span>
+          </div>
+          <div id="netif-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:5px;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -7720,6 +7777,167 @@
         return `<div style="background:${colors[l.type]||''};color:${text_colors[l.type]||'#666'};padding:0 4px;white-space:pre;overflow:hidden;text-overflow:ellipsis;">${_esc(l.text)}</div>`;
       }).join('');
     } catch(e) { output.textContent = 'Error'; }
+  }
+
+  // ── Password Generator ───────────────────────────────────────────────────
+
+  async function generatePasswords() {
+    const body = {
+      length: parseInt(document.getElementById('pg-length').value || '16', 10),
+      count: parseInt(document.getElementById('pg-count').value || '5', 10),
+      upper: document.getElementById('pg-upper').checked,
+      lower: document.getElementById('pg-lower').checked,
+      digits: document.getElementById('pg-digits').checked,
+      symbols: document.getElementById('pg-symbols').checked,
+    };
+    try {
+      const r = await fetch('/api/password', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) { const e = await r.json(); document.getElementById('pg-entropy').textContent = `Error: ${e.detail}`; return; }
+      const d = await r.json();
+      document.getElementById('pg-entropy').textContent =
+        `${d.entropy_bits} bits entropy · charset: ${d.charset_size} chars`;
+      document.getElementById('pg-list').innerHTML = d.passwords.map(p =>
+        `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;background:#080808;border-radius:3px;">
+          <span style="flex:1;color:#a5d6a7;letter-spacing:0.03em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(p)}</span>
+          <button onclick="navigator.clipboard.writeText(${JSON.stringify(p).replace(/</g,'&lt;')})"
+            style="background:none;border:none;color:#555;font-size:0.68rem;cursor:pointer;flex-shrink:0;">⎘</button>
+        </div>`
+      ).join('');
+    } catch(e) { document.getElementById('pg-entropy').textContent = 'Error'; }
+  }
+
+  // ── Timestamp Converter ───────────────────────────────────────────────────
+
+  async function convertTimestampNow() {
+    document.getElementById('ts-input').value = '';
+    await convertTimestamp();
+  }
+
+  async function convertTimestamp() {
+    const raw = document.getElementById('ts-input').value.trim();
+    const result = document.getElementById('ts-result');
+    const body = raw ? {value: isNaN(raw) ? raw : parseFloat(raw)} : {};
+    try {
+      const r = await fetch('/api/timestamp', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) { const e = await r.json(); result.textContent = `Error: ${e.detail}`; return; }
+      const d = await r.json();
+      const rows = [
+        ['Unix', d.unix],
+        ['Unix ms', d.unix_ms],
+        ['ISO UTC', d.iso_utc],
+        ['ISO local', d.iso_local],
+        ['Human UTC', d.human_utc],
+        ['Human local', d.human_local],
+        ['Relative', d.relative],
+      ];
+      result.innerHTML = rows.map(([label, val]) =>
+        `<div style="display:flex;gap:8px;align-items:center;padding:3px 6px;background:#080808;border-radius:2px;">
+          <span style="color:#555;width:80px;flex-shrink:0;font-size:0.65rem;">${label}</span>
+          <span style="flex:1;color:#e0e0e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(String(val))}</span>
+          <button onclick="navigator.clipboard.writeText(${JSON.stringify(String(val)).replace(/</g,'&lt;')})"
+            style="background:none;border:none;color:#555;font-size:0.65rem;cursor:pointer;flex-shrink:0;">⎘</button>
+        </div>`
+      ).join('');
+    } catch(e) { result.textContent = 'Error'; }
+  }
+
+  // ── JSON Formatter ────────────────────────────────────────────────────────
+
+  async function jsonFormat() {
+    const raw = document.getElementById('jf-input').value;
+    const indent = parseInt(document.getElementById('jf-indent').value || '2', 10);
+    const err = document.getElementById('jf-error');
+    const out = document.getElementById('jf-output');
+    const info = document.getElementById('jf-info');
+    err.textContent = '';
+    try {
+      const r = await fetch('/api/json/format', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({json: raw, indent}),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        out.value = d.result;
+        info.textContent = `${d.keys} keys`;
+        document.getElementById('jf-input').style.borderColor = '#2e4d2e';
+      } else {
+        err.textContent = `Line ${d.line} col ${d.col}: ${d.error}`;
+        out.value = '';
+        document.getElementById('jf-input').style.borderColor = '#4d2e2e';
+      }
+    } catch(e) { err.textContent = 'Error'; }
+  }
+
+  async function jsonMinify() {
+    const raw = document.getElementById('jf-input').value;
+    const err = document.getElementById('jf-error');
+    const out = document.getElementById('jf-output');
+    const info = document.getElementById('jf-info');
+    err.textContent = '';
+    try {
+      const r = await fetch('/api/json/minify', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({json: raw}),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        out.value = d.result;
+        info.textContent = `saved ${d.saved} chars`;
+        document.getElementById('jf-input').style.borderColor = '#2e4d2e';
+      } else {
+        err.textContent = d.error;
+        out.value = '';
+        document.getElementById('jf-input').style.borderColor = '#4d2e2e';
+      }
+    } catch(e) { err.textContent = 'Error'; }
+  }
+
+  function copyJsonOutput() {
+    const val = document.getElementById('jf-output').value;
+    if (val) navigator.clipboard.writeText(val);
+  }
+
+  // ── Network Interfaces ────────────────────────────────────────────────────
+
+  async function loadNetworkInterfaces() {
+    const list = document.getElementById('netif-list');
+    const total = document.getElementById('netif-total');
+    try {
+      const r = await fetch('/api/network/interfaces');
+      if (!r.ok) {
+        const e = await r.json();
+        list.innerHTML = `<div style="color:#ef9a9a;font-size:0.72rem;">${_esc(e.detail)}</div>`;
+        return;
+      }
+      const d = await r.json();
+      total.textContent = `${d.total} interfaces`;
+      list.innerHTML = d.interfaces.map(iface => {
+        const up = (iface.operstate || '').toLowerCase() === 'up';
+        const addrs = (iface.addr_info || []).map(a =>
+          `<div style="display:flex;align-items:center;gap:4px;padding-left:14px;">
+            <span style="color:#888;font-size:0.68rem;">${_esc(a.local || '')}/${a.prefixlen||''}</span>
+            <span style="color:#555;font-size:0.65rem;">${_esc(a.family||'')}</span>
+            <button onclick="navigator.clipboard.writeText(${JSON.stringify(a.local||'').replace(/</g,'&lt;')})"
+              style="background:none;border:none;color:#444;font-size:0.6rem;cursor:pointer;">⎘</button>
+          </div>`
+        ).join('');
+        return `<div style="background:#0a0a0a;border-radius:3px;padding:5px 8px;display:flex;flex-direction:column;gap:2px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="width:7px;height:7px;border-radius:50%;background:${up?'#a5d6a7':'#555'};flex-shrink:0;"></span>
+            <span style="font-family:monospace;font-size:0.72rem;color:#e0e0e0;">${_esc(iface.ifname||'')}</span>
+            <span style="font-size:0.65rem;color:#555;">${_esc(iface.operstate||'')}</span>
+            <span style="font-size:0.65rem;color:#444;margin-left:auto;">${_esc(iface.link_type||'')}</span>
+          </div>
+          ${addrs}
+        </div>`;
+      }).join('') || '<div style="color:#444;font-size:0.72rem;">No interfaces</div>';
+    } catch(e) { list.textContent = 'Error'; }
   }
 
   // ── Tool playground ──────────────────────────────────────────────────────

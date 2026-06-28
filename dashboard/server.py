@@ -4317,6 +4317,140 @@ async def text_diff(body: dict):
     }
 
 
+# ── Password generator ───────────────────────────────────────────────────────
+
+def _relative_time(ts: float) -> str:
+    import time as _t
+    diff = _t.time() - ts
+    abs_diff = abs(diff)
+    suffix = "ago" if diff > 0 else "from now"
+    if abs_diff < 60:
+        return f"{int(abs_diff)}s {suffix}"
+    if abs_diff < 3600:
+        return f"{int(abs_diff / 60)}m {suffix}"
+    if abs_diff < 86400:
+        return f"{int(abs_diff / 3600)}h {suffix}"
+    return f"{int(abs_diff / 86400)}d {suffix}"
+
+
+@router.post("/api/password")
+async def generate_password(body: dict):
+    import secrets
+    import string
+    import math
+    length = min(max(int(body.get("length", 16)), 4), 128)
+    count = min(max(int(body.get("count", 1)), 1), 20)
+    charset = ""
+    if body.get("upper", True):
+        charset += string.ascii_uppercase
+    if body.get("lower", True):
+        charset += string.ascii_lowercase
+    if body.get("digits", True):
+        charset += string.digits
+    if body.get("symbols", True):
+        charset += "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    if not charset:
+        raise HTTPException(status_code=422, detail="At least one character class required")
+    passwords = ["".join(secrets.choice(charset) for _ in range(length)) for _ in range(count)]
+    entropy = round(length * math.log2(len(charset)), 1)
+    return {"passwords": passwords, "length": length, "charset_size": len(charset), "entropy_bits": entropy}
+
+
+# ── Timestamp converter ───────────────────────────────────────────────────────
+
+@router.post("/api/timestamp")
+async def convert_timestamp(body: dict):
+    from datetime import datetime, timezone
+    import time as _t
+    value = body.get("value")
+    if value is None:
+        ts = _t.time()
+    elif isinstance(value, (int, float)):
+        ts = float(value)
+    elif isinstance(value, str):
+        try:
+            ts = float(value)
+        except ValueError:
+            try:
+                dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                ts = dt.timestamp()
+            except Exception:
+                raise HTTPException(status_code=422, detail=f"Cannot parse: {value!r}")
+    else:
+        raise HTTPException(status_code=422, detail="value must be number or ISO string")
+    dt_utc = datetime.fromtimestamp(ts, tz=timezone.utc)
+    dt_local = datetime.fromtimestamp(ts)
+    return {
+        "unix": ts,
+        "unix_ms": int(ts * 1000),
+        "iso_utc": dt_utc.isoformat(),
+        "iso_local": dt_local.isoformat(),
+        "human_utc": dt_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "human_local": dt_local.strftime("%Y-%m-%d %H:%M:%S"),
+        "relative": _relative_time(ts),
+    }
+
+
+# ── JSON formatter ────────────────────────────────────────────────────────────
+
+def _count_keys(obj: object, n: int = 0) -> int:
+    if isinstance(obj, dict):
+        n += len(obj)
+        for v in obj.values():
+            n = _count_keys(v, n)
+    elif isinstance(obj, list):
+        for item in obj:
+            n = _count_keys(item, n)
+    return n
+
+
+@router.post("/api/json/format")
+async def json_format(body: dict):
+    import json as _j
+    raw = body.get("json", "")
+    indent = min(max(int(body.get("indent", 2)), 1), 8)
+    try:
+        parsed = _j.loads(raw)
+        formatted = _j.dumps(parsed, indent=indent, ensure_ascii=False)
+        return {"ok": True, "result": formatted, "keys": _count_keys(parsed)}
+    except _j.JSONDecodeError as e:
+        return {"ok": False, "error": str(e), "line": e.lineno, "col": e.colno, "result": None}
+
+
+@router.post("/api/json/minify")
+async def json_minify(body: dict):
+    import json as _j
+    raw = body.get("json", "")
+    try:
+        parsed = _j.loads(raw)
+        minified = _j.dumps(parsed, separators=(",", ":"), ensure_ascii=False)
+        return {"ok": True, "result": minified, "saved": len(raw) - len(minified)}
+    except _j.JSONDecodeError as e:
+        return {"ok": False, "error": str(e), "result": None}
+
+
+# ── Network interfaces ────────────────────────────────────────────────────────
+
+@router.get("/api/network/interfaces")
+async def network_interfaces():
+    proc = await asyncio.create_subprocess_exec(
+        "ip", "-j", "addr",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise HTTPException(
+            status_code=503,
+            detail=f"ip command failed: {stderr.decode(errors='replace').strip()}",
+        )
+    try:
+        interfaces = json.loads(stdout.decode(errors="replace"))
+    except Exception:
+        interfaces = []
+    return {"interfaces": interfaces, "total": len(interfaces)}
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
