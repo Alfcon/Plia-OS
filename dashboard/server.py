@@ -89,13 +89,23 @@ async def dashboard():
 
 @router.post("/api/voice/transcribe")
 async def voice_transcribe(request: Request):
+    import time
     body = await request.body()
     if not body:
-        return {"text": ""}
+        return {"text": "", "latency_ms": 0, "audio_duration_s": 0.0, "sample_rate": 16000}
     audio = np.frombuffer(body, dtype=np.float32)
+    sample_rate = 16000
+    audio_duration_s = round(len(audio) / sample_rate, 3)
     from voice.stt import get_stt_service
+    t0 = time.monotonic()
     text = await asyncio.to_thread(get_stt_service().transcribe, audio)
-    return {"text": text}
+    latency_ms = int((time.monotonic() - t0) * 1000)
+    return {
+        "text": text,
+        "latency_ms": latency_ms,
+        "audio_duration_s": audio_duration_s,
+        "sample_rate": sample_rate,
+    }
 
 
 @router.get("/api/hass/entities")

@@ -756,6 +756,7 @@
         <button class="m-nav-btn" data-section="health" onclick="showMenuSection('health');loadHealth()">Health</button>
         <button class="m-nav-btn" data-section="bench" onclick="showMenuSection('bench');loadBenchHistory()">Bench</button>
         <button class="m-nav-btn" data-section="prompts" onclick="showMenuSection('prompts');loadPrompts()">Prompts</button>
+        <button class="m-nav-btn" data-section="voicetest" onclick="showMenuSection('voicetest')">STT Test</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1713,6 +1714,36 @@
         </div>
 
         <!-- Benchmark panel -->
+        <!-- STT Voice Test -->
+        <div id="m-section-voicetest" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <!-- Controls -->
+          <div style="flex-shrink:0;display:flex;flex-direction:column;gap:6px;border:1px solid #1a1a1a;border-radius:3px;padding:8px;">
+            <div style="font-size:0.68rem;color:#555;">Record audio and transcribe with Whisper</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button id="vt-record-btn" onclick="vtToggleRecord()"
+                style="width:44px;height:44px;border-radius:50%;border:2px solid #333;background:#1a1a1a;color:#aaa;font-size:1.2rem;cursor:pointer;flex-shrink:0;">🎤</button>
+              <div style="flex:1;min-width:0;">
+                <div id="vt-status" style="font-size:0.72rem;color:#555;">Press to record</div>
+                <div id="vt-duration" style="font-size:0.65rem;color:#333;font-family:monospace;"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Result -->
+          <div id="vt-result" style="flex-shrink:0;display:none;background:#0d0d0d;border:1px solid #1b3a5e;border-radius:3px;padding:8px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap;">
+              <span style="font-size:0.68rem;color:#4fc3f7;">Transcript</span>
+              <span id="vt-latency" style="font-size:0.62rem;color:#555;"></span>
+              <span id="vt-rtf" style="font-size:0.62rem;color:#555;"></span>
+              <span style="flex:1;"></span>
+              <button onclick="vtSendToChat()" style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.65rem;padding:2px 8px;border-radius:3px;cursor:pointer;">→ Chat</button>
+            </div>
+            <div id="vt-text" style="font-size:0.8rem;color:#e0e0e0;line-height:1.5;word-break:break-word;"></div>
+          </div>
+          <!-- History -->
+          <div style="font-size:0.68rem;color:#444;flex-shrink:0;">Recent tests</div>
+          <div id="vt-history" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;"></div>
+        </div>
+
         <!-- Prompt Library -->
         <div id="m-section-prompts" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
           <!-- Save current prompt -->
@@ -5906,6 +5937,125 @@
         <span style="font-size:0.62rem;color:${color};border:1px solid ${border};border-radius:3px;padding:1px 6px;flex-shrink:0;">${st}</span>
       </div>`;
     }).join('');
+  }
+
+  // ── STT Voice Test ────────────────────────────────────────────────────────
+
+  let _vtStream = null, _vtCtx = null, _vtProcessor = null, _vtChunks = [], _vtRecording = false;
+  let _vtTimer = null, _vtStartTs = 0;
+  const _vtHistory = [];
+
+  async function vtToggleRecord() {
+    if (_vtRecording) await _vtStop(); else await _vtStart();
+  }
+
+  async function _vtStart() {
+    const btn = document.getElementById('vt-record-btn');
+    const statusEl = document.getElementById('vt-status');
+    try {
+      _vtStream = await navigator.mediaDevices.getUserMedia({audio: true});
+    } catch(e) {
+      statusEl.textContent = 'Mic denied: ' + e.message;
+      statusEl.style.color = '#ef5350';
+      return;
+    }
+    _vtChunks = [];
+    _vtCtx = new AudioContext({sampleRate: 16000});
+    const source = _vtCtx.createMediaStreamSource(_vtStream);
+    _vtProcessor = _vtCtx.createScriptProcessor(4096, 1, 1);
+    _vtProcessor.onaudioprocess = e => _vtChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    source.connect(_vtProcessor);
+    _vtProcessor.connect(_vtCtx.destination);
+    _vtRecording = true;
+    _vtStartTs = Date.now();
+    btn.textContent = '⏹';
+    btn.style.background = '#2a0d0d';
+    btn.style.borderColor = '#ef5350';
+    btn.style.color = '#ef9a9a';
+    statusEl.textContent = 'Recording…';
+    statusEl.style.color = '#ef9a9a';
+    document.getElementById('vt-duration').textContent = '0.0s';
+    _vtTimer = setInterval(() => {
+      document.getElementById('vt-duration').textContent = ((Date.now() - _vtStartTs) / 1000).toFixed(1) + 's';
+    }, 100);
+  }
+
+  async function _vtStop() {
+    _vtRecording = false;
+    clearInterval(_vtTimer);
+    const btn = document.getElementById('vt-record-btn');
+    const statusEl = document.getElementById('vt-status');
+    btn.textContent = '⏳';
+    btn.style.background = '#1a1a1a';
+    btn.style.borderColor = '#333';
+    btn.style.color = '#aaa';
+    statusEl.textContent = 'Transcribing…';
+    statusEl.style.color = '#555';
+    if (_vtProcessor) { _vtProcessor.disconnect(); _vtProcessor = null; }
+    if (_vtCtx) { await _vtCtx.close(); _vtCtx = null; }
+    if (_vtStream) { _vtStream.getTracks().forEach(t => t.stop()); _vtStream = null; }
+    if (!_vtChunks.length) { statusEl.textContent = 'No audio captured.'; btn.textContent = '🎤'; return; }
+    const total = _vtChunks.reduce((n, c) => n + c.length, 0);
+    const merged = new Float32Array(total);
+    let off = 0;
+    for (const c of _vtChunks) { merged.set(c, off); off += c.length; }
+    _vtChunks = [];
+    try {
+      const r = await fetch('/api/voice/transcribe', {
+        method: 'POST', body: merged.buffer,
+        headers: {'Content-Type': 'application/octet-stream'},
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      _vtShowResult(data);
+    } catch(e) {
+      statusEl.textContent = 'Error: ' + e.message;
+      statusEl.style.color = '#ef5350';
+    }
+    btn.textContent = '🎤';
+    statusEl.textContent = 'Press to record';
+    statusEl.style.color = '#555';
+    document.getElementById('vt-duration').textContent = '';
+  }
+
+  function _vtShowResult(data) {
+    const text = data.text || '(empty)';
+    const latency = data.latency_ms || 0;
+    const audioDur = data.audio_duration_s || 0;
+    const rtf = audioDur > 0 ? (latency / 1000 / audioDur).toFixed(2) : null;
+    document.getElementById('vt-result').style.display = 'block';
+    document.getElementById('vt-text').textContent = text;
+    document.getElementById('vt-latency').textContent = `${latency}ms`;
+    document.getElementById('vt-rtf').textContent = rtf !== null ? `RTF ${rtf}×` : '';
+    const entry = {text, latency_ms: latency, audio_duration_s: audioDur, rtf, ts: Date.now()};
+    _vtHistory.unshift(entry);
+    if (_vtHistory.length > 20) _vtHistory.pop();
+    _vtRenderHistory();
+  }
+
+  function _vtRenderHistory() {
+    const el = document.getElementById('vt-history');
+    if (!_vtHistory.length) { el.innerHTML = '<div style="font-size:0.68rem;color:#444;">No tests yet.</div>'; return; }
+    el.innerHTML = _vtHistory.map(h => {
+      const t = new Date(h.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      const rtfBadge = h.rtf !== null ? `<span style="font-size:0.6rem;color:#555;">RTF ${h.rtf}×</span>` : '';
+      return `<div style="background:#0d0d0d;border:1px solid #1a1a1a;border-radius:3px;padding:5px 9px;display:flex;flex-direction:column;gap:2px;">
+        <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
+          <span style="font-size:0.62rem;color:#444;flex-shrink:0;">${t}</span>
+          <span style="font-size:0.68rem;color:#4fc3f7;flex-shrink:0;">${h.latency_ms}ms</span>
+          <span style="font-size:0.65rem;color:#555;flex-shrink:0;">${h.audio_duration_s}s audio</span>
+          ${rtfBadge}
+        </div>
+        <div style="font-size:0.73rem;color:#ccc;">${_esc(h.text)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function vtSendToChat() {
+    const text = document.getElementById('vt-text').textContent;
+    if (!text || text === '(empty)') return;
+    const inp = document.getElementById('chat-input');
+    if (inp) { inp.value = text; inp.focus(); }
   }
 
   // ── Prompt Library ────────────────────────────────────────────────────────
