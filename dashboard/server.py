@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 import pathlib
 from pathlib import Path
 from core import events, registry, pipeline_registry
+from core.registry import call_tool_async
 from core.config import get_config, update_config, restore_system_prompt, reset_system_prompt_to_default
 from voice.tts import get_tts_service
 from voice.vram_broker import get_vram_broker
@@ -118,7 +119,19 @@ async def hass_toggle(entity_id: str):
 
 @router.get("/api/tools")
 async def get_tools():
-    return registry.list_tools()
+    from core.registry import _tools, _disabled_modules
+    disabled = _disabled_modules()
+    tools = []
+    for name, entry in sorted(_tools.items()):
+        schema = entry["schema"]["function"]
+        tools.append({
+            "name": name,
+            "description": schema.get("description", ""),
+            "module": entry.get("module", ""),
+            "disabled": entry.get("module", "") in disabled,
+            "parameters": schema.get("parameters", {"type": "object", "properties": {}, "required": []}),
+        })
+    return {"tools": tools}
 
 
 @router.get("/api/modules")
@@ -876,7 +889,6 @@ async def run_tool(body: dict):
     """Call any registered tool directly — no LLM involved.
     Body: {"tool": "tool_name", "params": {...}}
     """
-    from core.registry import call_tool_async
     tool_name = body.get("tool")
     params = body.get("params", {})
     if not tool_name:
@@ -1918,6 +1930,22 @@ async def trigger_webhook(slug: str, request: Request):
         payload = {}
     result = await fire_webhook(slug, payload)
     return result
+
+
+# ── Tool playground ───────────────────────────────────────────────────────────
+
+@router.post("/api/tools/{name}/run")
+async def run_tool_endpoint(name: str, body: dict):
+    params = body.get("params", {})
+    try:
+        result = await call_tool_async(name, params)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except TypeError as exc:
+        raise HTTPException(status_code=400, detail=f"Bad params: {exc}")
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "result": None}
+    return {"ok": True, "result": str(result) if result is not None else ""}
 
 
 @router.get("/api/token-usage")

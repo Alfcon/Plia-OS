@@ -749,6 +749,7 @@
         <button class="m-nav-btn" data-section="snaps" onclick="showMenuSection('snaps');loadSnapshots()">Snaps</button>
         <button class="m-nav-btn" data-section="git" onclick="showMenuSection('git');loadGit()">Git</button>
         <button class="m-nav-btn" data-section="vars" onclick="showMenuSection('vars');loadVars()">Vars</button>
+        <button class="m-nav-btn" data-section="tools" onclick="showMenuSection('tools');loadTools()">Tools</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1622,6 +1623,24 @@
           </div>
           <div style="font-size:0.62rem;color:#444;margin-bottom:5px;flex-shrink:0;">Use <code style="background:#111;padding:0 3px;border-radius:2px;color:#81c784;">{{vars.name}}</code> in workflow step params and webhook payloads.</div>
           <div id="var-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;"></div>
+        </div>
+
+        <!-- Tool playground -->
+        <div id="m-section-tools" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;">
+            <select id="tool-select" onchange="toolSelected()" style="flex:1;min-width:140px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 7px;font-size:0.75rem;font-family:monospace;">
+              <option value="">-- select tool --</option>
+            </select>
+            <button onclick="loadTools()" style="background:none;border:none;color:#4fc3f7;font-size:0.78rem;cursor:pointer;">↻</button>
+            <span id="tool-module-badge" style="font-size:0.62rem;color:#555;font-family:monospace;"></span>
+          </div>
+          <div style="font-size:0.7rem;color:#555;flex-shrink:0;font-style:italic;" id="tool-desc"></div>
+          <div id="tool-params" style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;"></div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button onclick="runTool()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.73rem;padding:4px 16px;border-radius:3px;cursor:pointer;">▶ Run</button>
+            <button onclick="document.getElementById('tool-output').textContent=''" style="background:none;border:none;color:#444;font-size:0.7rem;cursor:pointer;">Clear</button>
+          </div>
+          <pre id="tool-output" style="flex:1;min-height:0;overflow-y:auto;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;padding:8px;font-size:0.72rem;color:#e0e0e0;white-space:pre-wrap;word-break:break-all;margin:0;"></pre>
         </div>
 
         <div id="m-section-git" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
@@ -5281,6 +5300,98 @@
       if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
       if (e.key === 'Escape') { loadVars(); }
     });
+  }
+
+  // ── Tool playground ──────────────────────────────────────────────────────
+
+  let _toolsData = [];
+
+  async function loadTools() {
+    let data;
+    try {
+      const r = await fetch('/api/tools');
+      if (!r.ok) return;
+      data = await r.json();
+    } catch(e) { return; }
+    _toolsData = data.tools;
+    const sel = document.getElementById('tool-select');
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">-- select tool --</option>' +
+      _toolsData.map(t =>
+        `<option value="${_esc(t.name)}"${t.disabled?' disabled':''} style="${t.disabled?'color:#444':''}">` +
+        `${_esc(t.name)}${t.disabled?' (disabled)':''}</option>`
+      ).join('');
+    if (prev && _toolsData.find(t => t.name === prev)) sel.value = prev;
+    toolSelected();
+  }
+
+  function toolSelected() {
+    const name = document.getElementById('tool-select').value;
+    const tool = _toolsData.find(t => t.name === name);
+    document.getElementById('tool-desc').textContent = tool ? tool.description : '';
+    document.getElementById('tool-module-badge').textContent = tool ? tool.module : '';
+    const container = document.getElementById('tool-params');
+    container.innerHTML = '';
+    if (!tool) return;
+    const props = tool.parameters.properties || {};
+    const required = tool.parameters.required || [];
+    Object.entries(props).forEach(([pname, pschema]) => {
+      const isReq = required.includes(pname);
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;';
+      row.innerHTML = `
+        <label style="font-size:0.7rem;color:#888;font-family:monospace;width:120px;flex-shrink:0;text-align:right;">
+          ${_esc(pname)}${isReq?'<span style="color:#ef5350">*</span>':''}
+          <span style="color:#444;font-size:0.6rem;display:block;">${pschema.type||'string'}</span>
+        </label>
+        ${pschema.type === 'boolean'
+          ? `<select data-param="${_esc(pname)}" style="width:80px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 6px;font-size:0.73rem;"><option value="false">false</option><option value="true">true</option></select>`
+          : `<input data-param="${_esc(pname)}" type="${pschema.type==='integer'||pschema.type==='number'?'number':'text'}"
+              placeholder="${isReq?'required':'optional'}"
+              style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 7px;font-size:0.73rem;font-family:monospace;"
+              onkeydown="if(event.key==='Enter')runTool()">`
+        }`;
+      container.appendChild(row);
+    });
+    if (!Object.keys(props).length) {
+      container.innerHTML = '<div style="font-size:0.68rem;color:#444;padding:4px 0;">No parameters</div>';
+    }
+  }
+
+  async function runTool() {
+    const name = document.getElementById('tool-select').value;
+    if (!name) { alert('Select a tool first'); return; }
+    const tool = _toolsData.find(t => t.name === name);
+    const props = tool?.parameters?.properties || {};
+    const required = tool?.parameters?.required || [];
+    const params = {};
+    let missing = [];
+    document.querySelectorAll('#tool-params [data-param]').forEach(el => {
+      const pname = el.dataset.param;
+      const pschema = props[pname] || {};
+      let val = el.value;
+      if (pschema.type === 'integer') val = parseInt(val, 10);
+      else if (pschema.type === 'number') val = parseFloat(val);
+      else if (pschema.type === 'boolean') val = val === 'true';
+      if (val === '' || (typeof val === 'number' && isNaN(val))) {
+        if (required.includes(pname)) missing.push(pname);
+      } else {
+        params[pname] = val;
+      }
+    });
+    if (missing.length) { alert('Required: ' + missing.join(', ')); return; }
+    const out = document.getElementById('tool-output');
+    out.textContent = '⏳ running…';
+    try {
+      const r = await fetch(`/api/tools/${encodeURIComponent(name)}/run`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({params}),
+      });
+      const data = await r.json();
+      if (!r.ok) { out.textContent = `❌ ${r.status}: ${data.detail || JSON.stringify(data)}`; return; }
+      if (!data.ok) { out.textContent = `❌ ${data.error}`; return; }
+      out.textContent = data.result || '(empty result)';
+    } catch(e) { out.textContent = `❌ Network error: ${e.message}`; }
   }
 
   // ── Git panel ─────────────────────────────────────────────────────────────
