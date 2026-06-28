@@ -2316,6 +2316,62 @@ async def patch_cron_job(name: str, body: dict):
     return {"ok": True}
 
 
+import collections as _collections
+_BENCH_HISTORY: _collections.deque = _collections.deque(maxlen=50)
+_BENCH_DEFAULT_PROMPT = "Respond in exactly one sentence: What is the capital of France?"
+
+
+@router.post("/api/benchmark")
+async def run_benchmark(body: dict):
+    import time
+    import httpx
+    config = get_config()
+    prompt = (body.get("prompt") or _BENCH_DEFAULT_PROMPT).strip()
+    model = (body.get("model") or config.ollama_model).strip()
+    runs = max(1, min(int(body.get("runs") or 1), 5))
+
+    results = []
+    for _ in range(runs):
+        t0 = time.monotonic()
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    f"{config.ollama_url}/api/chat",
+                    json={"model": model, "messages": [{"role": "user", "content": prompt}], "stream": False},
+                )
+            resp.raise_for_status()
+            body_json = resp.json()
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "results": []}
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        content = body_json.get("message", {}).get("content", "")
+        prompt_tokens = body_json.get("prompt_eval_count") or 0
+        completion_tokens = body_json.get("eval_count") or 0
+        eval_duration_ns = body_json.get("eval_duration") or 0
+        tps = round(completion_tokens / (eval_duration_ns / 1e9), 1) if eval_duration_ns > 0 else 0.0
+        entry = {
+            "ts": time.time(),
+            "model": model,
+            "prompt": prompt[:80],
+            "latency_ms": elapsed_ms,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "tokens_per_sec": tps,
+            "response_snippet": content[:120],
+        }
+        results.append(entry)
+        _BENCH_HISTORY.appendleft(entry)
+
+    avg_latency = int(sum(r["latency_ms"] for r in results) / len(results))
+    avg_tps = round(sum(r["tokens_per_sec"] for r in results) / len(results), 1)
+    return {"ok": True, "runs": results, "avg_latency_ms": avg_latency, "avg_tokens_per_sec": avg_tps}
+
+
+@router.get("/api/benchmark/history")
+async def benchmark_history(n: int = 20):
+    return {"history": list(_BENCH_HISTORY)[:n]}
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()

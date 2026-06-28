@@ -754,6 +754,7 @@
         <button class="m-nav-btn" data-section="search" onclick="showMenuSection('search');document.getElementById('search-input').focus()">Search</button>
         <button class="m-nav-btn" data-section="inspector" onclick="showMenuSection('inspector');loadInspector()">Inspector</button>
         <button class="m-nav-btn" data-section="health" onclick="showMenuSection('health');loadHealth()">Health</button>
+        <button class="m-nav-btn" data-section="bench" onclick="showMenuSection('bench');loadBenchHistory()">Bench</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1708,6 +1709,32 @@
             <button onclick="loadHealth()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.7rem;padding:3px 10px;border-radius:3px;cursor:pointer;">↻ Recheck</button>
           </div>
           <div id="health-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+        </div>
+
+        <!-- Benchmark panel -->
+        <div id="m-section-bench" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="flex-shrink:0;display:flex;flex-direction:column;gap:6px;">
+            <textarea id="bench-prompt" rows="3"
+              style="background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:6px 8px;font-size:0.73rem;font-family:monospace;resize:vertical;"
+              placeholder="Prompt…">Respond in exactly one sentence: What is the capital of France?</textarea>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <select id="bench-model"
+                style="flex:1;min-width:0;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 6px;font-size:0.72rem;font-family:monospace;">
+                <option value="">Default model</option>
+              </select>
+              <label style="font-size:0.7rem;color:#666;">Runs:</label>
+              <select id="bench-runs"
+                style="width:48px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 4px;font-size:0.72rem;">
+                <option>1</option><option>3</option><option>5</option>
+              </select>
+              <button onclick="runBenchmark()" id="bench-run-btn"
+                style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.73rem;padding:5px 14px;border-radius:3px;cursor:pointer;">▶ Run</button>
+            </div>
+          </div>
+          <div id="bench-result" style="flex-shrink:0;"></div>
+          <hr style="border-color:#1a1a1a;margin:0;flex-shrink:0;">
+          <div style="font-size:0.68rem;color:#444;flex-shrink:0;">Recent runs</div>
+          <div id="bench-history" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;"></div>
         </div>
 
         <div id="m-section-git" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
@@ -5839,6 +5866,86 @@
         <span style="font-size:0.62rem;color:${color};border:1px solid ${border};border-radius:3px;padding:1px 6px;flex-shrink:0;">${st}</span>
       </div>`;
     }).join('');
+  }
+
+  // ── Benchmark panel ───────────────────────────────────────────────────────
+
+  async function loadBenchHistory() {
+    // Populate model list from Ollama tags if possible
+    try {
+      const r = await fetch('/api/health');
+      // model list comes from ollama probe; use separate call to avoid parsing issues
+    } catch(_) {}
+    try {
+      const cfg = await fetch('/api/config').then(r => r.json());
+      const sel = document.getElementById('bench-model');
+      // set first option label to current model name
+      sel.options[0].text = `Default (${cfg.ollama_model || 'configured'})`;
+    } catch(_) {}
+    await _refreshBenchHistory();
+  }
+
+  async function _refreshBenchHistory() {
+    const r = await fetch('/api/benchmark/history?n=20').catch(() => null);
+    if (!r || !r.ok) return;
+    const data = await r.json();
+    _renderBenchHistory(data.history);
+  }
+
+  function _renderBenchHistory(history) {
+    const el = document.getElementById('bench-history');
+    if (!history.length) { el.innerHTML = '<div style="font-size:0.68rem;color:#444;">No runs yet.</div>'; return; }
+    el.innerHTML = history.map(h => {
+      const d = new Date(h.ts * 1000);
+      const t = d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      return `<div style="background:#0d0d0d;border:1px solid #1a1a1a;border-radius:3px;padding:5px 9px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
+        <span style="font-size:0.62rem;color:#444;flex-shrink:0;">${t}</span>
+        <span style="font-family:monospace;font-size:0.65rem;color:#4fc3f7;flex-shrink:0;">${_esc(h.model)}</span>
+        <span style="font-size:0.7rem;color:#e0e0e0;flex-shrink:0;">${h.latency_ms}ms</span>
+        <span style="font-size:0.68rem;color:#81c784;flex-shrink:0;">${h.tokens_per_sec} tok/s</span>
+        <span style="font-size:0.65rem;color:#555;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(h.response_snippet)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  async function runBenchmark() {
+    const btn = document.getElementById('bench-run-btn');
+    const resultEl = document.getElementById('bench-result');
+    const prompt = document.getElementById('bench-prompt').value.trim();
+    const model = document.getElementById('bench-model').value;
+    const runs = parseInt(document.getElementById('bench-runs').value, 10);
+    if (!prompt) { resultEl.innerHTML = '<div style="color:#ef5350;font-size:0.72rem;">Enter a prompt.</div>'; return; }
+    btn.disabled = true;
+    btn.textContent = '⏳ Running…';
+    resultEl.innerHTML = '<div style="font-size:0.72rem;color:#555;">Running benchmark…</div>';
+    try {
+      const r = await fetch('/api/benchmark', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({prompt, model: model || undefined, runs}),
+      });
+      const data = await r.json();
+      if (!data.ok) {
+        resultEl.innerHTML = `<div style="color:#ef5350;font-size:0.72rem;">Error: ${_esc(data.error)}</div>`;
+        return;
+      }
+      const snippet = data.runs[0]?.response_snippet || '';
+      resultEl.innerHTML = `
+        <div style="background:#0d2a1a;border:1px solid #1b5e20;border-radius:3px;padding:8px 12px;display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <span style="font-size:0.85rem;color:#81c784;font-weight:700;">${data.avg_latency_ms}ms</span>
+            <span style="font-size:0.85rem;color:#4fc3f7;font-weight:700;">${data.avg_tokens_per_sec} tok/s</span>
+            <span style="font-size:0.72rem;color:#555;">${runs > 1 ? `avg of ${runs} runs` : '1 run'}</span>
+          </div>
+          ${snippet ? `<div style="font-size:0.7rem;color:#888;font-style:italic;white-space:pre-wrap;">"${_esc(snippet)}"</div>` : ''}
+        </div>`;
+      await _refreshBenchHistory();
+    } catch(e) {
+      resultEl.innerHTML = `<div style="color:#ef5350;font-size:0.72rem;">Network error: ${_esc(e.message)}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '▶ Run';
+    }
   }
 
   // ── Git panel ─────────────────────────────────────────────────────────────
