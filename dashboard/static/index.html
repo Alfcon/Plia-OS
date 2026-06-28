@@ -813,6 +813,10 @@
         <button class="m-nav-btn" data-section="timestamp" onclick="showMenuSection('timestamp');convertTimestampNow()">Timestamp</button>
         <button class="m-nav-btn" data-section="jsonformat" onclick="showMenuSection('jsonformat')">JSON</button>
         <button class="m-nav-btn" data-section="netif" onclick="showMenuSection('netif');loadNetworkInterfaces()">Net Ifaces</button>
+        <button class="m-nav-btn" data-section="encoder" onclick="showMenuSection('encoder')">Encode</button>
+        <button class="m-nav-btn" data-section="hasher" onclick="showMenuSection('hasher')">Hash</button>
+        <button class="m-nav-btn" data-section="regextester" onclick="showMenuSection('regextester')">Regex</button>
+        <button class="m-nav-btn" data-section="diskusage" onclick="showMenuSection('diskusage');loadDiskUsage()">Disk</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2607,6 +2611,60 @@
             <span id="netif-total" style="font-size:0.68rem;color:#555;margin-left:auto;"></span>
           </div>
           <div id="netif-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:5px;"></div>
+        </div>
+
+        <!-- Encoder / Decoder -->
+        <div id="m-section-encoder" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Encode or decode text in base64, URL-safe base64, or hex.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;flex-wrap:wrap;">
+            <select id="enc-scheme" style="background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 6px;font-size:0.72rem;">
+              <option value="base64">Base64</option>
+              <option value="base64url">Base64 URL-safe</option>
+              <option value="hex">Hex</option>
+            </select>
+            <button onclick="runEncode()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Encode</button>
+            <button onclick="runDecode()" style="background:none;border:1px solid #333;color:#aaa;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Decode</button>
+            <button onclick="encSwap()" style="background:none;border:none;color:#555;font-size:0.72rem;cursor:pointer;" title="swap input/output">⇅</button>
+          </div>
+          <textarea id="enc-input" rows="4" placeholder="Input…" style="flex:0 0 auto;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:6px;font-size:0.68rem;font-family:monospace;resize:none;"></textarea>
+          <div id="enc-error" style="font-size:0.68rem;color:#ef9a9a;flex-shrink:0;min-height:0.9rem;"></div>
+          <div style="display:flex;gap:4px;flex-shrink:0;align-items:center;">
+            <span style="font-size:0.65rem;color:#555;">Output</span>
+            <button onclick="navigator.clipboard.writeText(document.getElementById('enc-output').value)" style="background:none;border:none;color:#444;font-size:0.65rem;cursor:pointer;">⎘</button>
+          </div>
+          <textarea id="enc-output" rows="4" readonly style="flex:1;min-height:0;background:#080808;border:1px solid #1a1a1a;color:#a5d6a7;border-radius:3px;padding:6px;font-size:0.68rem;font-family:monospace;resize:none;"></textarea>
+        </div>
+
+        <!-- Hash Calculator -->
+        <div id="m-section-hasher" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Compute cryptographic hashes of any text.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <textarea id="hash-input" rows="3" placeholder="Text to hash…" style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:6px;font-size:0.68rem;font-family:monospace;resize:none;" oninput="computeHash()"></textarea>
+          </div>
+          <div id="hash-results" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;font-size:0.68rem;font-family:monospace;"></div>
+        </div>
+
+        <!-- Regex Tester -->
+        <div id="m-section-regextester" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Test regular expressions against text. Flags: i m s.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;flex-wrap:wrap;">
+            <input id="rx-pattern" type="text" placeholder="pattern…" style="flex:1;background:#111;border:1px solid #1b3a5e;color:#4fc3f7;border-radius:3px;padding:4px 8px;font-size:0.72rem;font-family:monospace;" oninput="runRegex()">
+            <input id="rx-flags" type="text" placeholder="flags" maxlength="4" style="width:50px;background:#111;border:1px solid #333;color:#aaa;border-radius:3px;padding:4px 6px;font-size:0.72rem;text-align:center;" oninput="runRegex()">
+            <span id="rx-count" style="font-size:0.68rem;color:#555;"></span>
+          </div>
+          <textarea id="rx-text" rows="5" placeholder="Test text…" style="flex:0 0 auto;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:6px;font-size:0.68rem;font-family:monospace;resize:none;" oninput="runRegex()"></textarea>
+          <div id="rx-error" style="font-size:0.68rem;color:#ef9a9a;flex-shrink:0;min-height:0.9rem;"></div>
+          <div id="rx-matches" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;font-size:0.68rem;font-family:monospace;"></div>
+        </div>
+
+        <!-- Disk Usage -->
+        <div id="m-section-diskusage" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Disk partition usage from <code style="font-size:0.68rem;">df -h</code>.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <button onclick="loadDiskUsage()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻ Refresh</button>
+            <span id="disk-total" style="font-size:0.68rem;color:#555;margin-left:auto;"></span>
+          </div>
+          <div id="disk-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:5px;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -7937,6 +7995,149 @@
           ${addrs}
         </div>`;
       }).join('') || '<div style="color:#444;font-size:0.72rem;">No interfaces</div>';
+    } catch(e) { list.textContent = 'Error'; }
+  }
+
+  // ── Encoder / Decoder ────────────────────────────────────────────────────
+
+  async function runEncode() {
+    const text = document.getElementById('enc-input').value;
+    const scheme = document.getElementById('enc-scheme').value;
+    document.getElementById('enc-error').textContent = '';
+    try {
+      const r = await fetch(`/api/encode/${scheme}`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({text}),
+      });
+      const d = await r.json();
+      if (r.ok) { document.getElementById('enc-output').value = d.result; }
+      else { document.getElementById('enc-error').textContent = d.detail; }
+    } catch(e) { document.getElementById('enc-error').textContent = 'Error'; }
+  }
+
+  async function runDecode() {
+    const text = document.getElementById('enc-input').value;
+    const scheme = document.getElementById('enc-scheme').value;
+    document.getElementById('enc-error').textContent = '';
+    try {
+      const r = await fetch(`/api/decode/${scheme}`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({text}),
+      });
+      const d = await r.json();
+      if (r.ok) { document.getElementById('enc-output').value = d.result; }
+      else { document.getElementById('enc-error').textContent = d.detail; }
+    } catch(e) { document.getElementById('enc-error').textContent = 'Error'; }
+  }
+
+  function encSwap() {
+    const inp = document.getElementById('enc-input');
+    const out = document.getElementById('enc-output');
+    const tmp = inp.value;
+    inp.value = out.value;
+    out.value = tmp;
+  }
+
+  // ── Hash Calculator ───────────────────────────────────────────────────────
+
+  let _hashTimer = null;
+
+  async function computeHash() {
+    clearTimeout(_hashTimer);
+    _hashTimer = setTimeout(_doHash, 120);
+  }
+
+  async function _doHash() {
+    const text = document.getElementById('hash-input').value;
+    const results = document.getElementById('hash-results');
+    if (!text) { results.innerHTML = ''; return; }
+    try {
+      const r = await fetch('/api/hash', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({text}),
+      });
+      if (!r.ok) { return; }
+      const d = await r.json();
+      const algs = ['md5','sha1','sha256','sha512'];
+      results.innerHTML = algs.map(alg =>
+        `<div style="display:flex;align-items:center;gap:6px;padding:3px 6px;background:#080808;border-radius:2px;">
+          <span style="color:#555;width:52px;flex-shrink:0;font-size:0.65rem;">${alg.toUpperCase()}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#a5d6a7;">${_esc(d[alg])}</span>
+          <button onclick="navigator.clipboard.writeText(${JSON.stringify(d[alg]).replace(/</g,'&lt;')})"
+            style="background:none;border:none;color:#444;font-size:0.65rem;cursor:pointer;flex-shrink:0;">⎘</button>
+        </div>`
+      ).join('') + `<div style="font-size:0.65rem;color:#444;padding:2px 6px;">${d.length} bytes</div>`;
+    } catch(e) {}
+  }
+
+  // ── Regex Tester ──────────────────────────────────────────────────────────
+
+  let _rxTimer = null;
+
+  async function runRegex() {
+    clearTimeout(_rxTimer);
+    _rxTimer = setTimeout(_doRegex, 150);
+  }
+
+  async function _doRegex() {
+    const pattern = document.getElementById('rx-pattern').value;
+    const text = document.getElementById('rx-text').value;
+    const flags = document.getElementById('rx-flags').value;
+    const err = document.getElementById('rx-error');
+    const matches = document.getElementById('rx-matches');
+    const count = document.getElementById('rx-count');
+    err.textContent = '';
+    if (!pattern) { matches.innerHTML = ''; count.textContent = ''; return; }
+    try {
+      const r = await fetch('/api/regex', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({pattern, text, flags}),
+      });
+      const d = await r.json();
+      if (!d.ok) { err.textContent = d.error; matches.innerHTML = ''; count.textContent = ''; return; }
+      count.textContent = `${d.count} match${d.count !== 1 ? 'es' : ''}`;
+      matches.innerHTML = d.matches.map((m, i) =>
+        `<div style="padding:3px 6px;background:#080808;border-radius:2px;">
+          <span style="color:#555;font-size:0.65rem;">#${i+1} [${m.start}:${m.end}]</span>
+          <span style="color:#4fc3f7;margin-left:6px;">${_esc(m.match)}</span>
+          ${m.groups.length ? `<span style="color:#555;margin-left:6px;">(${m.groups.map(g=>_esc(String(g??''))).join(', ')})</span>` : ''}
+        </div>`
+      ).join('') || (d.count === 0 ? '<div style="color:#444;font-size:0.68rem;">No matches</div>' : '');
+    } catch(e) { err.textContent = 'Error'; }
+  }
+
+  // ── Disk Usage ────────────────────────────────────────────────────────────
+
+  async function loadDiskUsage() {
+    const list = document.getElementById('disk-list');
+    const total = document.getElementById('disk-total');
+    try {
+      const r = await fetch('/api/disk');
+      if (!r.ok) {
+        const e = await r.json();
+        list.innerHTML = `<div style="color:#ef9a9a;font-size:0.72rem;">${_esc(e.detail)}</div>`;
+        return;
+      }
+      const d = await r.json();
+      total.textContent = `${d.total} partitions`;
+      list.innerHTML = d.partitions.map(p => {
+        const pct = p.percent;
+        const color = pct >= 90 ? '#ef9a9a' : pct >= 75 ? '#ffb74d' : '#a5d6a7';
+        return `<div style="display:flex;flex-direction:column;gap:3px;padding:5px 8px;background:#0a0a0a;border-radius:3px;">
+          <div style="display:flex;align-items:center;gap:6px;font-size:0.68rem;font-family:monospace;">
+            <span style="color:#e0e0e0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(p.target)}</span>
+            <span style="color:#555;">${_esc(p.source)}</span>
+            <span style="color:${color};flex-shrink:0;">${pct}%</span>
+          </div>
+          <div style="height:4px;background:#1a1a1a;border-radius:2px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:${color};transition:width 0.3s;"></div>
+          </div>
+          <div style="display:flex;gap:8px;font-size:0.65rem;color:#555;">
+            <span>used ${_esc(p.used)}</span><span>avail ${_esc(p.avail)}</span><span>total ${_esc(p.size)}</span>
+            <span style="color:#444;">${_esc(p.fstype)}</span>
+          </div>
+        </div>`;
+      }).join('') || '<div style="color:#444;font-size:0.72rem;">No partitions</div>';
     } catch(e) { list.textContent = 'Error'; }
   }
 

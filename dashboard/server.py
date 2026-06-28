@@ -4451,6 +4451,122 @@ async def network_interfaces():
     return {"interfaces": interfaces, "total": len(interfaces)}
 
 
+# ── Encoder / decoder ────────────────────────────────────────────────────────
+
+@router.post("/api/encode/{scheme}")
+async def encode_text(scheme: str, body: dict):
+    import base64 as _b64
+    text = body.get("text", "")
+    data = text.encode("utf-8")
+    if scheme == "base64":
+        return {"result": _b64.b64encode(data).decode()}
+    if scheme == "base64url":
+        return {"result": _b64.urlsafe_b64encode(data).decode()}
+    if scheme == "hex":
+        return {"result": data.hex()}
+    raise HTTPException(status_code=400, detail=f"Unknown scheme '{scheme}'; use base64, base64url, hex")
+
+
+@router.post("/api/decode/{scheme}")
+async def decode_text(scheme: str, body: dict):
+    import base64 as _b64
+    text = (body.get("text") or "").strip()
+    try:
+        if scheme == "base64":
+            result = _b64.b64decode(text).decode("utf-8", errors="replace")
+        elif scheme == "base64url":
+            result = _b64.urlsafe_b64decode(text + "==").decode("utf-8", errors="replace")
+        elif scheme == "hex":
+            result = bytes.fromhex(text).decode("utf-8", errors="replace")
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown scheme '{scheme}'")
+        return {"result": result}
+    except (ValueError, Exception) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+# ── Hash calculator ───────────────────────────────────────────────────────────
+
+@router.post("/api/hash")
+async def compute_hash(body: dict):
+    import hashlib
+    text = body.get("text", "")
+    data = text.encode("utf-8")
+    return {
+        "md5":    hashlib.md5(data).hexdigest(),
+        "sha1":   hashlib.sha1(data).hexdigest(),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "sha512": hashlib.sha512(data).hexdigest(),
+        "length": len(data),
+    }
+
+
+# ── Regex tester ──────────────────────────────────────────────────────────────
+
+@router.post("/api/regex")
+async def test_regex(body: dict):
+    import re as _re
+    pattern = body.get("pattern", "")
+    text = body.get("text", "")
+    flags_raw = body.get("flags", "")
+    if not pattern:
+        raise HTTPException(status_code=422, detail="pattern required")
+    flags = 0
+    if "i" in flags_raw:
+        flags |= _re.IGNORECASE
+    if "m" in flags_raw:
+        flags |= _re.MULTILINE
+    if "s" in flags_raw:
+        flags |= _re.DOTALL
+    try:
+        compiled = _re.compile(pattern, flags)
+    except _re.error as exc:
+        return {"ok": False, "error": str(exc), "matches": [], "count": 0}
+    matches = []
+    for m in compiled.finditer(text):
+        matches.append({
+            "match": m.group(0),
+            "start": m.start(),
+            "end": m.end(),
+            "groups": list(m.groups()),
+        })
+    return {"ok": True, "error": None, "matches": matches, "count": len(matches)}
+
+
+# ── Disk usage ────────────────────────────────────────────────────────────────
+
+@router.get("/api/disk")
+async def disk_usage():
+    proc = await asyncio.create_subprocess_exec(
+        "df", "-h", "--output=source,fstype,size,used,avail,pcent,target",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise HTTPException(status_code=503, detail=stderr.decode(errors="replace").strip())
+    lines = stdout.decode(errors="replace").splitlines()
+    partitions = []
+    for line in lines[1:]:
+        parts = line.split()
+        if len(parts) >= 7:
+            pct_str = parts[5].rstrip("%")
+            try:
+                pct = int(pct_str)
+            except ValueError:
+                pct = 0
+            partitions.append({
+                "source": parts[0],
+                "fstype": parts[1],
+                "size": parts[2],
+                "used": parts[3],
+                "avail": parts[4],
+                "percent": pct,
+                "target": parts[6],
+            })
+    return {"partitions": partitions, "total": len(partitions)}
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
