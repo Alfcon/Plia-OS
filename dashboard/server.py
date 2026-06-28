@@ -172,6 +172,38 @@ async def voice_transcribe(request: Request):
     }
 
 
+@router.post("/api/voice/detect-language")
+async def voice_detect_language(request: Request):
+    import time
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=422, detail="Audio bytes required")
+    audio = np.frombuffer(body, dtype=np.float32)
+    from voice.stt import get_stt_service
+    svc = get_stt_service()
+    if svc._model is None:
+        raise HTTPException(status_code=503, detail="STT model not loaded")
+    t0 = time.monotonic()
+
+    def _detect():
+        result = svc._model.detect_language(audio)
+        if isinstance(result, tuple) and len(result) == 2:
+            lang, probs = result
+            if isinstance(probs, float):
+                prob = round(probs, 4)
+            elif isinstance(probs, dict):
+                prob = round(probs.get(lang, 0.0), 4)
+            else:
+                prob = round(getattr(probs, "language_probability", 0.0), 4)
+        else:
+            lang, prob = str(result), None
+        return lang, prob
+
+    lang, prob = await asyncio.to_thread(_detect)
+    latency_ms = int((time.monotonic() - t0) * 1000)
+    return {"language": lang, "probability": prob, "latency_ms": latency_ms}
+
+
 @router.get("/api/hass/entities")
 async def hass_entities():
     config = get_config()
@@ -683,6 +715,52 @@ async def search_memory(q: str = ""):
         return all_facts
     q_lower = q.lower()
     return [f for f in all_facts if q_lower in f["key"].lower() or q_lower in f["value"].lower()]
+
+
+@router.get("/api/memory/export")
+async def memory_export():
+    import sqlite3
+    store = get_memory_store()
+
+    def _dump():
+        facts = store.list_all()
+        with sqlite3.connect(store._db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            hist = [dict(r) for r in conn.execute("SELECT role, content, ts FROM history ORDER BY id ASC").fetchall()]
+            rems = [dict(r) for r in conn.execute(
+                "SELECT id, message, fire_at, done, is_timer FROM reminders ORDER BY id ASC"
+            ).fetchall()]
+        return {"facts": facts, "history": hist, "reminders": rems}
+
+    data = await asyncio.to_thread(_dump)
+    from fastapi.responses import Response
+    content = json.dumps(data, indent=2, ensure_ascii=False).encode()
+    return Response(content=content, media_type="application/json",
+                    headers={"Content-Disposition": "attachment; filename=plia_memory_export.json"})
+
+
+@router.post("/api/memory/import")
+async def memory_import(request: Request):
+    body = await request.json()
+    store = get_memory_store()
+
+    def _restore():
+        imported_facts = 0
+        imported_rems = 0
+        for fact in body.get("facts", []):
+            k = (fact.get("key") or "").strip()
+            v = (fact.get("value") or "").strip()
+            if k and v:
+                store.remember(k, v)
+                imported_facts += 1
+        for rem in body.get("reminders", []):
+            if not rem.get("done"):
+                store.add_reminder(rem["message"], rem["fire_at"], bool(rem.get("is_timer", False)))
+                imported_rems += 1
+        return imported_facts, imported_rems
+
+    imported_facts, imported_rems = await asyncio.to_thread(_restore)
+    return {"ok": True, "facts": imported_facts, "reminders": imported_rems}
 
 
 @router.post("/api/memory")
@@ -2820,6 +2898,13 @@ async def clear_events_endpoint():
     return {"ok": True, "deleted": deleted}
 
 
+@router.get("/api/events/types")
+async def list_event_types():
+    from core.event_log import get_event_types
+    types = await asyncio.to_thread(get_event_types)
+    return {"types": types}
+
+
 @router.get("/api/health")
 async def system_health():
     import time
@@ -3004,6 +3089,25 @@ async def add_cron_job(body: dict):
     from agents.cron_store import get_cron_store
     jid = await asyncio.to_thread(get_cron_store().add, name, expr, message)
     return {"id": jid, "name": name, "expr": expr, "message": message}
+
+
+@router.get("/api/cron/{name}/next")
+async def cron_next_runs(name: str, n: int = 5):
+    from agents.cron_store import get_cron_store
+    from croniter import croniter
+    from datetime import datetime, timezone
+    jobs = await asyncio.to_thread(get_cron_store().list_all)
+    job = next((j for j in jobs if j["name"] == name), None)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"No cron job named {name!r}")
+    n = max(1, min(n, 20))
+    now = datetime.now(timezone.utc)
+    try:
+        cron = croniter(job["expr"], now)
+        runs = [cron.get_next(datetime).isoformat() for _ in range(n)]
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Cron parse error: {exc}")
+    return {"name": name, "expr": job["expr"], "next_runs": runs}
 
 
 @router.delete("/api/cron/{name}")
