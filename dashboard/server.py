@@ -494,6 +494,65 @@ async def export_history(n: int = 10000, fmt: str = "json"):
     )
 
 
+@router.get("/api/history/export/pdf")
+async def export_history_pdf(n: int = 10000):
+    import tempfile, subprocess, shutil
+    from agents.chat_history import get_recent
+    if not shutil.which("wkhtmltopdf"):
+        raise HTTPException(status_code=503, detail="wkhtmltopdf not found")
+    messages = await asyncio.to_thread(get_recent, n)
+    rows_html = ""
+    for m in messages:
+        role = m.get("role", "")
+        content = (m.get("content") or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+        ts = m.get("ts", "")
+        color = "#4fc3f7" if role == "user" else "#a5d6a7"
+        label = "You" if role == "user" else "Plia"
+        rows_html += f'<div class="msg"><span class="who" style="color:{color}">{label}</span><span class="ts">{ts}</span><div class="body">{content}</div></div>'
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{{font-family:sans-serif;font-size:11pt;margin:20px}}
+.msg{{margin-bottom:12px;border-bottom:1px solid #eee;padding-bottom:8px}}
+.who{{font-weight:bold;font-size:10pt}} .ts{{color:#999;font-size:9pt;margin-left:8px}}
+.body{{margin-top:4px;white-space:pre-wrap}}</style></head>
+<body><h2>Plia-OS Chat Export</h2><p>{len(messages)} messages</p>{rows_html}</body></html>"""
+    with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w") as hf:
+        hf.write(html)
+        html_path = hf.name
+    pdf_path = html_path.replace(".html", ".pdf")
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "wkhtmltopdf", "--quiet", html_path, pdf_path,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        await asyncio.wait_for(proc.communicate(), timeout=30)
+        if proc.returncode != 0 or not pathlib.Path(pdf_path).exists():
+            raise HTTPException(status_code=500, detail="PDF generation failed")
+        pdf_bytes = pathlib.Path(pdf_path).read_bytes()
+    finally:
+        pathlib.Path(html_path).unlink(missing_ok=True)
+        pathlib.Path(pdf_path).unlink(missing_ok=True)
+    from fastapi.responses import Response
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="chat_export.pdf"'},
+    )
+
+
+@router.get("/api/chat/tokens")
+async def chat_token_count(n: int = 100):
+    from agents.chat_history import get_recent
+    messages = await asyncio.to_thread(get_recent, n)
+    total_chars = sum(len(m.get("content") or "") for m in messages)
+    estimated_tokens = round(total_chars / 4)
+    return {
+        "message_count": len(messages),
+        "total_chars": total_chars,
+        "estimated_tokens": estimated_tokens,
+        "model_context_note": "GPT-4 style: ~4 chars/token",
+    }
+
+
 @router.delete("/api/history")
 async def clear_history():
     from agents.chat_history import clear
@@ -646,6 +705,18 @@ async def edit_reminder(reminder_id: int, body: dict):
     if result is None:
         raise HTTPException(status_code=404, detail="Reminder not found or already done")
     return result
+
+
+@router.post("/api/reminders/{reminder_id}/snooze")
+async def snooze_reminder(reminder_id: int, body: dict):
+    minutes = int(body.get("minutes", 10))
+    if minutes < 1 or minutes > 1440:
+        raise HTTPException(status_code=400, detail="minutes must be 1-1440")
+    from agents.memory_store import get_memory_store
+    found = await asyncio.to_thread(get_memory_store().snooze_reminder, reminder_id, minutes)
+    if not found:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    return {"ok": True, "snoozed_minutes": minutes}
 
 
 @router.get("/api/timers")
@@ -949,6 +1020,22 @@ async def pipeline_start():
     task = pipeline_registry.get_task()
     if task and not task.done():
         return {"state": pipeline_registry.get_state()}
+    from core.pipeline_runner import start_pipeline
+    new_task = asyncio.create_task(start_pipeline())
+    pipeline_registry.set_task(new_task)
+    pipeline_registry.set_state("starting")
+    return {"state": "starting"}
+
+
+@router.post("/api/pipeline/restart")
+async def pipeline_restart():
+    task = pipeline_registry.get_task()
+    if task and not task.done():
+        task.cancel()
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=3.0)
+        except Exception:
+            pass
     from core.pipeline_runner import start_pipeline
     new_task = asyncio.create_task(start_pipeline())
     pipeline_registry.set_task(new_task)

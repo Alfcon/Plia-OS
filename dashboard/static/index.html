@@ -778,6 +778,8 @@
         <button class="m-nav-btn" data-section="toolstats" onclick="showMenuSection('toolstats');loadToolStats()">Tool Stats</button>
         <button class="m-nav-btn" data-section="voiceshortcuts" onclick="showMenuSection('voiceshortcuts');loadVoiceShortcuts()">Shortcuts</button>
         <button class="m-nav-btn" data-section="agenttrace" onclick="showMenuSection('agenttrace');loadAgentTrace()">Agent Trace</button>
+        <button class="m-nav-btn" data-section="tokencount" onclick="showMenuSection('tokencount');loadTokenCount()">Token Count</button>
+        <button class="m-nav-btn" data-section="pipelinerestart" onclick="showMenuSection('pipelinerestart')">Pipeline Ctrl</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2074,6 +2076,42 @@
             <button onclick="clearAgentTrace()" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;">Clear</button>
           </div>
           <div id="agent-trace-log" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;font-family:monospace;"></div>
+        </div>
+
+        <!-- Token Count -->
+        <div id="m-section-tokencount" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Estimated token usage of current chat history (4 chars ≈ 1 token).</div>
+          <div id="token-count-display" style="border:1px solid #1a1a1a;border-radius:3px;padding:12px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+              <div><div id="tc-msgs" style="font-size:1.4rem;color:#4fc3f7;font-variant-numeric:tabular-nums;">—</div><div style="font-size:0.65rem;color:#555;">messages</div></div>
+              <div><div id="tc-chars" style="font-size:1.4rem;color:#e0e0e0;font-variant-numeric:tabular-nums;">—</div><div style="font-size:0.65rem;color:#555;">chars</div></div>
+              <div><div id="tc-tokens" style="font-size:1.4rem;color:#a5d6a7;font-variant-numeric:tabular-nums;">—</div><div style="font-size:0.65rem;color:#555;">~tokens</div></div>
+            </div>
+          </div>
+          <div style="flex-shrink:0;display:flex;gap:6px;">
+            <button onclick="loadTokenCount()" style="background:none;border:1px solid #333;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">↻ Refresh</button>
+            <a href="/api/history/export?fmt=json" download style="background:none;border:1px solid #333;color:#aaa;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;text-decoration:none;">⬇ JSON</a>
+            <a href="/api/history/export?fmt=markdown" download style="background:none;border:1px solid #333;color:#aaa;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;text-decoration:none;">⬇ MD</a>
+            <a href="/api/history/export/pdf" download style="background:none;border:1px solid #333;color:#aaa;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;text-decoration:none;">⬇ PDF</a>
+          </div>
+        </div>
+
+        <!-- Pipeline Control -->
+        <div id="m-section-pipelinerestart" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Restart the voice pipeline without restarting the server. Use after changing STT/TTS/wake config.</div>
+          <div style="border:1px solid #1a1a1a;border-radius:3px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:0.72rem;color:#aaa;">Current state:</span>
+              <span id="plctrl-state" style="font-size:0.72rem;color:#4fc3f7;font-family:monospace;">—</span>
+              <button onclick="loadPipelineCtrlState()" style="background:none;border:none;color:#555;font-size:0.72rem;cursor:pointer;margin-left:auto;">↻</button>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button onclick="pipelineCtrl('restart')" style="background:#0a1a0a;border:1px solid #2e4d2e;color:#a5d6a7;font-size:0.73rem;padding:6px 16px;border-radius:3px;cursor:pointer;">⟳ Restart</button>
+              <button onclick="pipelineCtrl('stop')" style="background:#1a0a0a;border:1px solid #4d2e2e;color:#ef9a9a;font-size:0.73rem;padding:6px 16px;border-radius:3px;cursor:pointer;">■ Stop</button>
+              <button onclick="pipelineCtrl('start')" style="background:#0a0a1a;border:1px solid #2e2e4d;color:#b39ddb;font-size:0.73rem;padding:6px 16px;border-radius:3px;cursor:pointer;">▶ Start</button>
+            </div>
+            <div id="plctrl-log" style="font-size:0.72rem;color:#555;font-family:monospace;min-height:24px;"></div>
+          </div>
         </div>
 
         <!-- Wake Word Test -->
@@ -7492,6 +7530,35 @@
   async function clearAgentTrace() {
     await fetch('/api/trace/recent', {method:'DELETE'}).catch(()=>{});
     await loadAgentTrace();
+  }
+
+  // ── Token count ───────────────────────────────────────────────────────────
+
+  async function loadTokenCount() {
+    const data = await fetch('/api/chat/tokens').then(r=>r.json()).catch(()=>null);
+    if (!data) return;
+    const el = id => document.getElementById(id);
+    if (el('tc-msgs')) el('tc-msgs').textContent = data.message_count.toLocaleString();
+    if (el('tc-chars')) el('tc-chars').textContent = data.total_chars.toLocaleString();
+    if (el('tc-tokens')) el('tc-tokens').textContent = data.estimated_tokens.toLocaleString();
+  }
+
+  // ── Pipeline control ──────────────────────────────────────────────────────
+
+  async function loadPipelineCtrlState() {
+    const data = await fetch('/api/pipeline/status').then(r=>r.json()).catch(()=>null);
+    const el = document.getElementById('plctrl-state');
+    if (el && data) el.textContent = data.state;
+  }
+
+  async function pipelineCtrl(action) {
+    const log = document.getElementById('plctrl-log');
+    if (log) log.textContent = `Sending ${action}…`;
+    const url = `/api/pipeline/${action}`;
+    const r = await fetch(url, {method:'POST'}).catch(()=>null);
+    const data = r ? await r.json().catch(()=>null) : null;
+    if (log) log.textContent = data ? `state: ${data.state}` : 'Error';
+    setTimeout(loadPipelineCtrlState, 1500);
   }
 
   // ── Benchmark panel ───────────────────────────────────────────────────────

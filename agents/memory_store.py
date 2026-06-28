@@ -183,6 +183,16 @@ class MemoryStore:
             ).fetchall()
         return [{"id": r[0], "message": r[1], "fire_at": r[2], "is_timer": bool(r[3])} for r in rows]
 
+    def snooze_reminder(self, reminder_id: int, minutes: int) -> bool:
+        from datetime import datetime, timezone, timedelta
+        new_fire_at = (datetime.now(timezone.utc) + timedelta(minutes=minutes)).isoformat()
+        with self._conn() as conn:
+            cur = conn.execute(
+                "UPDATE reminders SET fire_at=?, done=0 WHERE id=?",
+                (new_fire_at, reminder_id),
+            )
+            return cur.rowcount > 0
+
     def mark_reminder_done(self, reminder_id: int) -> None:
         with self._conn() as conn:
             conn.execute("UPDATE reminders SET done=1 WHERE id=?", (reminder_id,))
