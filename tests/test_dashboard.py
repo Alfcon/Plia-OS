@@ -57,8 +57,10 @@ async def test_get_tools(app):
         resp = await client.get("/api/tools")
     assert resp.status_code == 200
     data = resp.json()
-    assert "my_tool" in data
-    assert data["my_tool"] == "test tool"
+    names = [t["name"] for t in data["tools"]]
+    assert "my_tool" in names
+    entry = next(t for t in data["tools"] if t["name"] == "my_tool")
+    assert entry["description"] == "test tool"
 
 
 async def test_get_config(app):

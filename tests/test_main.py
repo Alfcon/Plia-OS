@@ -16,6 +16,6 @@ async def test_api_tools_returns_example_module_tools():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get("/api/tools")
     assert resp.status_code == 200
-    tools = resp.json()
-    assert "get_time" in tools
-    assert "set_reminder" in tools
+    names = [t["name"] for t in resp.json()["tools"]]
+    assert "get_time" in names
+    assert "set_reminder" in names
