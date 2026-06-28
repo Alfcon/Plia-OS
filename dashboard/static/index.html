@@ -745,6 +745,7 @@
         <button class="m-nav-btn" data-section="logs" onclick="showMenuSection('logs');loadLogs()">Logs</button>
         <button class="m-nav-btn" data-section="flows" onclick="showMenuSection('flows');loadWorkflows()">Flows</button>
         <button class="m-nav-btn" data-section="hooks" onclick="showMenuSection('hooks');loadWebhooks()">Hooks</button>
+        <button class="m-nav-btn" data-section="clips" onclick="showMenuSection('clips');loadClips()">Clips</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1602,6 +1603,20 @@
               </button>
             </div>
           </div>
+        </div>
+
+        <div id="m-section-clips" class="m-pane" style="display:none;flex-direction:column;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-shrink:0;">
+            <span style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.06em;color:#555;">Voice Clips</span>
+            <label style="margin-left:auto;background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.7rem;padding:3px 9px;border-radius:3px;cursor:pointer;">
+              + Upload
+              <input type="file" accept="audio/*" style="display:none;" onchange="clipUpload(this)">
+            </label>
+            <button onclick="loadClips()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
+          </div>
+          <div id="clip-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;"></div>
+          <!-- inline player -->
+          <audio id="clip-player" controls style="display:none;width:100%;margin-top:6px;flex-shrink:0;"></audio>
         </div>
 
         <div id="m-section-hooks" class="m-pane" style="display:none;flex-direction:column;">
@@ -5116,6 +5131,114 @@
       return;
     }
   });
+
+  // ── Voice clip manager ───────────────────────────────────────────────────
+
+  async function loadClips() {
+    let data;
+    try {
+      const r = await fetch('/api/clips');
+      if (!r.ok) return;
+      data = await r.json();
+    } catch(e) { return; }
+    const list = document.getElementById('clip-list');
+    if (!data.clips.length) {
+      list.innerHTML = '<div style="padding:10px 8px;color:#333;font-size:0.72rem;">No audio clips yet. Upload a WAV or MP3.</div>';
+      return;
+    }
+    list.innerHTML = data.clips.map(c => {
+      const sz = c.size > 1048576 ? (c.size/1048576).toFixed(1)+'M' : (c.size/1024).toFixed(1)+'K';
+      const date = new Date(c.modified * 1000).toLocaleDateString();
+      const cbBadge = c.active_chatterbox ? `<span style="font-size:0.6rem;background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;border-radius:2px;padding:0 4px;">CB</span>` : '';
+      const dbBadge = c.active_dramabox ? `<span style="font-size:0.6rem;background:#1a0d2a;border:1px solid #3a1b5e;color:#ce93d8;border-radius:2px;padding:0 4px;">DB</span>` : '';
+      return `<div style="padding:5px 8px;border-bottom:1px solid #111;display:flex;align-items:center;gap:5px;">
+        <div style="flex:1;min-width:0;">
+          <div id="clip-name-${_esc(c.filename)}" style="color:#e0e0e0;font-family:monospace;font-size:0.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;"
+            title="Click to rename" ondblclick="clipRename(${JSON.stringify(c.filename)}, this)">
+            ${_esc(c.filename)}
+          </div>
+          <div style="color:#444;font-size:0.62rem;">${sz} · ${date} ${cbBadge} ${dbBadge}</div>
+        </div>
+        <button onclick="clipPlay(${JSON.stringify(c.filename)})" title="Play"
+          style="background:none;border:none;color:#4fc3f7;font-size:0.9rem;cursor:pointer;flex-shrink:0;padding:0 3px;">▶</button>
+        <button onclick="clipActivate(${JSON.stringify(c.filename)},'chatterbox')" title="Set as Chatterbox voice"
+          style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.62rem;padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0;">CB</button>
+        <button onclick="clipActivate(${JSON.stringify(c.filename)},'dramabox')" title="Set as Dramabox voice"
+          style="background:#1a0d2a;border:1px solid #3a1b5e;color:#ce93d8;font-size:0.62rem;padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0;">DB</button>
+        <button onclick="clipDelete(${JSON.stringify(c.filename)})" title="Delete"
+          style="background:#2a0d0d;border:1px solid #5e1b1b;color:#ef5350;font-size:0.65rem;padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0;">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  function clipPlay(filename) {
+    const player = document.getElementById('clip-player');
+    player.src = `/api/clips/${encodeURIComponent(filename)}`;
+    player.style.display = 'block';
+    player.play();
+  }
+
+  async function clipActivate(filename, target) {
+    try {
+      const r = await fetch(`/api/clips/${encodeURIComponent(filename)}/activate`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({target}),
+      });
+      if (!r.ok) { const e = await r.json(); alert(e.detail || 'Failed'); return; }
+      loadClips();
+    } catch(e) { alert('Network error'); }
+  }
+
+  async function clipDelete(filename) {
+    if (!confirm(`Delete "${filename}"?`)) return;
+    try {
+      await fetch(`/api/clips/${encodeURIComponent(filename)}`, {method:'DELETE'});
+    } catch(e) {}
+    loadClips();
+    const player = document.getElementById('clip-player');
+    if (player.src.endsWith(encodeURIComponent(filename))) {
+      player.pause(); player.src = ''; player.style.display = 'none';
+    }
+  }
+
+  function clipRename(filename, el) {
+    const cur = el.textContent.trim();
+    const input = document.createElement('input');
+    input.value = cur;
+    input.style.cssText = 'background:#111;border:1px solid #333;color:#e0e0e0;font-size:0.72rem;font-family:monospace;width:100%;padding:1px 4px;border-radius:2px;';
+    el.replaceWith(input);
+    input.focus(); input.select();
+    const finish = async () => {
+      const newName = input.value.trim();
+      if (newName && newName !== cur) {
+        try {
+          const r = await fetch(`/api/clips/${encodeURIComponent(filename)}/rename`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({name: newName}),
+          });
+          if (!r.ok) { const e = await r.json(); alert(e.detail || 'Rename failed'); }
+        } catch(e) {}
+      }
+      loadClips();
+    };
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      if (e.key === 'Escape') { loadClips(); }
+    });
+  }
+
+  async function clipUpload(input) {
+    if (!input.files.length) return;
+    const form = new FormData();
+    form.append('file', input.files[0]);
+    try {
+      const r = await fetch('/api/upload-reference-audio', {method:'POST', body: form});
+      if (!r.ok) { const e = await r.json(); alert(e.detail || 'Upload failed'); return; }
+    } catch(e) { alert('Network error'); return; }
+    input.value = '';
+    loadClips();
+  }
 
   // ── Webhook triggers ─────────────────────────────────────────────────────
 

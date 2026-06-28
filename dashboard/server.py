@@ -8,7 +8,7 @@ import numpy as np
 from datetime import datetime
 from scipy.io import wavfile
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 import pathlib
 from pathlib import Path
 from core import events, registry, pipeline_registry
@@ -1493,6 +1493,120 @@ async def files_rename(body: dict):
         raise HTTPException(status_code=404, detail="Source not found")
     await asyncio.to_thread(ps.rename, pd)
     return {"ok": True}
+
+
+# ── Voice clip manager ────────────────────────────────────────────────────────
+
+_AUDIO_EXTS = {".wav", ".mp3", ".ogg", ".flac", ".m4a", ".aac"}
+
+
+def _clip_path(filename: str) -> Path:
+    safe = Path(filename).name
+    if not safe or safe in (".", ".."):
+        raise ValueError("Invalid filename")
+    return UPLOADS_DIR / safe
+
+
+def _list_clips_sync() -> list[dict]:
+    import os, stat as _stat
+    cfg = get_config()
+    active = {cfg.chatterbox_reference_audio, cfg.dramabox_voice_ref}
+    clips = []
+    if not UPLOADS_DIR.exists():
+        return []
+    for p in UPLOADS_DIR.iterdir():
+        if p.suffix.lower() not in _AUDIO_EXTS:
+            continue
+        st = p.stat()
+        clips.append({
+            "filename": p.name,
+            "size": st.st_size,
+            "modified": int(st.st_mtime),
+            "active_chatterbox": str(p) == cfg.chatterbox_reference_audio,
+            "active_dramabox": str(p) == cfg.dramabox_voice_ref,
+        })
+    clips.sort(key=lambda c: c["modified"], reverse=True)
+    return clips
+
+
+@router.get("/api/clips")
+async def list_clips():
+    clips = await asyncio.to_thread(_list_clips_sync)
+    return {"clips": clips}
+
+
+@router.get("/api/clips/{filename}")
+async def serve_clip(filename: str):
+    try:
+        p = _clip_path(filename)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="Clip not found")
+    return FileResponse(str(p), media_type="audio/mpeg" if p.suffix.lower() == ".mp3" else "audio/wav")
+
+
+@router.post("/api/clips/{filename}/activate")
+async def activate_clip(filename: str, body: dict):
+    try:
+        p = _clip_path(filename)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="Clip not found")
+    target = body.get("target", "chatterbox")
+    if target == "dramabox":
+        await asyncio.to_thread(update_config, dramabox_voice_ref=str(p))
+    else:
+        await asyncio.to_thread(update_config, chatterbox_reference_audio=str(p))
+    return {"ok": True, "target": target, "path": str(p)}
+
+
+@router.delete("/api/clips/{filename}")
+async def delete_clip(filename: str):
+    import os
+    try:
+        p = _clip_path(filename)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="Clip not found")
+    cfg = get_config()
+    updates: dict = {}
+    if cfg.chatterbox_reference_audio == str(p):
+        updates["chatterbox_reference_audio"] = None
+    if cfg.dramabox_voice_ref == str(p):
+        updates["dramabox_voice_ref"] = None
+    await asyncio.to_thread(os.remove, p)
+    if updates:
+        await asyncio.to_thread(update_config, **updates)
+    return {"ok": True}
+
+
+@router.post("/api/clips/{filename}/rename")
+async def rename_clip(filename: str, body: dict):
+    new_name = (body.get("name") or "").strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="name required")
+    try:
+        src = _clip_path(filename)
+        dst = _clip_path(new_name)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if not src.exists():
+        raise HTTPException(status_code=404, detail="Clip not found")
+    if dst.exists():
+        raise HTTPException(status_code=409, detail="Name already taken")
+    await asyncio.to_thread(src.rename, dst)
+    cfg = get_config()
+    updates: dict = {}
+    if cfg.chatterbox_reference_audio == str(src):
+        updates["chatterbox_reference_audio"] = str(dst)
+    if cfg.dramabox_voice_ref == str(src):
+        updates["dramabox_voice_ref"] = str(dst)
+    if updates:
+        await asyncio.to_thread(update_config, **updates)
+    return {"ok": True, "filename": dst.name}
 
 
 # ── Log buffer ────────────────────────────────────────────────────────────────
