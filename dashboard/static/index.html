@@ -1298,7 +1298,7 @@
         <div id="m-section-cron" class="m-pane" style="display:none">
           <div class="settings-section">
             <h3 style="margin:0 0 6px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">Recurring Schedules</h3>
-            <p style="font-size:11px;color:#555;margin:0 0 6px">5-field cron (min hr day mon wday). Message: plain text or <code style="color:#4fc3f7">tool:tool_name</code> to invoke a tool.</p>
+            <p style="font-size:11px;color:#555;margin:0 0 6px">5-field cron (min hr day mon wday). Message: plain text, <code style="color:#4fc3f7">tool:name</code> to call a tool, or <code style="color:#81c784">workflow:name</code> to run a workflow.</p>
             <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
               <button onclick="setCronPreset('0 8 * * *')"    class="cron-preset">Daily 8am</button>
               <button onclick="setCronPreset('0 8 * * 1-5')"  class="cron-preset">Weekdays 8am</button>
@@ -1311,7 +1311,13 @@
               <input id="cron-name" placeholder="Name" style="background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:4px 6px;font-size:0.75rem;" />
               <input id="cron-expr" placeholder="0 8 * * *" style="background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:4px 6px;font-family:monospace;font-size:0.75rem;" />
             </div>
-            <input id="cron-msg" placeholder="Message to announce  (or tool:morning_briefing)" style="width:100%;background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:4px 6px;font-size:0.75rem;box-sizing:border-box;margin-bottom:6px;" />
+            <input id="cron-msg" placeholder="Message (or tool:name or workflow:name)" style="width:100%;background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:4px 6px;font-size:0.75rem;box-sizing:border-box;margin-bottom:4px;" />
+            <div style="display:flex;gap:4px;margin-bottom:6px;align-items:center;">
+              <span style="font-size:0.68rem;color:#555;flex-shrink:0;">Quick:</span>
+              <select id="cron-wf-select" onchange="cronPickWorkflow()" style="flex:1;background:#111;border:1px solid #2a2a2a;color:#81c784;border-radius:3px;padding:2px 5px;font-size:0.7rem;font-family:monospace;">
+                <option value="">— workflow —</option>
+              </select>
+            </div>
             <div style="display:flex;gap:6px;align-items:center">
               <button onclick="addCronJob()" style="padding:4px 12px;background:#1b5e20;color:#a5d6a7;border:1px solid #2e7d32;border-radius:3px;font-size:0.75rem;cursor:pointer">Add</button>
               <button onclick="loadCronJobs()" style="padding:4px 12px;background:#1a1a1a;color:#888;border:1px solid #333;border-radius:3px;font-size:0.75rem;cursor:pointer">↻</button>
@@ -4789,14 +4795,29 @@
 
   async function loadCronJobs() {
     const list = document.getElementById('cron-list');
+    // populate workflow quick-select
+    try {
+      const wr = await fetch('/api/workflows');
+      if (wr.ok) {
+        const wdata = await wr.json();
+        const sel = document.getElementById('cron-wf-select');
+        if (sel) {
+          sel.innerHTML = '<option value="">— workflow —</option>' +
+            (wdata.workflows || []).map(w => `<option value="${_esc(w.name)}">${_esc(w.name)}</option>`).join('');
+        }
+      }
+    } catch(e) {}
     try {
       const r = await fetch('/api/cron');
       const jobs = await r.json();
       if (!jobs.length) { list.innerHTML = '<span style="color:#555">No cron jobs.</span>'; return; }
       list.innerHTML = jobs.map(j => {
         const isTool = j.message.startsWith('tool:');
+        const isWf = j.message.startsWith('workflow:');
         const msgLabel = isTool
           ? `<span style="color:#4fc3f7;font-family:monospace;">${_esc(j.message)}</span>`
+          : isWf
+          ? `<span style="color:#81c784;font-family:monospace;">${_esc(j.message)}</span>`
           : `<span style="color:#888;">${_esc(j.message)}</span>`;
         const nextLabel = j.next_run
           ? `<span style="color:#555;font-size:0.65rem;margin-left:4px;" title="${_esc(j.next_run)}">${_fmtNextRun(j.next_run)}</span>`
@@ -4825,6 +4846,15 @@
   function setCronPreset(expr) {
     const el = document.getElementById('cron-expr');
     if (el) { el.value = expr; el.focus(); }
+  }
+
+  function cronPickWorkflow() {
+    const sel = document.getElementById('cron-wf-select');
+    const name = sel?.value;
+    if (!name) return;
+    const msg = document.getElementById('cron-msg');
+    if (msg) msg.value = `workflow:${name}`;
+    sel.value = '';
   }
 
   async function addCronJob() {

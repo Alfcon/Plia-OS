@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
+from core import events
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +10,6 @@ _POLL_INTERVAL_S = 60
 
 
 async def _fire_cron_job(job: dict) -> None:
-    from core import events
     msg = job["message"]
     if msg.startswith("tool:"):
         tool_name = msg[5:].strip()
@@ -19,6 +19,16 @@ async def _fire_cron_job(job: dict) -> None:
         except Exception:
             logger.exception("Cron tool call %r failed", tool_name)
             msg = f"Failed to run {tool_name}."
+    elif msg.startswith("workflow:"):
+        wf_name = msg[9:].strip()
+        try:
+            from agents.workflow_store import run_workflow
+            results = await run_workflow(wf_name)
+            last = next((r["result"] for r in reversed(results) if r.get("result")), "")
+            msg = f"Workflow '{wf_name}' complete. {last}".strip()
+        except Exception:
+            logger.exception("Cron workflow %r failed", wf_name)
+            msg = f"Workflow '{wf_name}' failed."
     await events.emit("reminder_fired", {
         "id": job["id"],
         "message": f"[Cron: {job['name']}] {msg}",
