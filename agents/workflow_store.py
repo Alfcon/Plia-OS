@@ -128,3 +128,33 @@ async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
             break
 
     return output
+
+
+async def dry_run_workflow(name: str, payload: dict | None = None) -> list[dict]:
+    """Simulate a workflow run without executing tool calls."""
+    wf = get_workflow(name)
+    if wf is None:
+        raise KeyError(f"Workflow {name!r} not found")
+
+    step_results: list[str] = []
+    output: list[dict] = []
+
+    for i, step in enumerate(wf["steps"]):
+        tool = step.get("tool", "")
+        raw_params = step.get("params", {})
+        note = step.get("note", "")
+        params = _interpolate_params(raw_params, step_results, payload)
+        dry_result = f"[DRY RUN] would call {tool!r} with {params}"
+        step_results.append(dry_result)
+        output.append({
+            "step": i,
+            "tool": tool,
+            "params": params,
+            "note": note,
+            "result": dry_result,
+            "error": None,
+            "duration_ms": 0,
+            "dry_run": True,
+        })
+
+    return output

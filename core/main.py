@@ -75,8 +75,9 @@ def create_app() -> FastAPI:
         reminder_task = asyncio.create_task(run_reminder_loop())
         cron_task = asyncio.create_task(run_cron_loop())
         proactive_task = asyncio.create_task(run_proactive_memory_loop())
-        from dashboard.server import run_vram_sampler
+        from dashboard.server import run_vram_sampler, run_mcp_health_monitor
         vram_sampler_task = asyncio.create_task(run_vram_sampler())
+        mcp_health_task = asyncio.create_task(run_mcp_health_monitor())
         # Start Tor if previously enabled
         tor_task = None
         if get_config().tor_enabled:
@@ -95,6 +96,7 @@ def create_app() -> FastAPI:
         cron_task.cancel()
         proactive_task.cancel()
         vram_sampler_task.cancel()
+        mcp_health_task.cancel()
         if tor_task and not tor_task.done():
             tor_task.cancel()
         if observer_task and not observer_task.done():

@@ -768,6 +768,9 @@
         <button class="m-nav-btn" data-section="llmstream" onclick="showMenuSection('llmstream')">LLM Stream</button>
         <button class="m-nav-btn" data-section="chatfork" onclick="showMenuSection('chatfork');loadChatForks()">Chat Forks</button>
         <button class="m-nav-btn" data-section="replay" onclick="showMenuSection('replay');loadReplayHistory()">Replay</button>
+        <button class="m-nav-btn" data-section="compactstats" onclick="showMenuSection('compactstats');loadCompactStats()">Compact Stats</button>
+        <button class="m-nav-btn" data-section="mcphealth" onclick="showMenuSection('mcphealth');loadMcpHealth()">MCP Health</button>
+        <button class="m-nav-btn" data-section="waketrain" onclick="showMenuSection('waketrain');loadWakePhrases()">Wake Train</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1894,6 +1897,54 @@
           <div style="font-size:0.63rem;color:#333;flex-shrink:0;">Recent turns — click to pre-fill:</div>
           <div id="replay-history" style="flex-shrink:0;display:flex;flex-direction:column;gap:3px;max-height:100px;overflow-y:auto;"></div>
           <div id="replay-output" style="flex:1;min-height:80px;overflow-y:auto;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;padding:8px;font-size:0.75rem;font-family:monospace;color:#e0e0e0;white-space:pre-wrap;word-break:break-word;display:none;"></div>
+        </div>
+
+        <!-- Context Compactor Stats -->
+        <div id="m-section-compactstats" class="m-pane" style="display:none;flex-direction:column;gap:10px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Tracks how often the voice/chat context is compacted to save tokens. Resets on server restart.</div>
+          <div style="flex-shrink:0;border:1px solid #1a1a1a;border-radius:3px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="compact-grid">
+            <div style="text-align:center;"><div id="cs-compactions" style="font-size:1.4rem;color:#81c784;font-family:monospace;">0</div><div style="font-size:0.65rem;color:#444;">compactions</div></div>
+            <div style="text-align:center;"><div id="cs-summarised" style="font-size:1.4rem;color:#4fc3f7;font-family:monospace;">0</div><div style="font-size:0.65rem;color:#444;">msgs summarised</div></div>
+            <div style="text-align:center;"><div id="cs-kept" style="font-size:1.4rem;color:#ffb74d;font-family:monospace;">0</div><div style="font-size:0.65rem;color:#444;">msgs kept verbatim</div></div>
+            <div style="text-align:center;"><div id="cs-failures" style="font-size:1.4rem;color:#ef9a9a;font-family:monospace;">0</div><div style="font-size:0.65rem;color:#444;">failures</div></div>
+          </div>
+          <div style="flex-shrink:0;border:1px solid #1a1a1a;border-radius:3px;padding:8px;font-size:0.72rem;color:#555;">
+            Threshold: <span id="cs-threshold" style="color:#888;">—</span> msgs &nbsp;·&nbsp; Keep recent: <span id="cs-keep" style="color:#888;">—</span> msgs
+          </div>
+          <div style="flex-shrink:0;display:flex;gap:6px;">
+            <button onclick="loadCompactStats()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
+            <button onclick="resetCompactStats()" style="background:none;border:1px solid #333;color:#888;font-size:0.7rem;padding:3px 10px;border-radius:3px;cursor:pointer;">Reset counters</button>
+          </div>
+        </div>
+
+        <!-- MCP Health Monitor -->
+        <div id="m-section-mcphealth" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Per-server latency via list_tools() ping. Auto-checked every 60s in background.</div>
+          <div style="flex-shrink:0;display:flex;gap:6px;align-items:center;">
+            <button onclick="pingMcpServers()" id="mcp-ping-btn"
+              style="background:#0d1a2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 12px;border-radius:3px;cursor:pointer;">Ping All</button>
+            <button onclick="loadMcpHealth()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
+            <span id="mcp-health-status" style="font-size:0.68rem;color:#444;"></span>
+          </div>
+          <div id="mcp-health-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;"></div>
+        </div>
+
+        <!-- Wake Phrase Trainer -->
+        <div id="m-section-waketrain" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Collect WAV samples per wake phrase for custom model training with openwakeword's training pipeline.</div>
+          <div style="flex-shrink:0;border:1px solid #1a1a1a;border-radius:3px;padding:8px;display:flex;flex-direction:column;gap:6px;">
+            <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.06em;color:#444;">Add samples</div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+              <input id="wt-phrase" type="text" placeholder="Phrase name (e.g. hey_plia)"
+                style="flex:1;min-width:100px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 7px;font-size:0.73rem;">
+              <label style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.7rem;padding:4px 10px;border-radius:3px;cursor:pointer;">
+                + Upload WAV
+                <input type="file" accept="audio/wav,audio/*" multiple style="display:none;" onchange="uploadWakeSamples(this)">
+              </label>
+            </div>
+            <div id="wt-upload-status" style="font-size:0.68rem;color:#555;min-height:14px;"></div>
+          </div>
+          <div id="wt-phrase-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -6987,6 +7038,105 @@
     out.style.display = 'block';
   }
 
+  // ── Context Compactor Stats ───────────────────────────────────────────────
+
+  async function loadCompactStats() {
+    const r = await fetch('/api/context/stats').then(x => x.json()).catch(() => null);
+    if (!r) return;
+    document.getElementById('cs-compactions').textContent = r.compactions;
+    document.getElementById('cs-summarised').textContent = r.messages_summarised;
+    document.getElementById('cs-kept').textContent = r.messages_kept;
+    document.getElementById('cs-failures').textContent = r.failures;
+    document.getElementById('cs-threshold').textContent = r.threshold;
+    document.getElementById('cs-keep').textContent = r.keep_recent;
+  }
+
+  async function resetCompactStats() {
+    await fetch('/api/context/stats/reset', {method: 'POST'});
+    await loadCompactStats();
+  }
+
+  // ── MCP Health Monitor ────────────────────────────────────────────────────
+
+  async function loadMcpHealth() {
+    const r = await fetch('/api/mcp/health').then(x => x.json()).catch(() => null);
+    const el = document.getElementById('mcp-health-list');
+    const st = document.getElementById('mcp-health-status');
+    if (!r) { el.innerHTML = '<div style="padding:6px;color:#555;">Error</div>'; return; }
+    if (!r.servers.length) { el.innerHTML = '<div style="padding:6px;color:#333;">No MCP servers configured.</div>'; return; }
+    st.textContent = `${r.total} server${r.total !== 1 ? 's' : ''}`;
+    el.innerHTML = r.servers.map(s => {
+      const dot = s.status === 'ok' ? '🟢' : s.status === 'disabled' ? '⚫' : s.status === 'unknown' ? '⚪' : '🔴';
+      const lat = s.latency_ms !== null ? `${s.latency_ms}ms` : '—';
+      const checked = s.checked_at ? new Date(s.checked_at * 1000).toLocaleTimeString() : 'never';
+      return `<div style="padding:6px 8px;border-bottom:1px solid #111;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:0.75rem;">${dot}</span>
+        <div style="flex:1;">
+          <div style="color:#ccc;font-size:0.73rem;">${_esc(s.name)}</div>
+          ${s.last_error ? `<div style="font-size:0.65rem;color:#ef9a9a;margin-top:1px;">${_esc(s.last_error)}</div>` : ''}
+        </div>
+        <span style="font-size:0.68rem;color:#888;font-family:monospace;">${lat}</span>
+        <span style="font-size:0.62rem;color:#333;">${checked}</span>
+      </div>`;
+    }).join('');
+  }
+
+  async function pingMcpServers() {
+    const btn = document.getElementById('mcp-ping-btn');
+    const st = document.getElementById('mcp-health-status');
+    btn.disabled = true;
+    st.textContent = 'Pinging…';
+    const r = await fetch('/api/mcp/health/ping', {method: 'POST'}).then(x => x.json()).catch(() => null);
+    btn.disabled = false;
+    if (r) await loadMcpHealth();
+  }
+
+  // ── Wake Phrase Trainer ───────────────────────────────────────────────────
+
+  async function loadWakePhrases() {
+    const r = await fetch('/api/wake/phrases').then(x => x.json()).catch(() => null);
+    const el = document.getElementById('wt-phrase-list');
+    if (!r) { el.innerHTML = '<div style="padding:6px;color:#555;">Error</div>'; return; }
+    if (!r.phrases.length) { el.innerHTML = '<div style="padding:6px;color:#333;">No phrases yet. Upload WAV samples to get started.</div>'; return; }
+    el.innerHTML = r.phrases.map(p => `
+      <div style="padding:6px 8px;border-bottom:1px solid #111;display:flex;align-items:center;gap:8px;">
+        <div style="flex:1;">
+          <div style="color:#ccc;font-size:0.73rem;font-family:monospace;">${_esc(p.phrase)}</div>
+          <div style="font-size:0.65rem;color:#444;">${p.sample_count} sample${p.sample_count !== 1 ? 's' : ''}</div>
+        </div>
+        <span style="font-size:0.65rem;color:#555;">${p.sample_count >= 3 ? '✓ ready' : `need ${3-p.sample_count} more`}</span>
+        <button onclick="deleteWakePhrase('${_esc(p.phrase)}')"
+          style="background:none;border:none;color:#555;font-size:0.65rem;cursor:pointer;">✕</button>
+      </div>`).join('');
+  }
+
+  async function uploadWakeSamples(input) {
+    const phrase = document.getElementById('wt-phrase').value.trim();
+    const st = document.getElementById('wt-upload-status');
+    if (!phrase) { st.textContent = 'Enter a phrase name first.'; return; }
+    const files = Array.from(input.files);
+    if (!files.length) return;
+    st.textContent = `Uploading ${files.length} file(s)…`;
+    let ok = 0;
+    for (const f of files) {
+      const fd = new FormData();
+      fd.append('file', f);
+      const r = await fetch(`/api/wake/phrases/${encodeURIComponent(phrase)}/samples`, {
+        method: 'POST', body: fd,
+      }).then(x => x.json()).catch(() => null);
+      if (r && r.ok) ok++;
+    }
+    st.textContent = `Uploaded ${ok}/${files.length} samples for "${phrase}".`;
+    input.value = '';
+    await loadWakePhrases();
+  }
+
+  async function deleteWakePhrase(phrase) {
+    const r = await fetch(`/api/wake/phrases/${encodeURIComponent(phrase)}`, {method: 'DELETE'})
+      .then(x => x.json()).catch(() => null);
+    if (r && r.ok) await loadWakePhrases();
+  }
+
   // ── Benchmark panel ───────────────────────────────────────────────────────
 
   async function loadBenchHistory() {
@@ -7547,6 +7697,8 @@
         </div>
         <button onclick="wfRunNamed(${JSON.stringify(wf.name)})" title="Run"
           style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.65rem;padding:2px 6px;border-radius:3px;cursor:pointer;flex-shrink:0;">▶</button>
+        <button onclick="wfDryRun(${JSON.stringify(wf.name)})" title="Dry run"
+          style="background:#1a1200;border:1px solid #4d3800;color:#ffb74d;font-size:0.65rem;padding:2px 6px;border-radius:3px;cursor:pointer;flex-shrink:0;">⊙</button>
         <button onclick="wfDelete(${JSON.stringify(wf.name)})" title="Delete"
           style="background:#2a0d0d;border:1px solid #5e1b1b;color:#ef5350;font-size:0.65rem;padding:2px 6px;border-radius:3px;cursor:pointer;flex-shrink:0;">✕</button>
       </div>`).join('');
@@ -7675,6 +7827,25 @@
         return `<div style="border:1px solid #1a1a1a;border-radius:3px;padding:4px 6px;background:#050505;">
           <div style="margin-bottom:3px;">${hdr}</div>${body}</div>`;
       }).join('');
+    } catch(e) { res.innerHTML = '<div style="color:#ef5350;font-size:0.72rem;padding:4px;">Network error</div>'; }
+  }
+
+  async function wfDryRun(name) {
+    const res = document.getElementById('wf-results');
+    res.style.display = 'flex';
+    res.innerHTML = '<div style="color:#555;font-size:0.72rem;padding:4px;">Dry-running…</div>';
+    try {
+      const r = await fetch(`/api/workflows/${encodeURIComponent(name)}/dryrun`, {method:'POST'});
+      if (!r.ok) { const e = await r.json(); res.innerHTML = `<div style="color:#ef5350;font-size:0.72rem;padding:4px;">${_esc(e.detail || 'Error')}</div>`; return; }
+      const data = await r.json();
+      res.innerHTML = '<div style="font-size:0.65rem;color:#ffb74d;padding:2px 4px;margin-bottom:4px;">DRY RUN — no tools executed</div>'
+        + data.steps.map((s, i) => {
+          const hdr = `<span style="color:#ffb74d;font-size:0.65rem;font-weight:600;">[${i}] ${_esc(s.tool)}</span>`
+            + (s.note ? `<span style="color:#444;font-size:0.65rem;"> — ${_esc(s.note)}</span>` : '');
+          return `<div style="border:1px solid #2a1a00;border-radius:3px;padding:4px 6px;background:#050505;">
+            <div style="margin-bottom:3px;">${hdr}</div>
+            <div style="color:#888;font-size:0.68rem;white-space:pre-wrap;word-break:break-all;">${_esc(s.result)}</div></div>`;
+        }).join('');
     } catch(e) { res.innerHTML = '<div style="color:#ef5350;font-size:0.72rem;padding:4px;">Network error</div>'; }
   }
 

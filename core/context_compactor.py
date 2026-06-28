@@ -6,6 +6,21 @@ logger = logging.getLogger(__name__)
 _COMPACT_THRESHOLD = 30   # compact when non-system messages exceed this
 _KEEP_RECENT = 20         # keep this many most-recent messages verbatim
 
+_STATS: dict = {
+    "compactions": 0,
+    "messages_summarised": 0,
+    "messages_kept": 0,
+    "failures": 0,
+}
+
+
+def get_stats() -> dict:
+    return {
+        **_STATS,
+        "threshold": _COMPACT_THRESHOLD,
+        "keep_recent": _KEEP_RECENT,
+    }
+
 
 async def maybe_compact(messages: list[dict]) -> list[dict]:
     """Return compacted message list if over threshold; otherwise return as-is."""
@@ -23,8 +38,12 @@ async def maybe_compact(messages: list[dict]) -> list[dict]:
         summary = await _summarise(to_summarise)
     except Exception:
         logger.exception("Context compaction failed; keeping original messages")
+        _STATS["failures"] += 1
         return messages
 
+    _STATS["compactions"] += 1
+    _STATS["messages_summarised"] += len(to_summarise)
+    _STATS["messages_kept"] += len(keep)
     summary_msg = {"role": "system", "content": f"[Earlier conversation summary]\n{summary}"}
     return system + [summary_msg] + keep
 

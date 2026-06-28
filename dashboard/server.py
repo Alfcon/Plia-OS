@@ -2885,6 +2885,158 @@ async def chat_stream(body: dict):
     return StreamingResponse(_gen(), media_type="text/event-stream")
 
 
+# ── Context compactor stats ───────────────────────────────────────────────────
+
+@router.get("/api/context/stats")
+async def context_compactor_stats():
+    from core.context_compactor import get_stats
+    return get_stats()
+
+
+@router.post("/api/context/stats/reset")
+async def reset_context_stats():
+    from core.context_compactor import _STATS
+    _STATS["compactions"] = 0
+    _STATS["messages_summarised"] = 0
+    _STATS["messages_kept"] = 0
+    _STATS["failures"] = 0
+    return {"ok": True}
+
+
+# ── Workflow dry-run ──────────────────────────────────────────────────────────
+
+@router.post("/api/workflows/{name}/dryrun")
+async def dry_run_workflow_endpoint(name: str):
+    from agents.workflow_store import dry_run_workflow
+    try:
+        results = await dry_run_workflow(name)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return {"name": name, "dry_run": True, "steps": results}
+
+
+# ── MCP health monitor ────────────────────────────────────────────────────────
+
+import collections as _collections_mcp
+_MCP_HEALTH: dict[str, dict] = {}
+
+
+async def _ping_mcp_server(name: str) -> dict:
+    import time as _time
+    from core.mcp_client import _servers, _disabled_servers
+    if name in _disabled_servers:
+        return {"name": name, "status": "disabled", "latency_ms": None, "last_error": None, "checked_at": _time.time()}
+    srv = _servers.get(name)
+    if srv is None:
+        return {"name": name, "status": "failed", "latency_ms": None, "last_error": "not connected", "checked_at": _time.time()}
+    t0 = _time.monotonic()
+    try:
+        await asyncio.wait_for(srv.session.list_tools(), timeout=5.0)
+        latency_ms = int((_time.monotonic() - t0) * 1000)
+        return {"name": name, "status": "ok", "latency_ms": latency_ms, "last_error": None, "checked_at": _time.time()}
+    except Exception as exc:
+        return {"name": name, "status": "error", "latency_ms": None, "last_error": str(exc), "checked_at": _time.time()}
+
+
+async def run_mcp_health_monitor() -> None:
+    while True:
+        try:
+            from core.mcp_client import get_mcp_status
+            for srv in get_mcp_status():
+                name = srv["name"]
+                result = await _ping_mcp_server(name)
+                _MCP_HEALTH[name] = result
+        except Exception:
+            pass
+        await asyncio.sleep(60)
+
+
+@router.get("/api/mcp/health")
+async def mcp_health():
+    from core.mcp_client import get_mcp_status
+    servers = get_mcp_status()
+    health = []
+    for srv in servers:
+        name = srv["name"]
+        h = _MCP_HEALTH.get(name, {
+            "name": name, "status": "unknown", "latency_ms": None,
+            "last_error": None, "checked_at": None,
+        })
+        health.append({**h, "healthy": srv.get("healthy", False)})
+    return {"servers": health, "total": len(health)}
+
+
+@router.post("/api/mcp/health/ping")
+async def ping_mcp_servers():
+    from core.mcp_client import get_mcp_status
+    servers = get_mcp_status()
+    results = []
+    for srv in servers:
+        name = srv["name"]
+        result = await _ping_mcp_server(name)
+        _MCP_HEALTH[name] = result
+        results.append(result)
+    return {"servers": results}
+
+
+# ── Wake phrase samples ───────────────────────────────────────────────────────
+
+def _wake_samples_dir() -> pathlib.Path:
+    from core.config import get_config
+    return pathlib.Path(get_config().memory_dir) / "wake_samples"
+
+
+@router.get("/api/wake/phrases")
+async def list_wake_phrases():
+    d = _wake_samples_dir()
+    if not d.exists():
+        return {"phrases": []}
+    phrases = []
+    for p in sorted(d.iterdir()):
+        if p.is_dir():
+            samples = list(p.glob("*.wav"))
+            phrases.append({"phrase": p.name, "sample_count": len(samples), "path": str(p)})
+    return {"phrases": phrases}
+
+
+@router.post("/api/wake/phrases/{phrase}/samples")
+async def upload_wake_sample(phrase: str, file: UploadFile = File(...)):
+    import re
+    safe = re.sub(r"[^\w\-]", "_", phrase.strip())[:40]
+    if not safe:
+        raise HTTPException(status_code=400, detail="Invalid phrase name")
+    d = _wake_samples_dir() / safe
+    d.mkdir(parents=True, exist_ok=True)
+    idx = len(list(d.glob("*.wav"))) + 1
+    dest = d / f"sample_{idx:03d}.wav"
+    content = await file.read()
+    dest.write_bytes(content)
+    return {"ok": True, "phrase": safe, "sample": dest.name, "total_samples": idx}
+
+
+@router.delete("/api/wake/phrases/{phrase}")
+async def delete_wake_phrase(phrase: str):
+    import shutil as _shutil
+    import re
+    safe = re.sub(r"[^\w\-]", "_", phrase.strip())[:40]
+    d = _wake_samples_dir() / safe
+    if not d.exists():
+        raise HTTPException(status_code=404, detail="Phrase not found")
+    await asyncio.to_thread(_shutil.rmtree, str(d))
+    return {"ok": True}
+
+
+@router.get("/api/wake/phrases/{phrase}/samples")
+async def list_wake_samples(phrase: str):
+    import re
+    safe = re.sub(r"[^\w\-]", "_", phrase.strip())[:40]
+    d = _wake_samples_dir() / safe
+    if not d.exists():
+        return {"phrase": safe, "samples": []}
+    samples = [{"name": p.name, "size": p.stat().st_size} for p in sorted(d.glob("*.wav"))]
+    return {"phrase": safe, "samples": samples}
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
