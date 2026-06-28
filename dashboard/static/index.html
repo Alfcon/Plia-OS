@@ -6345,18 +6345,49 @@
     } catch(e) { alert('Network error'); }
   }
 
-  async function hookTest(slug) {
+  function hookTest(slug) {
+    // show inline payload editor
     const el = document.getElementById(`hook-result-${slug}`);
-    if (el) { el.style.display = 'block'; el.textContent = 'Firing…'; }
+    if (!el) return;
+    el.style.display = 'block';
+    el.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div style="font-size:0.62rem;color:#555;">Payload JSON (optional)</div>
+        <textarea id="hook-payload-${_esc(slug)}" rows="2"
+          style="background:#0a0a0a;border:1px solid #222;color:#ccc;font-family:monospace;font-size:0.68rem;border-radius:2px;padding:3px 5px;resize:vertical;"
+          placeholder="{}">{}</textarea>
+        <div style="display:flex;gap:5px;align-items:center;">
+          <button onclick="_hookFire(${JSON.stringify(slug)})"
+            style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.68rem;padding:2px 10px;border-radius:3px;cursor:pointer;">▶ Fire</button>
+          <button onclick="document.getElementById('hook-result-${_esc(slug)}').style.display='none'"
+            style="background:none;border:none;color:#444;font-size:0.68rem;cursor:pointer;">✕</button>
+        </div>
+        <div id="hook-fire-result-${_esc(slug)}" style="font-size:0.68rem;font-family:monospace;color:#aaa;white-space:pre-wrap;word-break:break-all;max-height:120px;overflow-y:auto;"></div>
+      </div>`;
+  }
+
+  async function _hookFire(slug) {
+    const resultEl = document.getElementById(`hook-fire-result-${slug}`);
+    const payloadEl = document.getElementById(`hook-payload-${slug}`);
+    resultEl.textContent = '⏳ Firing…';
+    let payload = {};
+    try { payload = JSON.parse(payloadEl.value || '{}'); } catch(e) { resultEl.textContent = 'Invalid JSON: ' + e.message; return; }
     try {
-      const r = await fetch(`/api/webhooks/trigger/${encodeURIComponent(slug)}`, {
+      const r = await fetch(`/api/webhooks/${encodeURIComponent(slug)}/test`, {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({test: true}),
+        body: JSON.stringify({payload}),
       });
       const data = await r.json();
-      if (el) el.textContent = JSON.stringify(data, null, 2);
+      const badge = data.ok
+        ? `<span style="color:#81c784;">✓ ok</span>`
+        : `<span style="color:#ef5350;">✗ error</span>`;
+      const latency = `<span style="color:#555;"> ${data.latency_ms}ms</span>`;
+      const body = data.ok
+        ? (data.result?.result || data.result?.steps ? JSON.stringify(data.result, null, 2) : '')
+        : (data.error || '');
+      resultEl.innerHTML = `<div>${badge}${latency}</div><pre style="margin:2px 0 0;color:#888;font-size:0.65rem;">${_esc(body)}</pre>`;
     } catch(e) {
-      if (el) el.textContent = 'Error: ' + e.message;
+      resultEl.textContent = 'Network error: ' + e.message;
     }
   }
 

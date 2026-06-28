@@ -2010,6 +2010,27 @@ async def delete_webhook_endpoint(slug: str):
     return {"ok": True}
 
 
+@router.post("/api/webhooks/{slug}/test")
+async def test_webhook(slug: str, body: dict):
+    """Fire a webhook from the dashboard — skips secret check, adds timing."""
+    import time
+    from agents.webhook_store import get_webhook, fire_webhook
+    wh = await asyncio.to_thread(get_webhook, slug)
+    if wh is None:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    payload = body.get("payload") or {}
+    if not isinstance(payload, dict):
+        payload = {"body": payload}
+    t0 = time.monotonic()
+    try:
+        result = await fire_webhook(slug, payload)
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        return {"ok": result.get("ok", True), "result": result, "latency_ms": latency_ms}
+    except Exception as exc:
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        return {"ok": False, "error": str(exc), "result": None, "latency_ms": latency_ms}
+
+
 @router.post("/api/webhooks/trigger/{slug}")
 async def trigger_webhook(slug: str, request: Request):
     from agents.webhook_store import get_webhook, fire_webhook
