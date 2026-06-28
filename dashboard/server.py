@@ -87,6 +87,35 @@ async def dashboard():
     return HTMLResponse(index.read_text())
 
 
+@router.post("/api/tts/synthesize")
+async def tts_synthesize(body: dict):
+    import time
+    import io
+    text = (body.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="'text' required")
+    from voice.tts import get_tts_service as _get_tts
+    svc = _get_tts()
+    if svc is None:
+        raise HTTPException(status_code=503, detail="TTS service not loaded")
+    t0 = time.monotonic()
+    try:
+        audio = await asyncio.to_thread(svc.synthesise, text)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    latency_ms = int((time.monotonic() - t0) * 1000)
+    sample_rate = 24000
+    audio_duration_s = round(len(audio) / sample_rate, 3)
+    buf = io.BytesIO()
+    wavfile.write(buf, sample_rate, audio)
+    wav_bytes = buf.getvalue()
+    from fastapi.responses import Response
+    response = Response(content=wav_bytes, media_type="audio/wav")
+    response.headers["X-Latency-Ms"] = str(latency_ms)
+    response.headers["X-Audio-Duration-S"] = str(audio_duration_s)
+    return response
+
+
 @router.post("/api/voice/transcribe")
 async def voice_transcribe(request: Request):
     import time
