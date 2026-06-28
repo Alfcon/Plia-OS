@@ -1086,6 +1086,53 @@ async def airllm_unload():
     return {"ok": True}
 
 
+_DL_STATE: dict = {"state": "idle", "model": "", "file": "", "bytes": 0, "total": 0, "error": ""}
+
+
+def _download_sync(model: str) -> None:
+    from huggingface_hub import snapshot_download
+    from tqdm import tqdm as _tqdm
+
+    class _Tracker(_tqdm):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, **kw)
+            _DL_STATE["file"] = str(self.desc or "")
+
+        def update(self, n=1):
+            super().update(n)
+            _DL_STATE["bytes"] = int(self.n or 0)
+            _DL_STATE["total"] = int(self.total or 0)
+            _DL_STATE["file"] = str(self.desc or "")
+
+    snapshot_download(model, tqdm_class=_Tracker)
+
+
+async def _run_download(model: str) -> None:
+    try:
+        await asyncio.to_thread(_download_sync, model)
+        _DL_STATE["state"] = "done"
+    except Exception as exc:
+        _DL_STATE.update({"state": "error", "error": str(exc)})
+
+
+@router.post("/api/airllm/download")
+async def airllm_download_start(body: dict):
+    model = (body.get("model") or "").strip()
+    if not model:
+        raise HTTPException(status_code=422, detail="model required")
+    if _DL_STATE["state"] == "downloading":
+        raise HTTPException(status_code=409, detail="download already in progress")
+    _DL_STATE.update({"state": "downloading", "model": model, "file": "", "bytes": 0, "total": 0, "error": ""})
+    asyncio.create_task(_run_download(model))
+    return {"ok": True, "model": model}
+
+
+@router.get("/api/airllm/download/status")
+async def airllm_download_status():
+    pct = round(_DL_STATE["bytes"] / _DL_STATE["total"] * 100, 1) if _DL_STATE["total"] else 0
+    return {**_DL_STATE, "pct": pct}
+
+
 @router.get("/api/mcp/servers")
 async def get_mcp_servers():
     return get_mcp_status()

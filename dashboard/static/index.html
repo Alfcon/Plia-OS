@@ -757,6 +757,7 @@
         <button class="m-nav-btn" data-section="bench" onclick="showMenuSection('bench');loadBenchHistory()">Bench</button>
         <button class="m-nav-btn" data-section="prompts" onclick="showMenuSection('prompts');loadPrompts()">Prompts</button>
         <button class="m-nav-btn" data-section="voicetest" onclick="showMenuSection('voicetest')">STT Test</button>
+        <button class="m-nav-btn" data-section="ttstest" onclick="showMenuSection('ttstest')">TTS Test</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -993,7 +994,18 @@
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;">
             <button class="apply-btn" onclick="applyAirLLMConfig()" id="airllm-apply-btn">Load / Apply</button>
             <button id="airllm-unload-btn" onclick="unloadAirLLM()" style="display:none;background:#2e1e1e;border:1px solid #4d2e2e;border-radius:4px;color:#ef9a9a;font-size:0.75rem;padding:5px 12px;cursor:pointer;">Unload</button>
+            <button onclick="downloadAirLLM()" id="airllm-dl-btn" style="background:#0d1b2a;border:1px solid #1b3a5e;border-radius:4px;color:#4fc3f7;font-size:0.75rem;padding:5px 12px;cursor:pointer;">↓ Download</button>
             <span id="airllm-status-msg" style="font-size:0.72rem;color:#888;"></span>
+          </div>
+          <div id="airllm-dl-wrap" style="display:none;margin-top:8px;">
+            <div style="font-size:0.7rem;color:#666;margin-bottom:3px;" id="airllm-dl-file"></div>
+            <div style="background:#111;border:1px solid #222;border-radius:3px;height:8px;overflow:hidden;">
+              <div id="airllm-dl-bar" style="height:100%;width:0%;background:#4fc3f7;transition:width 0.3s;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:2px;font-size:0.68rem;color:#555;">
+              <span id="airllm-dl-pct">0%</span>
+              <span id="airllm-dl-bytes"></span>
+            </div>
           </div>
           <hr style="border:none;border-top:1px solid #222;margin:10px 0;">
           <label style="font-size:0.78rem;color:#aaa;display:block;margin-bottom:4px;">System Prompt</label>
@@ -1742,6 +1754,30 @@
           <!-- History -->
           <div style="font-size:0.68rem;color:#444;flex-shrink:0;">Recent tests</div>
           <div id="vt-history" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;"></div>
+        </div>
+
+        <!-- TTS Test -->
+        <div id="m-section-ttstest" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="flex-shrink:0;display:flex;flex-direction:column;gap:6px;border:1px solid #1a1a1a;border-radius:3px;padding:8px;">
+            <div style="font-size:0.68rem;color:#555;">Synthesize text with current TTS engine</div>
+            <textarea id="tts-input" rows="3"
+              style="background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:6px 8px;font-size:0.75rem;resize:vertical;"
+              placeholder="Enter text to synthesize…"
+              onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();ttsSpeak();}"></textarea>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button id="tts-speak-btn" onclick="ttsSpeak()"
+                style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.73rem;padding:5px 16px;border-radius:3px;cursor:pointer;">▶ Speak</button>
+              <span id="tts-status" style="font-size:0.7rem;color:#555;"></span>
+            </div>
+          </div>
+          <audio id="tts-audio" controls style="width:100%;display:none;flex-shrink:0;"></audio>
+          <div id="tts-meta" style="display:none;flex-shrink:0;display:none;flex-direction:row;gap:12px;font-size:0.68rem;color:#555;padding:2px 0;">
+            <span id="tts-latency"></span>
+            <span id="tts-duration"></span>
+            <span id="tts-rtf"></span>
+          </div>
+          <div style="font-size:0.68rem;color:#444;flex-shrink:0;">Recent tests</div>
+          <div id="tts-history" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;"></div>
         </div>
 
         <!-- Prompt Library -->
@@ -4139,6 +4175,47 @@
     await loadAirLLMStatus();
   }
 
+  let _dlPollTimer = null;
+  async function downloadAirLLM() {
+    const model = (document.getElementById('airllm-model')?.value || '').trim();
+    if (!model) { alert('Enter a HuggingFace model ID first.'); return; }
+    const btn = document.getElementById('airllm-dl-btn');
+    btn.disabled = true; btn.textContent = 'Starting…';
+    const r = await fetch('/api/airllm/download', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({model}) });
+    if (!r.ok) { const e = await r.json(); alert('Download error: ' + (e.detail || r.status)); btn.disabled = false; btn.textContent = '↓ Download'; return; }
+    document.getElementById('airllm-dl-wrap').style.display = 'block';
+    btn.textContent = 'Downloading…';
+    clearInterval(_dlPollTimer);
+    _dlPollTimer = setInterval(_dlPoll, 800);
+  }
+  async function _dlPoll() {
+    const s = await fetch('/api/airllm/download/status').then(r => r.json()).catch(() => null);
+    if (!s) return;
+    const bar = document.getElementById('airllm-dl-bar');
+    const pct = document.getElementById('airllm-dl-pct');
+    const bytes = document.getElementById('airllm-dl-bytes');
+    const file = document.getElementById('airllm-dl-file');
+    const btn = document.getElementById('airllm-dl-btn');
+    if (bar) bar.style.width = s.pct + '%';
+    if (pct) pct.textContent = s.pct + '%';
+    const fmt = n => n > 1e9 ? (n/1e9).toFixed(1)+'GB' : n > 1e6 ? (n/1e6).toFixed(0)+'MB' : (n/1e3).toFixed(0)+'KB';
+    if (bytes && s.total) bytes.textContent = fmt(s.bytes) + ' / ' + fmt(s.total);
+    if (file) file.textContent = s.file || '';
+    if (s.state === 'done') {
+      clearInterval(_dlPollTimer);
+      if (bar) bar.style.background = '#81c784';
+      if (pct) pct.textContent = 'Done';
+      if (file) file.textContent = 'Download complete';
+      if (btn) { btn.disabled = false; btn.textContent = '↓ Download'; }
+      document.getElementById('airllm-status-msg').textContent = 'Downloaded. Click Load / Apply.';
+    } else if (s.state === 'error') {
+      clearInterval(_dlPollTimer);
+      if (file) file.textContent = 'Error: ' + s.error;
+      if (bar) bar.style.background = '#ef5350';
+      if (btn) { btn.disabled = false; btn.textContent = '↓ Download'; }
+    }
+  }
+
   document.addEventListener('click', e => {
     if (!document.getElementById('airllm-compression-wrap')?.contains(e.target))
       document.getElementById('airllm-compression-dropdown')?.classList.remove('open');
@@ -5935,6 +6012,78 @@
           <div style="font-size:0.68rem;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(s.detail)}</div>
         </div>
         <span style="font-size:0.62rem;color:${color};border:1px solid ${border};border-radius:3px;padding:1px 6px;flex-shrink:0;">${st}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ── TTS Test ──────────────────────────────────────────────────────────────
+
+  const _ttsHistory = [];
+
+  async function ttsSpeak() {
+    const btn = document.getElementById('tts-speak-btn');
+    const statusEl = document.getElementById('tts-status');
+    const text = document.getElementById('tts-input').value.trim();
+    if (!text) { statusEl.textContent = 'Enter text first.'; return; }
+    btn.disabled = true;
+    btn.textContent = '⏳';
+    statusEl.textContent = 'Synthesizing…';
+    statusEl.style.color = '#555';
+    try {
+      const r = await fetch('/api/tts/synthesize', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text}),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        statusEl.textContent = 'Error: ' + (err.detail || r.status);
+        statusEl.style.color = '#ef5350';
+        return;
+      }
+      const latencyMs = parseInt(r.headers.get('X-Latency-Ms') || '0', 10);
+      const audioDurS = parseFloat(r.headers.get('X-Audio-Duration-S') || '0');
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = document.getElementById('tts-audio');
+      audio.src = url;
+      audio.style.display = 'block';
+      audio.play();
+      const rtf = audioDurS > 0 ? (latencyMs / 1000 / audioDurS).toFixed(2) : null;
+      document.getElementById('tts-latency').textContent = `${latencyMs}ms`;
+      document.getElementById('tts-duration').textContent = `${audioDurS}s audio`;
+      document.getElementById('tts-rtf').textContent = rtf !== null ? `RTF ${rtf}×` : '';
+      const meta = document.getElementById('tts-meta');
+      meta.style.display = 'flex';
+      statusEl.textContent = 'Done';
+      statusEl.style.color = '#81c784';
+      const entry = {text: text.substring(0, 80), latency_ms: latencyMs, audio_duration_s: audioDurS, rtf, ts: Date.now()};
+      _ttsHistory.unshift(entry);
+      if (_ttsHistory.length > 20) _ttsHistory.pop();
+      _ttsRenderHistory();
+    } catch(e) {
+      statusEl.textContent = 'Network error: ' + e.message;
+      statusEl.style.color = '#ef5350';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '▶ Speak';
+    }
+  }
+
+  function _ttsRenderHistory() {
+    const el = document.getElementById('tts-history');
+    if (!_ttsHistory.length) { el.innerHTML = '<div style="font-size:0.68rem;color:#444;">No tests yet.</div>'; return; }
+    el.innerHTML = _ttsHistory.map(h => {
+      const t = new Date(h.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      const rtfStr = h.rtf !== null ? `RTF ${h.rtf}×` : '';
+      return `<div style="background:#0d0d0d;border:1px solid #1a1a1a;border-radius:3px;padding:5px 9px;display:flex;flex-direction:column;gap:2px;">
+        <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
+          <span style="font-size:0.62rem;color:#444;flex-shrink:0;">${t}</span>
+          <span style="font-size:0.68rem;color:#4fc3f7;flex-shrink:0;">${h.latency_ms}ms</span>
+          <span style="font-size:0.65rem;color:#555;flex-shrink:0;">${h.audio_duration_s}s</span>
+          ${rtfStr ? `<span style="font-size:0.6rem;color:#555;">${_esc(rtfStr)}</span>` : ''}
+        </div>
+        <div style="font-size:0.72rem;color:#ccc;font-style:italic;">"${_esc(h.text)}${h.text.length >= 80 ? '…' : ''}"</div>
       </div>`;
     }).join('');
   }
