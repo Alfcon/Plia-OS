@@ -129,6 +129,12 @@ class PliaConfig:
     audio_input_device: int | None = None
     audio_output_device: int | None = None
 
+    # System resource alerts
+    alerts_enabled: bool = False
+    cpu_alert_threshold: int = 90
+    ram_alert_threshold: int = 90
+    gpu_alert_threshold: int = 90
+
 
 _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
     "tts_engine": ("kokoro", "chatterbox", "dramabox"),

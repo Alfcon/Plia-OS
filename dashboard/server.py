@@ -3037,6 +3037,156 @@ async def list_wake_samples(phrase: str):
     return {"phrase": safe, "samples": samples}
 
 
+# ── Scheduled messages ────────────────────────────────────────────────────────
+
+@router.get("/api/scheduled/messages")
+async def list_scheduled_messages():
+    from core.scheduled_msg_store import list_scheduled_messages
+    return {"messages": await asyncio.to_thread(list_scheduled_messages)}
+
+
+@router.post("/api/scheduled/messages")
+async def add_scheduled_message(body: dict):
+    from core.scheduled_msg_store import add_scheduled_message
+    message = (body.get("message") or "").strip()
+    fire_at = (body.get("fire_at") or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="message required")
+    if not fire_at:
+        raise HTTPException(status_code=400, detail="fire_at (ISO 8601) required")
+    msg_id = await asyncio.to_thread(add_scheduled_message, message, fire_at)
+    return {"ok": True, "id": msg_id, "fire_at": fire_at}
+
+
+@router.delete("/api/scheduled/messages/{msg_id}")
+async def delete_scheduled_message(msg_id: int):
+    from core.scheduled_msg_store import delete_scheduled_message
+    deleted = await asyncio.to_thread(delete_scheduled_message, msg_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return {"ok": True}
+
+
+# ── Plugin sandbox ────────────────────────────────────────────────────────────
+
+@router.post("/api/modules/sandbox")
+async def sandbox_module(body: dict):
+    import sys
+    import subprocess
+    code = (body.get("code") or "").strip()
+    timeout = min(int(body.get("timeout", 5)), 30)
+    if not code:
+        raise HTTPException(status_code=400, detail="code required")
+    t0 = asyncio.get_event_loop().time()
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-c", code,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            return {
+                "ok": False,
+                "exit_code": -1,
+                "stdout": "",
+                "stderr": f"Timed out after {timeout}s",
+                "duration_ms": int((asyncio.get_event_loop().time() - t0) * 1000),
+            }
+    except Exception as exc:
+        return {"ok": False, "exit_code": -1, "stdout": "", "stderr": str(exc), "duration_ms": 0}
+    duration_ms = int((asyncio.get_event_loop().time() - t0) * 1000)
+    return {
+        "ok": proc.returncode == 0,
+        "exit_code": proc.returncode,
+        "stdout": stdout.decode(errors="replace")[:4096],
+        "stderr": stderr.decode(errors="replace")[:2048],
+        "duration_ms": duration_ms,
+    }
+
+
+# ── System resource alerts ────────────────────────────────────────────────────
+
+_ALERT_LOG: _collections.deque = _collections.deque(maxlen=100)
+
+
+async def run_resource_alert_loop() -> None:
+    while True:
+        try:
+            from core.config import get_config as _gc
+            cfg = _gc()
+            if cfg.alerts_enabled:
+                import time as _t
+                try:
+                    import psutil
+                    cpu = psutil.cpu_percent(interval=None)
+                    ram = psutil.virtual_memory().percent
+                    _check = lambda val, thresh, name: (
+                        _ALERT_LOG.appendleft({"ts": _t.time(), "resource": name, "value": round(val, 1), "threshold": thresh})
+                        or asyncio.ensure_future(events.emit("system_alert", {"resource": name, "value": round(val, 1), "threshold": thresh}))
+                    ) if val >= thresh else None
+                    _check(cpu, cfg.cpu_alert_threshold, "cpu")
+                    _check(ram, cfg.ram_alert_threshold, "ram")
+                except ImportError:
+                    pass
+                try:
+                    broker = get_vram_broker()
+                    st = broker.status()
+                    used = st.get("vram_used_gb", 0) or 0
+                    total = st.get("vram_total_gb", 0) or 0
+                    if total > 0:
+                        pct = (used / total) * 100
+                        if pct >= cfg.gpu_alert_threshold:
+                            _ALERT_LOG.appendleft({"ts": _t.time(), "resource": "gpu", "value": round(pct, 1), "threshold": cfg.gpu_alert_threshold})
+                            await events.emit("system_alert", {"resource": "gpu", "value": round(pct, 1), "threshold": cfg.gpu_alert_threshold})
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        await asyncio.sleep(30)
+
+
+@router.get("/api/alerts/log")
+async def get_alert_log(n: int = 50):
+    return {"alerts": list(_ALERT_LOG)[:n]}
+
+
+@router.delete("/api/alerts/log")
+async def clear_alert_log():
+    _ALERT_LOG.clear()
+    return {"ok": True}
+
+
+@router.get("/api/alerts/config")
+async def get_alert_config():
+    cfg = get_config()
+    return {
+        "alerts_enabled": cfg.alerts_enabled,
+        "cpu_alert_threshold": cfg.cpu_alert_threshold,
+        "ram_alert_threshold": cfg.ram_alert_threshold,
+        "gpu_alert_threshold": cfg.gpu_alert_threshold,
+    }
+
+
+@router.post("/api/alerts/config")
+async def set_alert_config(body: dict):
+    kwargs: dict = {}
+    if "alerts_enabled" in body:
+        kwargs["alerts_enabled"] = bool(body["alerts_enabled"])
+    for key in ("cpu_alert_threshold", "ram_alert_threshold", "gpu_alert_threshold"):
+        if key in body:
+            val = int(body[key])
+            if not (1 <= val <= 100):
+                raise HTTPException(status_code=400, detail=f"{key} must be 1-100")
+            kwargs[key] = val
+    if kwargs:
+        await asyncio.to_thread(update_config, **kwargs)
+    return {"ok": True}
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()

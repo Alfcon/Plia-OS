@@ -771,6 +771,9 @@
         <button class="m-nav-btn" data-section="compactstats" onclick="showMenuSection('compactstats');loadCompactStats()">Compact Stats</button>
         <button class="m-nav-btn" data-section="mcphealth" onclick="showMenuSection('mcphealth');loadMcpHealth()">MCP Health</button>
         <button class="m-nav-btn" data-section="waketrain" onclick="showMenuSection('waketrain');loadWakePhrases()">Wake Train</button>
+        <button class="m-nav-btn" data-section="schedmsg" onclick="showMenuSection('schedmsg');loadScheduledMsgs()">Sched Msgs</button>
+        <button class="m-nav-btn" data-section="sandbox" onclick="showMenuSection('sandbox')">Sandbox</button>
+        <button class="m-nav-btn" data-section="sysalerts" onclick="showMenuSection('sysalerts');loadAlertConfig();loadAlertLog()">Sys Alerts</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1945,6 +1948,81 @@
             <div id="wt-upload-status" style="font-size:0.68rem;color:#555;min-height:14px;"></div>
           </div>
           <div id="wt-phrase-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;"></div>
+        </div>
+
+        <!-- Scheduled Messages -->
+        <div id="m-section-schedmsg" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Schedule a chat message to be sent through the pipeline at a future time. Result added to history.</div>
+          <div style="flex-shrink:0;border:1px solid #1a1a1a;border-radius:3px;padding:8px;display:flex;flex-direction:column;gap:6px;">
+            <textarea id="schedmsg-text" rows="2" placeholder="Message to send…"
+              style="width:100%;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:5px 7px;font-size:0.75rem;font-family:monospace;resize:vertical;box-sizing:border-box;"></textarea>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <input id="schedmsg-at" type="datetime-local"
+                style="flex:1;min-width:160px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 7px;font-size:0.73rem;">
+              <button onclick="addScheduledMsg()"
+                style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.73rem;padding:4px 12px;border-radius:3px;cursor:pointer;">Schedule</button>
+              <button onclick="loadScheduledMsgs()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
+            </div>
+            <div id="schedmsg-status" style="font-size:0.68rem;color:#555;min-height:14px;"></div>
+          </div>
+          <div id="schedmsg-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;"></div>
+        </div>
+
+        <!-- Plugin Sandbox -->
+        <div id="m-section-sandbox" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Run Python snippets in an isolated subprocess. No registry side-effects. Max 30s timeout.</div>
+          <div style="flex-shrink:0;display:flex;gap:6px;align-items:flex-start;">
+            <textarea id="sandbox-code" rows="6" placeholder="# Python code here&#10;print('hello')"
+              style="flex:1;background:#0a0a0a;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:6px 8px;font-size:0.75rem;font-family:monospace;resize:vertical;"
+              onkeydown="if(event.ctrlKey&&event.key==='Enter')runSandbox()"></textarea>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <button onclick="runSandbox()" id="sandbox-run-btn"
+                style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.73rem;padding:5px 10px;border-radius:3px;cursor:pointer;">▶ Run</button>
+              <select id="sandbox-timeout" style="background:#111;border:1px solid #333;color:#888;border-radius:3px;padding:3px 5px;font-size:0.7rem;">
+                <option value="5">5s</option>
+                <option value="10">10s</option>
+                <option value="30">30s</option>
+              </select>
+              <button onclick="sandboxClear()" style="background:none;border:none;color:#444;font-size:0.7rem;cursor:pointer;">Clear</button>
+            </div>
+          </div>
+          <div id="sandbox-meta" style="font-size:0.68rem;color:#444;flex-shrink:0;min-height:14px;"></div>
+          <div id="sandbox-stdout" style="flex:1;min-height:60px;overflow-y:auto;background:#050505;border:1px solid #1a1a1a;border-radius:3px;padding:7px;font-size:0.75rem;font-family:monospace;color:#e0e0e0;white-space:pre-wrap;word-break:break-word;display:none;"></div>
+          <div id="sandbox-stderr" style="flex-shrink:0;min-height:0;overflow-y:auto;background:#150505;border:1px solid #2a1a1a;border-radius:3px;padding:7px;font-size:0.73rem;font-family:monospace;color:#ef9a9a;white-space:pre-wrap;word-break:break-word;display:none;"></div>
+        </div>
+
+        <!-- System Resource Alerts -->
+        <div id="m-section-sysalerts" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Emit WebSocket events when CPU/RAM/GPU exceed thresholds. Checked every 30s.</div>
+          <div style="flex-shrink:0;border:1px solid #1a1a1a;border-radius:3px;padding:8px;display:flex;flex-direction:column;gap:8px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:0.72rem;color:#aaa;">
+              <input type="checkbox" id="alerts-enabled" onchange="saveAlertConfig()">
+              Enable alerts
+            </label>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <label style="font-size:0.72rem;color:#aaa;">CPU %
+                <input type="number" id="alert-cpu" min="1" max="100" value="90"
+                  style="width:100%;margin-top:3px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 6px;font-size:0.73rem;box-sizing:border-box;"
+                  onchange="saveAlertConfig()">
+              </label>
+              <label style="font-size:0.72rem;color:#aaa;">RAM %
+                <input type="number" id="alert-ram" min="1" max="100" value="90"
+                  style="width:100%;margin-top:3px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 6px;font-size:0.73rem;box-sizing:border-box;"
+                  onchange="saveAlertConfig()">
+              </label>
+              <label style="font-size:0.72rem;color:#aaa;">GPU %
+                <input type="number" id="alert-gpu" min="1" max="100" value="90"
+                  style="width:100%;margin-top:3px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 6px;font-size:0.73rem;box-sizing:border-box;"
+                  onchange="saveAlertConfig()">
+              </label>
+            </div>
+          </div>
+          <div style="flex-shrink:0;display:flex;align-items:center;gap:6px;">
+            <span style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.06em;color:#444;">Recent alerts</span>
+            <button onclick="loadAlertLog()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻</button>
+            <button onclick="clearAlertLog()" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;">Clear</button>
+          </div>
+          <div id="alert-log" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -7135,6 +7213,129 @@
     const r = await fetch(`/api/wake/phrases/${encodeURIComponent(phrase)}`, {method: 'DELETE'})
       .then(x => x.json()).catch(() => null);
     if (r && r.ok) await loadWakePhrases();
+  }
+
+  // ── Scheduled Messages ────────────────────────────────────────────────────
+
+  async function loadScheduledMsgs() {
+    const r = await fetch('/api/scheduled/messages').then(x => x.json()).catch(() => null);
+    const el = document.getElementById('schedmsg-list');
+    if (!r) { el.innerHTML = '<div style="padding:6px;color:#555;">Error</div>'; return; }
+    if (!r.messages.length) { el.innerHTML = '<div style="padding:6px;color:#333;">No scheduled messages.</div>'; return; }
+    el.innerHTML = r.messages.map(m => {
+      const d = new Date(m.fire_at);
+      const ts = isNaN(d) ? m.fire_at : d.toLocaleString();
+      const past = new Date(m.fire_at) < new Date();
+      return `<div style="padding:5px 8px;border-bottom:1px solid #111;display:flex;align-items:flex-start;gap:6px;">
+        <div style="flex:1;">
+          <div style="color:#ccc;font-size:0.73rem;white-space:pre-wrap;word-break:break-word;">${_esc(m.message)}</div>
+          <div style="font-size:0.65rem;color:${past?'#ef9a9a':'#444'};margin-top:2px;">⏰ ${ts}${past?' (past)':''}</div>
+        </div>
+        <button onclick="deleteScheduledMsg(${m.id})"
+          style="background:none;border:none;color:#555;font-size:0.65rem;cursor:pointer;flex-shrink:0;">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  async function addScheduledMsg() {
+    const message = document.getElementById('schedmsg-text').value.trim();
+    const fireAt = document.getElementById('schedmsg-at').value;
+    const st = document.getElementById('schedmsg-status');
+    if (!message) { st.textContent = 'Enter a message.'; return; }
+    if (!fireAt) { st.textContent = 'Select a date/time.'; return; }
+    // convert local datetime-local to ISO 8601 with timezone
+    const isoAt = new Date(fireAt).toISOString();
+    st.textContent = 'Scheduling…';
+    const r = await fetch('/api/scheduled/messages', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message, fire_at: isoAt}),
+    }).then(x => x.json()).catch(() => null);
+    if (!r || !r.ok) { st.textContent = r?.detail || 'Error'; return; }
+    st.textContent = `Scheduled #${r.id} for ${new Date(r.fire_at).toLocaleString()}`;
+    document.getElementById('schedmsg-text').value = '';
+    await loadScheduledMsgs();
+  }
+
+  async function deleteScheduledMsg(id) {
+    const r = await fetch(`/api/scheduled/messages/${id}`, {method:'DELETE'})
+      .then(x => x.json()).catch(() => null);
+    if (r && r.ok) await loadScheduledMsgs();
+  }
+
+  // ── Plugin Sandbox ────────────────────────────────────────────────────────
+
+  async function runSandbox() {
+    const code = document.getElementById('sandbox-code').value;
+    const timeout = parseInt(document.getElementById('sandbox-timeout').value, 10);
+    const btn = document.getElementById('sandbox-run-btn');
+    const meta = document.getElementById('sandbox-meta');
+    const outEl = document.getElementById('sandbox-stdout');
+    const errEl = document.getElementById('sandbox-stderr');
+    if (!code.trim()) return;
+    btn.disabled = true;
+    meta.textContent = 'Running…';
+    outEl.style.display = 'none';
+    errEl.style.display = 'none';
+    const r = await fetch('/api/modules/sandbox', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({code, timeout}),
+    }).then(x => x.json()).catch(e => ({ok:false, stderr: e.message, stdout:'', exit_code:-1, duration_ms:0}));
+    btn.disabled = false;
+    const exitColor = r.ok ? '#81c784' : '#ef9a9a';
+    meta.textContent = `exit ${r.exit_code} · ${r.duration_ms}ms`;
+    meta.style.color = exitColor;
+    if (r.stdout) { outEl.textContent = r.stdout; outEl.style.display = 'block'; }
+    if (r.stderr) { errEl.textContent = r.stderr; errEl.style.display = 'block'; }
+  }
+
+  function sandboxClear() {
+    document.getElementById('sandbox-code').value = '';
+    document.getElementById('sandbox-stdout').style.display = 'none';
+    document.getElementById('sandbox-stderr').style.display = 'none';
+    document.getElementById('sandbox-meta').textContent = '';
+  }
+
+  // ── System Resource Alerts ────────────────────────────────────────────────
+
+  async function loadAlertConfig() {
+    const r = await fetch('/api/alerts/config').then(x => x.json()).catch(() => null);
+    if (!r) return;
+    document.getElementById('alerts-enabled').checked = r.alerts_enabled;
+    document.getElementById('alert-cpu').value = r.cpu_alert_threshold;
+    document.getElementById('alert-ram').value = r.ram_alert_threshold;
+    document.getElementById('alert-gpu').value = r.gpu_alert_threshold;
+  }
+
+  async function saveAlertConfig() {
+    const body = {
+      alerts_enabled: document.getElementById('alerts-enabled').checked,
+      cpu_alert_threshold: parseInt(document.getElementById('alert-cpu').value, 10),
+      ram_alert_threshold: parseInt(document.getElementById('alert-ram').value, 10),
+      gpu_alert_threshold: parseInt(document.getElementById('alert-gpu').value, 10),
+    };
+    await fetch('/api/alerts/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).catch(()=>{});
+  }
+
+  async function loadAlertLog() {
+    const r = await fetch('/api/alerts/log?n=50').then(x => x.json()).catch(() => null);
+    const el = document.getElementById('alert-log');
+    if (!r) { el.innerHTML = '<div style="padding:6px;color:#555;">Error</div>'; return; }
+    if (!r.alerts.length) { el.innerHTML = '<div style="padding:6px;color:#333;">No alerts yet.</div>'; return; }
+    const icons = {cpu:'🖥', ram:'💾', gpu:'🎮'};
+    el.innerHTML = r.alerts.map(a => {
+      const d = new Date(a.ts * 1000).toLocaleTimeString();
+      return `<div style="padding:4px 8px;border-bottom:1px solid #111;display:flex;gap:6px;align-items:center;">
+        <span>${icons[a.resource]||'⚠'}</span>
+        <span style="color:#ffb74d;font-family:monospace;font-size:0.72rem;">${_esc(a.resource.toUpperCase())} ${a.value}%</span>
+        <span style="color:#444;font-size:0.68rem;">&gt;${a.threshold}%</span>
+        <span style="color:#333;font-size:0.65rem;margin-left:auto;">${d}</span>
+      </div>`;
+    }).join('');
+  }
+
+  async function clearAlertLog() {
+    await fetch('/api/alerts/log', {method:'DELETE'}).catch(()=>{});
+    await loadAlertLog();
   }
 
   // ── Benchmark panel ───────────────────────────────────────────────────────

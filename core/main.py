@@ -13,6 +13,7 @@ from core.config import get_config
 from core.reminder_loop import run_reminder_loop
 from core.cron_loop import run_cron_loop
 from core.proactive_memory import run_proactive_memory_loop
+from core.scheduled_msg_loop import run_scheduled_msg_loop
 from core import pipeline_registry
 from core.pipeline_runner import start_pipeline
 from core.mcp_client import load_mcp_servers, shutdown_mcp_servers
@@ -75,9 +76,11 @@ def create_app() -> FastAPI:
         reminder_task = asyncio.create_task(run_reminder_loop())
         cron_task = asyncio.create_task(run_cron_loop())
         proactive_task = asyncio.create_task(run_proactive_memory_loop())
-        from dashboard.server import run_vram_sampler, run_mcp_health_monitor
+        schedmsg_task = asyncio.create_task(run_scheduled_msg_loop())
+        from dashboard.server import run_vram_sampler, run_mcp_health_monitor, run_resource_alert_loop
         vram_sampler_task = asyncio.create_task(run_vram_sampler())
         mcp_health_task = asyncio.create_task(run_mcp_health_monitor())
+        resource_alert_task = asyncio.create_task(run_resource_alert_loop())
         # Start Tor if previously enabled
         tor_task = None
         if get_config().tor_enabled:
@@ -95,8 +98,10 @@ def create_app() -> FastAPI:
         reminder_task.cancel()
         cron_task.cancel()
         proactive_task.cancel()
+        schedmsg_task.cancel()
         vram_sampler_task.cancel()
         mcp_health_task.cancel()
+        resource_alert_task.cancel()
         if tor_task and not tor_task.done():
             tor_task.cancel()
         if observer_task and not observer_task.done():
