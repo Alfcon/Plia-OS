@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
 from core.config import get_config
@@ -187,6 +188,8 @@ async def _supervisor_node(state: AgentState) -> dict:
         (m["content"] for m in reversed(state["messages"]) if m["role"] == "user"), ""
     )
 
+    query_snippet = last_user[:120]
+
     # Fast path: email search with extracted query
     email_query = _extract_email_search(last_user)
     if email_query:
@@ -195,6 +198,10 @@ async def _supervisor_node(state: AgentState) -> dict:
             result_str = str(result)
             await events.emit("transcript", {"role": "tool", "text": f"[search_email]\n{result_str}"})
             logger.info("Supervisor direct-called search_email query=%r", email_query)
+            await events.emit("agent_routing", {
+                "agent": "respond", "routing_method": "email_search",
+                "query": query_snippet, "latency_ms": 0,
+            })
             return {"active_agent": "respond", "direct_result": result_str, "hop_count": state["hop_count"] + 1}
         except Exception:
             logger.exception("Direct search_email call failed; falling through to LLM")
@@ -207,25 +214,37 @@ async def _supervisor_node(state: AgentState) -> dict:
             result_str = str(result)
             await events.emit("transcript", {"role": "tool", "text": f"[{direct}]\n{result_str}"})
             logger.info("Supervisor direct-called tool: %s", direct)
+            await events.emit("agent_routing", {
+                "agent": "respond", "routing_method": "direct_tool",
+                "query": query_snippet, "latency_ms": 0, "tool": direct,
+            })
             return {"active_agent": "respond", "direct_result": result_str, "hop_count": state["hop_count"] + 1}
         except Exception:
             logger.exception("Direct tool call %r failed; falling through to LLM", direct)
 
     intent = _keyword_route(last_user)
+    latency_ms = 0
     if intent is None:
+        t0 = time.monotonic()
         classify_messages = [
             {"role": "system", "content": _CLASSIFY_SYSTEM},
             *state["messages"],
         ]
         msg = await call_llm(classify_messages)
+        latency_ms = int((time.monotonic() - t0) * 1000)
         content = msg.get("content", "") or ""
         intent = content.strip().lower().split()[0] if content.strip() else "respond"
         if intent not in _KNOWN_INTENTS:
             intent = "respond"
+        routing_method = "llm"
+    else:
+        routing_method = "keyword"
 
     logger.info("Supervisor routed to: %s", intent)
-    if intent != "respond":
-        await events.emit("agent_routing", {"agent": intent})
+    await events.emit("agent_routing", {
+        "agent": intent, "routing_method": routing_method,
+        "query": query_snippet, "latency_ms": latency_ms,
+    })
     return {"active_agent": intent, "hop_count": state["hop_count"] + 1}
 
 

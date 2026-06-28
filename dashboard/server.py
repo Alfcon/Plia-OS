@@ -2109,6 +2109,24 @@ async def clear_events_endpoint():
     return {"ok": True, "deleted": deleted}
 
 
+@router.get("/api/inspector")
+async def inspector(n: int = 50):
+    from core.event_log import get_events
+    raw = await asyncio.to_thread(get_events, n, "agent_routing")
+    turns = []
+    for ev in raw:
+        d = ev.get("data", {})
+        turns.append({
+            "ts": ev["ts"],
+            "agent": d.get("agent", "unknown"),
+            "routing_method": d.get("routing_method", "unknown"),
+            "query": d.get("query", ""),
+            "latency_ms": d.get("latency_ms", 0),
+            "tool": d.get("tool"),
+        })
+    return {"turns": turns, "count": len(turns)}
+
+
 # ── Tool playground ───────────────────────────────────────────────────────────
 
 @router.post("/api/tools/{name}/run")
