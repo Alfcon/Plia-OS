@@ -197,6 +197,23 @@ class MemoryStore:
         with self._conn() as conn:
             conn.execute("UPDATE reminders SET done=1 WHERE id=?", (reminder_id,))
 
+    def delete_done_reminders(self) -> int:
+        with self._conn() as conn:
+            cur = conn.execute("DELETE FROM reminders WHERE done=1")
+            return cur.rowcount
+
+    def bulk_snooze_reminders(self, ids: list, minutes: int) -> int:
+        new_fire_at = (datetime.now(timezone.utc) + timedelta(minutes=minutes)).isoformat()
+        with self._conn() as conn:
+            count = 0
+            for rid in ids:
+                cur = conn.execute(
+                    "UPDATE reminders SET fire_at=?, done=0 WHERE id=?",
+                    (new_fire_at, int(rid)),
+                )
+                count += cur.rowcount
+            return count
+
     def prune_done_reminders(self, older_than_days: int = 7) -> int:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=older_than_days)).isoformat()
         with self._conn() as conn:

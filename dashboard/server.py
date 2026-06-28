@@ -331,6 +331,34 @@ async def set_ollama_model(body: dict):
     return {"ok": True, "model": model}
 
 
+@router.post("/api/ollama/pull")
+async def ollama_pull(body: dict):
+    import httpx
+    model = (body.get("model") or "").strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="model required")
+    cfg = get_config()
+    if not cfg.ollama_url:
+        raise HTTPException(status_code=503, detail="Ollama URL not configured")
+
+    async def _stream():
+        try:
+            async with httpx.AsyncClient(timeout=None) as client:
+                async with client.stream(
+                    "POST",
+                    f"{cfg.ollama_url}/api/pull",
+                    json={"name": model, "stream": True},
+                ) as resp:
+                    async for line in resp.aiter_lines():
+                        if line:
+                            yield f"data: {line}\n\n"
+        except Exception as exc:
+            yield f"data: {{\"error\": {json.dumps(str(exc))}}}\n\n"
+        yield "data: {\"status\": \"done\"}\n\n"
+
+    return StreamingResponse(_stream(), media_type="text/event-stream")
+
+
 @router.post("/api/config")
 async def post_config(updates: dict):
     updates.pop("system_prompt_backup", None)  # internal field — not settable via public API
@@ -839,6 +867,26 @@ async def delete_note(key: str):
 async def list_reminders():
     from agents.memory_store import get_memory_store
     return await asyncio.to_thread(get_memory_store().list_pending)
+
+
+@router.delete("/api/reminders/done")
+async def delete_done_reminders():
+    from agents.memory_store import get_memory_store
+    deleted = await asyncio.to_thread(get_memory_store().delete_done_reminders)
+    return {"ok": True, "deleted": deleted}
+
+
+@router.post("/api/reminders/bulk-snooze")
+async def bulk_snooze_reminders(body: dict):
+    ids = body.get("ids") or []
+    minutes = int(body.get("minutes", 10))
+    if not ids:
+        raise HTTPException(status_code=422, detail="ids list required")
+    if minutes < 1 or minutes > 1440:
+        raise HTTPException(status_code=400, detail="minutes must be 1-1440")
+    from agents.memory_store import get_memory_store
+    count = await asyncio.to_thread(get_memory_store().bulk_snooze_reminders, ids, minutes)
+    return {"ok": True, "snoozed": count, "minutes": minutes}
 
 
 @router.delete("/api/reminders/{reminder_id}")
@@ -3629,6 +3677,41 @@ async def config_history(n: int = 50):
 @router.delete("/api/config/history")
 async def clear_config_history():
     _CONFIG_HISTORY.clear()
+    return {"ok": True}
+
+
+@router.get("/api/config/presets")
+async def list_config_presets():
+    from core.preset_store import list_presets
+    names = await asyncio.to_thread(list_presets)
+    return {"presets": names}
+
+
+@router.post("/api/config/presets/{name}/apply")
+async def apply_config_preset(name: str):
+    from core.preset_store import apply_preset
+    ok = await asyncio.to_thread(apply_preset, name)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Preset {name!r} not found")
+    return {"ok": True}
+
+
+@router.post("/api/config/presets/{name}")
+async def save_config_preset(name: str):
+    name = name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name required")
+    from core.preset_store import save_preset
+    await asyncio.to_thread(save_preset, name)
+    return {"ok": True, "name": name}
+
+
+@router.delete("/api/config/presets/{name}")
+async def delete_config_preset(name: str):
+    from core.preset_store import delete_preset
+    ok = await asyncio.to_thread(delete_preset, name)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Preset {name!r} not found")
     return {"ok": True}
 
 

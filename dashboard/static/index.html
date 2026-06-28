@@ -790,6 +790,10 @@
         <button class="m-nav-btn" data-section="sttdetect" onclick="showMenuSection('sttdetect')">STT Detect</button>
         <button class="m-nav-btn" data-section="memexport" onclick="showMenuSection('memexport')">Mem Export</button>
         <button class="m-nav-btn" data-section="cronnext" onclick="showMenuSection('cronnext');loadCronNext()">Cron Next</button>
+        <button class="m-nav-btn" data-section="ollamapull" onclick="showMenuSection('ollamapull')">Ollama Pull</button>
+        <button class="m-nav-btn" data-section="micviz" onclick="showMenuSection('micviz')">Mic Viz</button>
+        <button class="m-nav-btn" data-section="cfgpresets" onclick="showMenuSection('cfgpresets');loadCfgPresets()">Presets</button>
+        <button class="m-nav-btn" data-section="remindersbulk" onclick="showMenuSection('remindersbulk');loadBulkReminders()">Rem Bulk</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2251,6 +2255,66 @@
             <button onclick="loadCronNextRuns()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Preview</button>
           </div>
           <div id="cronnext-list" style="flex:1;min-height:0;overflow-y:auto;font-size:0.72rem;font-family:monospace;color:#aaa;display:flex;flex-direction:column;gap:3px;"></div>
+        </div>
+
+        <!-- Ollama Pull -->
+        <div id="m-section-ollamapull" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Pull a model from Ollama registry. Streams download progress in real time.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <input id="pull-model" type="text" placeholder="e.g. llama3.2:3b" style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 8px;font-size:0.72rem;"
+              onkeydown="if(event.key==='Enter')startOllamaPull()">
+            <button id="pull-btn" onclick="startOllamaPull()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 12px;border-radius:3px;cursor:pointer;">Pull</button>
+            <button id="pull-cancel-btn" onclick="cancelOllamaPull()" style="display:none;background:#2a0d0d;border:1px solid #5e1b1b;color:#ef9a9a;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">✕</button>
+          </div>
+          <div style="flex-shrink:0;">
+            <div id="pull-bar-wrap" style="display:none;background:#1a1a1a;border-radius:3px;height:6px;overflow:hidden;margin-bottom:4px;">
+              <div id="pull-bar" style="height:100%;background:#4fc3f7;width:0%;transition:width 0.2s;"></div>
+            </div>
+            <div id="pull-status" style="font-size:0.7rem;color:#888;font-family:monospace;min-height:1rem;"></div>
+          </div>
+          <div id="pull-log" style="flex:1;min-height:0;overflow-y:auto;font-size:0.66rem;font-family:monospace;color:#555;display:flex;flex-direction:column;gap:1px;"></div>
+        </div>
+
+        <!-- Mic Visualizer -->
+        <div id="m-section-micviz" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Real-time microphone waveform and level meter using Web Audio API.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <button id="viz-start-btn" onclick="startViz()" style="background:#0d2a0d;border:1px solid #1b5e1b;color:#81c784;font-size:0.72rem;padding:4px 12px;border-radius:3px;cursor:pointer;">▶ Start</button>
+            <button id="viz-stop-btn" onclick="stopViz()" style="display:none;background:#2a0d0d;border:1px solid #5e1b1b;color:#ef9a9a;font-size:0.72rem;padding:4px 12px;border-radius:3px;cursor:pointer;">■ Stop</button>
+            <span id="viz-status" style="font-size:0.68rem;color:#555;">Press Start to open mic.</span>
+          </div>
+          <canvas id="viz-canvas" width="600" height="120"
+            style="width:100%;height:120px;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;display:block;flex-shrink:0;"></canvas>
+          <div id="viz-rms" style="font-size:0.65rem;color:#555;font-family:monospace;flex-shrink:0;"></div>
+        </div>
+
+        <!-- Config Presets -->
+        <div id="m-section-cfgpresets" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Save and restore named snapshots of the current config.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <input id="preset-name" type="text" placeholder="preset name" style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 8px;font-size:0.72rem;"
+              onkeydown="if(event.key==='Enter')savePreset()">
+            <button onclick="savePreset()" style="background:#0d2a0d;border:1px solid #1b5e1b;color:#81c784;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Save</button>
+          </div>
+          <div id="preset-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+          <div id="preset-status" style="font-size:0.7rem;color:#888;flex-shrink:0;min-height:1rem;"></div>
+        </div>
+
+        <!-- Reminder Bulk Actions -->
+        <div id="m-section-remindersbulk" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Select reminders for bulk snooze or dismiss all done reminders.</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;">
+            <button onclick="selectAllBulkReminders(true)" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;">All</button>
+            <button onclick="selectAllBulkReminders(false)" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;">None</button>
+            <span style="flex:1;"></span>
+            <input type="number" id="bulk-snooze-min" value="10" min="1" max="1440" style="width:50px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:2px 5px;font-size:0.72rem;text-align:center;" title="snooze minutes">
+            <span style="font-size:0.68rem;color:#555;">min</span>
+            <button onclick="doBulkSnooze()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Snooze Selected</button>
+            <button onclick="doDeleteDone()" style="background:#2a1a0d;border:1px solid #5e3a1b;color:#ffb74d;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Delete All Done</button>
+            <button onclick="loadBulkReminders()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻</button>
+          </div>
+          <div id="bulk-rem-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;font-size:0.72rem;font-family:monospace;"></div>
+          <div id="bulk-rem-status" style="font-size:0.7rem;color:#888;flex-shrink:0;min-height:1rem;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -6512,6 +6576,257 @@
         <span style="color:#4fc3f7;margin-left:auto;">in ${_esc(diffStr)}</span>
       </div>`;
     }).join('');
+  }
+
+  // ── Ollama Pull ───────────────────────────────────────────────────────────
+
+  let _pullReader = null;
+
+  async function startOllamaPull() {
+    const model = (document.getElementById('pull-model')?.value || '').trim();
+    if (!model) { alert('Enter a model name'); return; }
+    const log = document.getElementById('pull-log');
+    const status = document.getElementById('pull-status');
+    const bar = document.getElementById('pull-bar');
+    const barWrap = document.getElementById('pull-bar-wrap');
+    const pullBtn = document.getElementById('pull-btn');
+    const cancelBtn = document.getElementById('pull-cancel-btn');
+    log.innerHTML = '';
+    status.textContent = 'Starting…';
+    if (barWrap) barWrap.style.display = '';
+    if (bar) bar.style.width = '0%';
+    if (pullBtn) pullBtn.disabled = true;
+    if (cancelBtn) cancelBtn.style.display = '';
+
+    try {
+      const resp = await fetch('/api/ollama/pull', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({model}),
+      });
+      const reader = resp.body.getReader();
+      _pullReader = reader;
+      const dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, {stream: true});
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          let obj;
+          try { obj = JSON.parse(line.slice(6)); } catch { continue; }
+          if (obj.error) { status.textContent = `Error: ${obj.error}`; break; }
+          if (obj.status === 'done') { status.textContent = 'Complete.'; if (bar) bar.style.width = '100%'; break; }
+          const pct = obj.total ? Math.round((obj.completed || 0) / obj.total * 100) : null;
+          status.textContent = `${obj.status}${pct != null ? ` — ${pct}%` : ''}`;
+          if (bar && pct != null) bar.style.width = `${pct}%`;
+          const entry = document.createElement('div');
+          entry.style.color = '#444';
+          entry.textContent = JSON.stringify(obj);
+          log.appendChild(entry);
+          log.scrollTop = log.scrollHeight;
+        }
+      }
+    } catch(e) {
+      if (e.name !== 'AbortError') status.textContent = `Error: ${e.message}`;
+    } finally {
+      _pullReader = null;
+      if (pullBtn) pullBtn.disabled = false;
+      if (cancelBtn) cancelBtn.style.display = 'none';
+    }
+  }
+
+  function cancelOllamaPull() {
+    if (_pullReader) { _pullReader.cancel(); _pullReader = null; }
+    document.getElementById('pull-status').textContent = 'Cancelled.';
+    const cancelBtn = document.getElementById('pull-cancel-btn');
+    const pullBtn = document.getElementById('pull-btn');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    if (pullBtn) pullBtn.disabled = false;
+  }
+
+  // ── Mic Visualizer ────────────────────────────────────────────────────────
+
+  let _vizStream = null;
+  let _vizAnalyser = null;
+  let _vizFrame = null;
+  let _vizAudioCtx = null;
+
+  async function startViz() {
+    const canvas = document.getElementById('viz-canvas');
+    if (!canvas) return;
+    const status = document.getElementById('viz-status');
+    try {
+      _vizStream = await navigator.mediaDevices.getUserMedia({audio: true, video: false});
+    } catch(e) { status.textContent = `Mic error: ${e.message}`; return; }
+    _vizAudioCtx = new AudioContext();
+    const source = _vizAudioCtx.createMediaStreamSource(_vizStream);
+    _vizAnalyser = _vizAudioCtx.createAnalyser();
+    _vizAnalyser.fftSize = 2048;
+    source.connect(_vizAnalyser);
+    status.textContent = 'Listening…';
+    document.getElementById('viz-start-btn').style.display = 'none';
+    document.getElementById('viz-stop-btn').style.display = '';
+    _drawVizFrame();
+  }
+
+  function _drawVizFrame() {
+    if (!_vizAnalyser) return;
+    const canvas = document.getElementById('viz-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const bufLen = _vizAnalyser.frequencyBinCount;
+    const data = new Float32Array(bufLen);
+    _vizAnalyser.getFloatTimeDomainData(data);
+
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // waveform
+    ctx.strokeStyle = '#4fc3f7';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const sliceW = canvas.width / bufLen;
+    let x = 0;
+    for (let i = 0; i < bufLen; i++) {
+      const y = ((data[i] + 1) / 2) * (canvas.height - 12);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      x += sliceW;
+    }
+    ctx.stroke();
+
+    // RMS level bar at bottom
+    let rms = 0;
+    for (let i = 0; i < bufLen; i++) rms += data[i] * data[i];
+    rms = Math.sqrt(rms / bufLen);
+    const barW = Math.min(1, rms * 10) * canvas.width;
+    const hue = 120 - Math.min(120, rms * 1200);
+    ctx.fillStyle = `hsl(${hue},70%,45%)`;
+    ctx.fillRect(0, canvas.height - 10, barW, 10);
+
+    const rmsEl = document.getElementById('viz-rms');
+    if (rmsEl) rmsEl.textContent = `RMS: ${rms.toFixed(4)}  Peak: ${Math.max(...data).toFixed(4)}`;
+
+    _vizFrame = requestAnimationFrame(_drawVizFrame);
+  }
+
+  function stopViz() {
+    if (_vizFrame) { cancelAnimationFrame(_vizFrame); _vizFrame = null; }
+    if (_vizStream) { _vizStream.getTracks().forEach(t => t.stop()); _vizStream = null; }
+    if (_vizAudioCtx) { _vizAudioCtx.close(); _vizAudioCtx = null; }
+    _vizAnalyser = null;
+    const canvas = document.getElementById('viz-canvas');
+    if (canvas) { const ctx = canvas.getContext('2d'); ctx.fillStyle='#0a0a0a'; ctx.fillRect(0,0,canvas.width,canvas.height); }
+    const rmsEl = document.getElementById('viz-rms');
+    if (rmsEl) rmsEl.textContent = '';
+    document.getElementById('viz-status').textContent = 'Stopped.';
+    document.getElementById('viz-start-btn').style.display = '';
+    document.getElementById('viz-stop-btn').style.display = 'none';
+  }
+
+  // ── Config Presets ────────────────────────────────────────────────────────
+
+  async function loadCfgPresets() {
+    const r = await fetch('/api/config/presets');
+    if (!r.ok) return;
+    const {presets} = await r.json();
+    const list = document.getElementById('preset-list');
+    if (!list) return;
+    if (!presets.length) {
+      list.innerHTML = '<div style="color:#333;padding:4px;">No presets saved.</div>';
+      return;
+    }
+    list.innerHTML = presets.map(name => `
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #1a1a1a;border-radius:3px;background:#0d0d0d;">
+        <span style="flex:1;color:#e0e0e0;font-size:0.73rem;">${_esc(name)}</span>
+        <button onclick="applyPreset('${_esc(name)}')" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.68rem;padding:2px 8px;border-radius:3px;cursor:pointer;">Apply</button>
+        <button onclick="deletePreset('${_esc(name)}')" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;">✕</button>
+      </div>`).join('');
+  }
+
+  async function savePreset() {
+    const name = (document.getElementById('preset-name')?.value || '').trim();
+    if (!name) { alert('Enter a preset name'); return; }
+    const r = await fetch(`/api/config/presets/${encodeURIComponent(name)}`, {method:'POST'});
+    const status = document.getElementById('preset-status');
+    if (r.ok) { status.textContent = `Saved "${name}".`; document.getElementById('preset-name').value = ''; await loadCfgPresets(); }
+    else { status.textContent = `Error: ${r.status}`; }
+  }
+
+  async function applyPreset(name) {
+    const r = await fetch(`/api/config/presets/${encodeURIComponent(name)}/apply`, {method:'POST'});
+    const status = document.getElementById('preset-status');
+    if (r.ok) status.textContent = `Applied "${name}".`;
+    else status.textContent = `Apply failed: ${r.status}`;
+  }
+
+  async function deletePreset(name) {
+    if (!confirm(`Delete preset "${name}"?`)) return;
+    const r = await fetch(`/api/config/presets/${encodeURIComponent(name)}`, {method:'DELETE'});
+    if (r.ok) { document.getElementById('preset-status').textContent = `Deleted "${name}".`; await loadCfgPresets(); }
+  }
+
+  // ── Reminder Bulk Actions ─────────────────────────────────────────────────
+
+  let _bulkRems = [];
+
+  async function loadBulkReminders() {
+    const r = await fetch('/api/reminders');
+    if (!r.ok) return;
+    _bulkRems = await r.json();
+    _renderBulkReminders();
+  }
+
+  function _renderBulkReminders() {
+    const list = document.getElementById('bulk-rem-list');
+    if (!list) return;
+    if (!_bulkRems.length) { list.innerHTML = '<div style="color:#333;padding:4px;">No pending reminders.</div>'; return; }
+    list.innerHTML = _bulkRems.map(rem => {
+      const t = new Date(rem.fire_at);
+      return `<label style="display:flex;align-items:baseline;gap:8px;padding:4px 6px;border-bottom:1px solid #111;cursor:pointer;">
+        <input type="checkbox" class="bulk-rem-cb" data-id="${rem.id}" style="flex-shrink:0;">
+        <span style="color:#e0e0e0;flex:1;">${_esc(rem.message)}</span>
+        <span style="color:#555;font-size:0.65rem;white-space:nowrap;">${_esc(t.toLocaleString())}</span>
+      </label>`;
+    }).join('');
+  }
+
+  function selectAllBulkReminders(checked) {
+    document.querySelectorAll('.bulk-rem-cb').forEach(cb => cb.checked = checked);
+  }
+
+  function _getCheckedIds() {
+    return [...document.querySelectorAll('.bulk-rem-cb:checked')].map(cb => parseInt(cb.dataset.id));
+  }
+
+  async function doBulkSnooze() {
+    const ids = _getCheckedIds();
+    if (!ids.length) { alert('Select at least one reminder'); return; }
+    const minutes = parseInt(document.getElementById('bulk-snooze-min')?.value || '10', 10);
+    const r = await fetch('/api/reminders/bulk-snooze', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ids, minutes}),
+    });
+    const status = document.getElementById('bulk-rem-status');
+    if (r.ok) {
+      const d = await r.json();
+      status.textContent = `Snoozed ${d.snoozed} reminder(s) for ${minutes}m.`;
+      await loadBulkReminders();
+    } else { status.textContent = `Error: ${r.status}`; }
+  }
+
+  async function doDeleteDone() {
+    if (!confirm('Delete all done reminders permanently?')) return;
+    const r = await fetch('/api/reminders/done', {method:'DELETE'});
+    const status = document.getElementById('bulk-rem-status');
+    if (r.ok) {
+      const d = await r.json();
+      status.textContent = `Deleted ${d.deleted} done reminder(s).`;
+      await loadBulkReminders();
+    } else { status.textContent = `Error: ${r.status}`; }
   }
 
   // ── Tool playground ──────────────────────────────────────────────────────
