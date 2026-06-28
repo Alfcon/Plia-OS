@@ -14,6 +14,8 @@ from pathlib import Path
 from core import events, registry, pipeline_registry
 from core.registry import call_tool_async
 from core.loader import load_modules
+from agents.chat_history import search as chat_search
+from agents.memory_store import get_memory_store
 from core.config import get_config, update_config, restore_system_prompt, reset_system_prompt_to_default
 from voice.tts import get_tts_service
 from voice.vram_broker import get_vram_broker
@@ -2026,6 +2028,68 @@ async def trigger_webhook(slug: str, request: Request):
         payload = {}
     result = await fire_webhook(slug, payload)
     return result
+
+
+# ── Global search ─────────────────────────────────────────────────────────────
+
+@router.get("/api/search")
+async def global_search(q: str = "", n: int = 20):
+    if not q.strip():
+        return {"query": q, "results": {}}
+
+    from agents.variable_store import list_vars
+    from agents.workflow_store import list_workflows
+    from agents.webhook_store import list_webhooks
+
+    store = get_memory_store()
+    ql = q.lower()
+
+    def _search_all():
+        hits: dict[str, list] = {}
+
+        chat = chat_search(q, n)
+        if chat:
+            hits["chat"] = [{"role": m["role"], "content": m["content"], "ts": m["ts"]} for m in chat]
+
+        facts = store.search_facts(q, n)
+        if facts:
+            hits["facts"] = facts
+
+        reminders = store.search_reminders(q, n)
+        if reminders:
+            hits["reminders"] = reminders
+
+        # variables (in-memory JSON)
+        var_hits = [v for v in list_vars() if ql in v["name"].lower() or ql in v["value"].lower()
+                    or ql in (v.get("description") or "").lower()]
+        if var_hits:
+            hits["variables"] = var_hits[:n]
+
+        # workflows
+        wf_hits = [w for w in list_workflows()
+                   if ql in w["name"].lower() or ql in (w.get("description") or "").lower()
+                   or any(ql in (s.get("tool") or "").lower() or ql in (s.get("note") or "").lower()
+                          for s in w.get("steps", []))]
+        if wf_hits:
+            hits["workflows"] = [{"name": w["name"], "description": w.get("description", ""),
+                                   "steps": len(w.get("steps", []))} for w in wf_hits[:n]]
+
+        # webhooks
+        try:
+            wh_hits = [h for h in list_webhooks()
+                       if ql in h.get("slug", "").lower() or ql in h.get("name", "").lower()
+                       or ql in h.get("target", "").lower()]
+            if wh_hits:
+                hits["webhooks"] = [{"slug": h["slug"], "name": h.get("name", ""),
+                                     "target": h.get("target", "")} for h in wh_hits[:n]]
+        except Exception:
+            pass
+
+        return hits
+
+    results = await asyncio.to_thread(_search_all)
+    total = sum(len(v) for v in results.values())
+    return {"query": q, "results": results, "total": total}
 
 
 # ── Event history ─────────────────────────────────────────────────────────────

@@ -751,6 +751,7 @@
         <button class="m-nav-btn" data-section="vars" onclick="showMenuSection('vars');loadVars()">Vars</button>
         <button class="m-nav-btn" data-section="tools" onclick="showMenuSection('tools');loadTools()">Tools</button>
         <button class="m-nav-btn" data-section="evtlog" onclick="showMenuSection('evtlog');loadEventLog()">Events</button>
+        <button class="m-nav-btn" data-section="search" onclick="showMenuSection('search');document.getElementById('search-input').focus()">Search</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1673,6 +1674,18 @@
           </div>
           <div id="evtlog-count" style="font-size:0.65rem;color:#444;flex-shrink:0;"></div>
           <div id="evtlog-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.7rem;font-family:monospace;"></div>
+        </div>
+
+        <!-- Global search -->
+        <div id="m-section-search" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <input id="search-input" type="search" placeholder="Search everything…"
+              style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:5px 10px;font-size:0.8rem;"
+              oninput="_searchDebounce()" onkeydown="if(event.key==='Enter')runSearch()">
+            <button onclick="runSearch()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.73rem;padding:4px 12px;border-radius:3px;cursor:pointer;">Go</button>
+          </div>
+          <div id="search-summary" style="font-size:0.68rem;color:#444;flex-shrink:0;min-height:1rem;"></div>
+          <div id="search-results" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
         </div>
 
         <div id="m-section-git" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
@@ -5482,6 +5495,77 @@
       if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
       if (e.key === 'Escape') { loadVars(); }
     });
+  }
+
+  // ── Global search ────────────────────────────────────────────────────────
+
+  const _SEARCH_COLORS = {chat:'#4fc3f7',facts:'#81c784',reminders:'#ffb74d',
+    variables:'#ce93d8',workflows:'#a5d6a7',webhooks:'#80deea'};
+  let _searchTimer = null;
+
+  function _searchDebounce() {
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(runSearch, 400);
+  }
+
+  async function runSearch() {
+    const q = document.getElementById('search-input')?.value?.trim();
+    const summary = document.getElementById('search-summary');
+    const results = document.getElementById('search-results');
+    if (!q) { summary.textContent = ''; results.innerHTML = ''; return; }
+    summary.textContent = 'Searching…';
+    results.innerHTML = '';
+    try {
+      const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&n=20`);
+      if (!r.ok) { summary.textContent = 'Error'; return; }
+      const data = await r.json();
+      const total = data.total || 0;
+      summary.textContent = total ? `${total} result${total!==1?'s':''} across ${Object.keys(data.results).length} source${Object.keys(data.results).length!==1?'s':''}` : 'No results';
+      if (!total) return;
+      Object.entries(data.results).forEach(([source, hits]) => {
+        const color = _SEARCH_COLORS[source] || '#888';
+        const section = document.createElement('div');
+        section.innerHTML = `<div style="font-size:0.68rem;color:${color};font-weight:bold;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">${_esc(source)} (${hits.length})</div>`;
+        hits.forEach(hit => {
+          const row = document.createElement('div');
+          row.style.cssText = 'background:#111;border:1px solid #1a1a1a;border-radius:3px;padding:6px 8px;margin-bottom:3px;font-size:0.72rem;cursor:pointer;';
+          row.innerHTML = _renderSearchHit(source, hit, q);
+          row.onmouseenter = () => row.style.background = '#181818';
+          row.onmouseleave = () => row.style.background = '#111';
+          section.appendChild(row);
+        });
+        results.appendChild(section);
+      });
+    } catch(e) { summary.textContent = 'Search failed'; }
+  }
+
+  function _renderSearchHit(source, hit, q) {
+    const hi = s => _esc(s || '').replace(new RegExp('('+_esc(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')', 'gi'),
+      '<mark style="background:#2a3a1a;color:#a5d6a7;border-radius:2px;">$1</mark>');
+    switch(source) {
+      case 'chat':
+        return `<span style="color:#555;font-size:0.65rem;">[${_esc(hit.role)}]</span> <span style="color:#ccc;">${hi(hit.content?.slice(0,120))}</span>
+                <span style="color:#333;font-size:0.62rem;display:block;margin-top:2px;">${_esc(hit.ts||'')}</span>`;
+      case 'facts':
+        return `<span style="color:#81c784;font-family:monospace;">${hi(hit.key)}</span>
+                <span style="color:#555;margin:0 4px;">→</span><span style="color:#ccc;">${hi(hit.value?.slice(0,100))}</span>`;
+      case 'reminders':
+        return `<span style="color:${hit.done?'#444':'#ffb74d'};">${hi(hit.message)}</span>
+                <span style="color:#333;font-size:0.62rem;margin-left:6px;">${_esc(hit.fire_at||'')} ${hit.done?'(done)':''}</span>`;
+      case 'variables':
+        return `<span style="color:#ce93d8;font-family:monospace;">${hi(hit.name)}</span>
+                <span style="color:#555;margin:0 4px;">=</span><span style="color:#ccc;">${hi(hit.value?.slice(0,80))}</span>`;
+      case 'workflows':
+        return `<span style="color:#a5d6a7;">${hi(hit.name)}</span>
+                <span style="color:#555;font-size:0.65rem;margin-left:6px;">${hit.steps} step${hit.steps!==1?'s':''}</span>
+                ${hit.description ? `<span style="color:#555;display:block;margin-top:2px;">${hi(hit.description)}</span>` : ''}`;
+      case 'webhooks':
+        return `<span style="color:#80deea;font-family:monospace;">${hi(hit.slug)}</span>
+                ${hit.name ? `<span style="color:#555;margin-left:6px;">${hi(hit.name)}</span>` : ''}
+                <span style="color:#444;font-size:0.65rem;margin-left:6px;">→ ${hi(hit.target)}</span>`;
+      default:
+        return `<pre style="margin:0;color:#888;font-size:0.68rem;white-space:pre-wrap;">${hi(JSON.stringify(hit).slice(0,200))}</pre>`;
+    }
   }
 
   // ── Event history ────────────────────────────────────────────────────────

@@ -90,6 +90,24 @@ class MemoryStore:
             ).fetchall()
         return [{"key": r[0], "value": r[1]} for r in rows]
 
+    def search_facts(self, query: str, n: int = 50) -> list[dict]:
+        pattern = f"%{query}%"
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT key, value FROM facts WHERE key LIKE ? OR value LIKE ? ORDER BY updated_at DESC LIMIT ?",
+                (pattern, pattern, n),
+            ).fetchall()
+        return [{"key": r[0], "value": r[1]} for r in rows]
+
+    def search_reminders(self, query: str, n: int = 50) -> list[dict]:
+        pattern = f"%{query}%"
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT id, message, fire_at, done, is_timer FROM reminders WHERE message LIKE ? ORDER BY fire_at DESC LIMIT ?",
+                (pattern, n),
+            ).fetchall()
+        return [{"id": r[0], "message": r[1], "fire_at": r[2], "done": bool(r[3]), "is_timer": bool(r[4])} for r in rows]
+
     def add_turn(self, role: str, content: str) -> None:
         now = datetime.now(timezone.utc).isoformat()
         with self._conn() as conn:

@@ -51,6 +51,18 @@ def get_recent(n: int = 100) -> list[dict]:
     return [{"role": r, "content": c, "ts": t} for r, c, t in reversed(rows)]
 
 
+def search(query: str, n: int = 50) -> list[dict]:
+    if not query:
+        return []
+    pattern = f"%{query}%"
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT role, content, ts FROM messages WHERE content LIKE ? ORDER BY id DESC LIMIT ?",
+            (pattern, n),
+        ).fetchall()
+    return [{"role": r, "content": c, "ts": t} for r, c, t in rows]
+
+
 def clear() -> None:
     rows = get_recent(n=10000)
     if rows:
