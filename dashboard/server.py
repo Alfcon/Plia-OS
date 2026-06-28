@@ -1609,6 +1609,35 @@ async def rename_clip(filename: str, body: dict):
     return {"ok": True, "filename": dst.name}
 
 
+# ── Variable store ───────────────────────────────────────────────────────────
+
+@router.get("/api/vars")
+async def list_vars_endpoint():
+    from agents.variable_store import list_vars
+    return {"vars": await asyncio.to_thread(list_vars)}
+
+
+@router.post("/api/vars")
+async def set_var_endpoint(body: dict):
+    from agents.variable_store import set_var
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name required")
+    value = str(body.get("value", ""))
+    description = body.get("description", "")
+    await asyncio.to_thread(set_var, name, value, description)
+    return {"ok": True, "name": name}
+
+
+@router.delete("/api/vars/{name}")
+async def delete_var_endpoint(name: str):
+    from agents.variable_store import delete_var
+    deleted = await asyncio.to_thread(delete_var, name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Variable not found")
+    return {"ok": True}
+
+
 # ── Config snapshots ──────────────────────────────────────────────────────────
 
 @router.get("/api/snapshots")

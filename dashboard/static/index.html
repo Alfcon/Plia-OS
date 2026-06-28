@@ -748,6 +748,7 @@
         <button class="m-nav-btn" data-section="clips" onclick="showMenuSection('clips');loadClips()">Clips</button>
         <button class="m-nav-btn" data-section="snaps" onclick="showMenuSection('snaps');loadSnapshots()">Snaps</button>
         <button class="m-nav-btn" data-section="git" onclick="showMenuSection('git');loadGit()">Git</button>
+        <button class="m-nav-btn" data-section="vars" onclick="showMenuSection('vars');loadVars()">Vars</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1605,6 +1606,22 @@
               </button>
             </div>
           </div>
+        </div>
+
+        <div id="m-section-vars" class="m-pane" style="display:none;flex-direction:column;">
+          <!-- Add row -->
+          <div style="display:flex;gap:5px;margin-bottom:8px;flex-shrink:0;flex-wrap:wrap;">
+            <input id="var-name" placeholder="name" style="width:120px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 7px;font-size:0.75rem;font-family:monospace;"
+              onkeydown="if(event.key==='Enter')saveVar()">
+            <input id="var-value" placeholder="value" style="flex:1;min-width:80px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 7px;font-size:0.75rem;font-family:monospace;"
+              onkeydown="if(event.key==='Enter')saveVar()">
+            <input id="var-desc" placeholder="description (optional)" style="flex:1;min-width:80px;background:#111;border:1px solid #333;color:#888;border-radius:3px;padding:3px 7px;font-size:0.72rem;"
+              onkeydown="if(event.key==='Enter')saveVar()">
+            <button onclick="saveVar()" style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.7rem;padding:3px 12px;border-radius:3px;cursor:pointer;">Set</button>
+            <button onclick="loadVars()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
+          </div>
+          <div style="font-size:0.62rem;color:#444;margin-bottom:5px;flex-shrink:0;">Use <code style="background:#111;padding:0 3px;border-radius:2px;color:#81c784;">{{vars.name}}</code> in workflow step params and webhook payloads.</div>
+          <div id="var-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;"></div>
         </div>
 
         <div id="m-section-git" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
@@ -5190,6 +5207,81 @@
       return;
     }
   });
+
+  // ── Variable store ───────────────────────────────────────────────────────
+
+  async function loadVars() {
+    let data;
+    try {
+      const r = await fetch('/api/vars');
+      if (!r.ok) return;
+      data = await r.json();
+    } catch(e) { return; }
+    const list = document.getElementById('var-list');
+    if (!data.vars.length) {
+      list.innerHTML = '<div style="padding:10px 8px;color:#333;font-size:0.72rem;">No variables yet.</div>';
+      return;
+    }
+    list.innerHTML = data.vars.map(v => {
+      const ts = new Date(v.updated_at * 1000).toLocaleString();
+      return `<div style="padding:5px 8px;border-bottom:1px solid #111;display:flex;align-items:center;gap:5px;">
+        <span style="color:#81c784;font-family:monospace;font-size:0.72rem;flex-shrink:0;min-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(v.name)}">${_esc(v.name)}</span>
+        <span style="color:#e0e0e0;font-family:monospace;font-size:0.72rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;"
+          title="Click to edit" ondblclick="varEdit(${JSON.stringify(v.name)},${JSON.stringify(v.value)},this)">${_esc(v.value)}</span>
+        ${v.description ? `<span style="color:#444;font-size:0.65rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px;" title="${_esc(v.description)}">${_esc(v.description)}</span>` : ''}
+        <span style="color:#333;font-size:0.62rem;flex-shrink:0;">${ts}</span>
+        <button onclick="deleteVar(${JSON.stringify(v.name)})"
+          style="background:#2a0d0d;border:1px solid #5e1b1b;color:#ef5350;font-size:0.65rem;padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0;">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  async function saveVar() {
+    const name = document.getElementById('var-name').value.trim();
+    const value = document.getElementById('var-value').value;
+    const desc = document.getElementById('var-desc').value.trim();
+    if (!name) { alert('Name required'); return; }
+    try {
+      const r = await fetch('/api/vars', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({name, value, description: desc}),
+      });
+      if (!r.ok) { const e = await r.json(); alert(e.detail || 'Failed'); return; }
+      document.getElementById('var-name').value = '';
+      document.getElementById('var-value').value = '';
+      document.getElementById('var-desc').value = '';
+      loadVars();
+    } catch(e) { alert('Network error'); }
+  }
+
+  async function deleteVar(name) {
+    if (!confirm(`Delete variable "${name}"?`)) return;
+    await fetch(`/api/vars/${encodeURIComponent(name)}`, {method:'DELETE'}).catch(()=>{});
+    loadVars();
+  }
+
+  function varEdit(name, currentValue, el) {
+    const input = document.createElement('input');
+    input.value = currentValue;
+    input.style.cssText = 'background:#111;border:1px solid #333;color:#e0e0e0;font-size:0.72rem;font-family:monospace;width:100%;padding:1px 4px;border-radius:2px;';
+    el.replaceWith(input);
+    input.focus(); input.select();
+    const finish = async () => {
+      const newVal = input.value;
+      if (newVal !== currentValue) {
+        await fetch('/api/vars', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({name, value: newVal}),
+        }).catch(()=>{});
+      }
+      loadVars();
+    };
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      if (e.key === 'Escape') { loadVars(); }
+    });
+  }
 
   // ── Git panel ─────────────────────────────────────────────────────────────
 

@@ -57,7 +57,7 @@ def delete_workflow(name: str) -> bool:
 
 
 def _interpolate(value: Any, results: list[str], payload: dict | None = None) -> Any:
-    """Substitute {{prev}}, {{step_N}}, {{payload}}, {{payload.key}} in string values."""
+    """Substitute {{prev}}, {{step_N}}, {{payload}}, {{payload.key}}, {{vars.name}}."""
     if not isinstance(value, str):
         return value
     prev = results[-1] if results else ""
@@ -78,6 +78,9 @@ def _interpolate(value: Any, results: list[str], payload: dict | None = None) ->
             return str(v)
 
         value = re.sub(r"\{\{payload\.([^}]+)\}\}", _sub_payload, value)
+
+    from agents.variable_store import resolve_vars
+    value = resolve_vars(value)
 
     return value
 
