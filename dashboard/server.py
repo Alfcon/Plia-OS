@@ -389,6 +389,35 @@ async def get_history(n: int = 100):
     return await asyncio.to_thread(get_recent, n)
 
 
+@router.get("/api/history/export")
+async def export_history(n: int = 10000, fmt: str = "json"):
+    from agents.chat_history import get_recent
+    messages = await asyncio.to_thread(get_recent, n)
+    if fmt == "markdown":
+        lines = [f"# Chat Export\n\n*{len(messages)} messages*\n"]
+        for m in messages:
+            ts = m.get("ts", "")
+            role = m.get("role", "")
+            content = m.get("content", "")
+            prefix = "**You**" if role == "user" else "**Plia**"
+            lines.append(f"### {prefix}  \n*{ts}*\n\n{content}\n")
+        body = "\n---\n\n".join(lines)
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(
+            content=body,
+            media_type="text/markdown",
+            headers={"Content-Disposition": 'attachment; filename="chat_export.md"'},
+        )
+    # default: JSON
+    import json as _json
+    from fastapi.responses import Response
+    return Response(
+        content=_json.dumps({"messages": messages}, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": 'attachment; filename="chat_export.json"'},
+    )
+
+
 @router.delete("/api/history")
 async def clear_history():
     from agents.chat_history import clear

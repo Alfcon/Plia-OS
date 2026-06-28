@@ -1606,7 +1606,9 @@
           <div class="settings-section">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
               <span style="font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:.05em">Conversation History</span>
-              <button onclick="loadHistory()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;margin-left:auto">↻ Refresh</button>
+              <button onclick="loadHistory()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;margin-left:auto">↻</button>
+              <button onclick="downloadHistory('json')" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.68rem;padding:2px 8px;border-radius:3px;cursor:pointer;">↓ JSON</button>
+              <button onclick="downloadHistory('markdown')" style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.68rem;padding:2px 8px;border-radius:3px;cursor:pointer;">↓ MD</button>
             </div>
             <input id="history-search" type="text" placeholder="Filter messages…"
               style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#ccc;border-radius:3px;padding:4px 8px;font-size:12px;margin-bottom:8px"
@@ -2209,15 +2211,36 @@
     }
   }
 
-  async function downloadHistory() {
-    const r = await fetch('/api/history?n=10000');
-    if (!r.ok) return;
-    const msgs = await r.json();
-    const lines = msgs.map(m => `[${m.ts}] ${m.role}: ${m.content}`).join('\n');
-    const blob = new Blob([lines], {type: 'text/plain'});
+  async function downloadHistory(fmt) {
+    if (!fmt) {
+      // show inline picker if called without arg (toolbar button)
+      const existing = document.getElementById('_hist-fmt-picker');
+      if (existing) { existing.remove(); return; }
+      const btn = document.querySelector('[onclick*="downloadHistory"]');
+      const picker = document.createElement('div');
+      picker.id = '_hist-fmt-picker';
+      picker.style.cssText = 'position:absolute;background:#1a1a1a;border:1px solid #333;border-radius:4px;padding:4px;z-index:999;display:flex;flex-direction:column;gap:2px;';
+      ['json','markdown'].forEach(f => {
+        const b = document.createElement('button');
+        b.textContent = f === 'json' ? 'JSON' : 'Markdown';
+        b.style.cssText = 'background:none;border:none;color:#e0e0e0;font-size:0.75rem;padding:4px 10px;cursor:pointer;text-align:left;';
+        b.onmouseenter = () => b.style.background='#222';
+        b.onmouseleave = () => b.style.background='none';
+        b.onclick = () => { picker.remove(); downloadHistory(f); };
+        picker.appendChild(b);
+      });
+      (btn?.parentElement || document.body).appendChild(picker);
+      setTimeout(() => document.addEventListener('click', () => picker.remove(), {once:true}), 50);
+      return;
+    }
+    const ext = fmt === 'markdown' ? 'md' : 'json';
+    const date = new Date().toISOString().slice(0, 10);
+    const r = await fetch(`/api/history/export?fmt=${fmt}&n=10000`);
+    if (!r.ok) { alert('Export failed'); return; }
+    const blob = await r.blob();
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(blob),
-      download: `plia-chat-${new Date().toISOString().slice(0,10)}.txt`,
+      download: `plia-chat-${date}.${ext}`,
     });
     a.click();
     URL.revokeObjectURL(a.href);
