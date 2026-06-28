@@ -1646,6 +1646,132 @@ async def delete_snapshot_endpoint(name: str):
     return {"ok": True}
 
 
+# ── Git panel ─────────────────────────────────────────────────────────────────
+
+_GIT_ROOT = Path(__file__).resolve().parent.parent
+
+
+async def _git(*args: str, check: bool = False) -> tuple[int, str, str]:
+    import subprocess
+    result = await asyncio.to_thread(
+        subprocess.run,
+        ["git", "-C", str(_GIT_ROOT), *args],
+        capture_output=True, text=True,
+    )
+    if check and result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+    return result.returncode, result.stdout, result.stderr
+
+
+def _parse_status(porcelain: str) -> dict:
+    staged, unstaged, untracked = [], [], []
+    _STATUS_LABELS = {
+        "M": "modified", "A": "added", "D": "deleted",
+        "R": "renamed", "C": "copied", "U": "unmerged",
+    }
+    for line in porcelain.splitlines():
+        if len(line) < 4:
+            continue
+        x, y, path = line[0], line[1], line[3:]
+        if x == "?" and y == "?":
+            untracked.append(path)
+            continue
+        if x != " " and x != "?":
+            staged.append({"status": _STATUS_LABELS.get(x, x), "path": path})
+        if y != " " and y != "?":
+            unstaged.append({"status": _STATUS_LABELS.get(y, y), "path": path})
+    return {"staged": staged, "unstaged": unstaged, "untracked": untracked}
+
+
+@router.get("/api/git/status")
+async def git_status():
+    rc, branch_out, _ = await _git("rev-parse", "--abbrev-ref", "HEAD")
+    if rc != 0:
+        raise HTTPException(status_code=500, detail="Not a git repository")
+    branch = branch_out.strip()
+    _, porcelain, _ = await _git("status", "--porcelain=v1")
+    parsed = _parse_status(porcelain)
+    parsed["branch"] = branch
+    parsed["clean"] = not (parsed["staged"] or parsed["unstaged"] or parsed["untracked"])
+    return parsed
+
+
+@router.get("/api/git/log")
+async def git_log(n: int = 25):
+    _, out, _ = await _git("log", f"--format=%H|%ai|%an|%s", f"-n{n}")
+    commits = []
+    for line in out.strip().splitlines():
+        parts = line.split("|", 3)
+        if len(parts) == 4:
+            h, date, author, msg = parts
+            commits.append({"hash": h, "short": h[:7], "date": date[:16], "author": author, "message": msg})
+    return {"commits": commits}
+
+
+@router.get("/api/git/diff")
+async def git_diff(path: str = "", staged: bool = False):
+    args = ["diff"]
+    if staged:
+        args.append("--cached")
+    if path:
+        args += ["--", path]
+    _, out, _ = await _git(*args)
+    return {"diff": out}
+
+
+@router.post("/api/git/stage")
+async def git_stage(body: dict):
+    files = body.get("files", [])
+    all_files = body.get("all", False)
+    if all_files:
+        rc, _, err = await _git("add", "-A")
+    elif files:
+        rc, _, err = await _git("add", "--", *files)
+    else:
+        raise HTTPException(status_code=400, detail="files or all required")
+    if rc != 0:
+        raise HTTPException(status_code=500, detail=err.strip())
+    return {"ok": True}
+
+
+@router.post("/api/git/unstage")
+async def git_unstage(body: dict):
+    files = body.get("files", [])
+    if not files:
+        raise HTTPException(status_code=400, detail="files required")
+    rc, _, err = await _git("restore", "--staged", "--", *files)
+    if rc != 0:
+        raise HTTPException(status_code=500, detail=err.strip())
+    return {"ok": True}
+
+
+@router.post("/api/git/commit")
+async def git_commit(body: dict):
+    message = (body.get("message") or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="message required")
+    rc, out, err = await _git("commit", "-m", message)
+    if rc != 0:
+        raise HTTPException(status_code=500, detail=err.strip() or out.strip())
+    return {"ok": True, "output": out.strip()}
+
+
+@router.post("/api/git/push")
+async def git_push():
+    rc, out, err = await _git("push")
+    if rc != 0:
+        raise HTTPException(status_code=500, detail=err.strip() or out.strip())
+    return {"ok": True, "output": (out + err).strip()}
+
+
+@router.post("/api/git/pull")
+async def git_pull():
+    rc, out, err = await _git("pull")
+    if rc != 0:
+        raise HTTPException(status_code=500, detail=err.strip() or out.strip())
+    return {"ok": True, "output": (out + err).strip()}
+
+
 # ── Log buffer ────────────────────────────────────────────────────────────────
 
 _LEVEL_MAP = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}

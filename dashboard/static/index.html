@@ -747,6 +747,7 @@
         <button class="m-nav-btn" data-section="hooks" onclick="showMenuSection('hooks');loadWebhooks()">Hooks</button>
         <button class="m-nav-btn" data-section="clips" onclick="showMenuSection('clips');loadClips()">Clips</button>
         <button class="m-nav-btn" data-section="snaps" onclick="showMenuSection('snaps');loadSnapshots()">Snaps</button>
+        <button class="m-nav-btn" data-section="git" onclick="showMenuSection('git');loadGit()">Git</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1604,6 +1605,51 @@
               </button>
             </div>
           </div>
+        </div>
+
+        <div id="m-section-git" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <!-- Header: branch + action buttons -->
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;">
+            <span id="git-branch" style="font-family:monospace;font-size:0.78rem;color:#4fc3f7;background:#0d1b2a;border:1px solid #1b3a5e;border-radius:3px;padding:2px 8px;"></span>
+            <span id="git-clean-badge" style="font-size:0.65rem;padding:2px 6px;border-radius:3px;"></span>
+            <span style="flex:1;"></span>
+            <button onclick="gitPull()" style="background:#111;border:1px solid #333;color:#888;font-size:0.7rem;padding:3px 9px;border-radius:3px;cursor:pointer;">↓ Pull</button>
+            <button onclick="gitPush()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.7rem;padding:3px 9px;border-radius:3px;cursor:pointer;">↑ Push</button>
+            <button onclick="loadGit()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
+          </div>
+          <!-- Status: staged + unstaged -->
+          <div style="display:flex;gap:6px;flex:1;min-height:0;overflow:hidden;">
+            <!-- Left: file lists -->
+            <div style="width:44%;min-width:0;display:flex;flex-direction:column;gap:5px;overflow-y:auto;">
+              <div>
+                <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:3px;display:flex;align-items:center;gap:4px;">
+                  Staged
+                  <button onclick="gitStageAll()" style="margin-left:auto;background:none;border:none;color:#4fc3f7;font-size:0.65rem;cursor:pointer;">+All</button>
+                </div>
+                <div id="git-staged" style="border:1px solid #1a1a1a;border-radius:3px;min-height:32px;font-size:0.72rem;font-family:monospace;"></div>
+              </div>
+              <div>
+                <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:3px;">Unstaged / Untracked</div>
+                <div id="git-unstaged" style="border:1px solid #1a1a1a;border-radius:3px;min-height:32px;font-size:0.72rem;font-family:monospace;"></div>
+              </div>
+              <!-- Commit -->
+              <div>
+                <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:3px;">Commit Message</div>
+                <textarea id="git-msg" rows="3"
+                  style="width:100%;box-sizing:border-box;background:#0a0a0a;border:1px solid #222;color:#e0e0e0;font-size:0.72rem;padding:4px 6px;border-radius:3px;resize:none;font-family:monospace;"
+                  placeholder="feat: …"></textarea>
+                <button onclick="gitCommit()" style="width:100%;margin-top:3px;background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.7rem;padding:4px;border-radius:3px;cursor:pointer;">Commit</button>
+              </div>
+            </div>
+            <!-- Right: diff + log -->
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;overflow:hidden;">
+              <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:.06em;color:#555;">Diff</div>
+              <pre id="git-diff" style="flex:1;min-height:60px;max-height:200px;overflow:auto;background:#050505;border:1px solid #1a1a1a;border-radius:3px;font-size:0.65rem;padding:5px 7px;margin:0;white-space:pre;color:#888;">(click a file to diff)</pre>
+              <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:.06em;color:#555;">Recent Commits</div>
+              <div id="git-log" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.68rem;font-family:monospace;"></div>
+            </div>
+          </div>
+          <div id="git-status-msg" style="font-size:0.7rem;color:#555;flex-shrink:0;min-height:1em;"></div>
         </div>
 
         <div id="m-section-snaps" class="m-pane" style="display:none;flex-direction:column;">
@@ -5144,6 +5190,133 @@
       return;
     }
   });
+
+  // ── Git panel ─────────────────────────────────────────────────────────────
+
+  const _GIT_STATUS_COLORS = {modified:'#ffb74d', added:'#81c784', deleted:'#ef5350', renamed:'#4fc3f7', unmerged:'#ff6e6e'};
+
+  async function loadGit() {
+    gitMsg('Loading…');
+    try {
+      const [sRes, lRes] = await Promise.all([fetch('/api/git/status'), fetch('/api/git/log?n=25')]);
+      if (!sRes.ok) { gitMsg('Not a git repo or git unavailable.'); return; }
+      const [status, log] = await Promise.all([sRes.json(), lRes.json()]);
+      _renderGitStatus(status);
+      _renderGitLog(log.commits);
+      gitMsg('');
+    } catch(e) { gitMsg('Error: ' + e.message); }
+  }
+
+  function _renderGitStatus(s) {
+    document.getElementById('git-branch').textContent = '⎇ ' + s.branch;
+    const badge = document.getElementById('git-clean-badge');
+    badge.textContent = s.clean ? 'clean' : 'dirty';
+    badge.style.cssText = `font-size:0.65rem;padding:2px 6px;border-radius:3px;background:${s.clean?'#0d2a1a':'#2a1a0d'};color:${s.clean?'#81c784':'#ffb74d'};border:1px solid ${s.clean?'#1b5e20':'#5e3a0d'};`;
+
+    const staged = document.getElementById('git-staged');
+    staged.innerHTML = s.staged.length
+      ? s.staged.map(f => `<div style="padding:2px 6px;border-bottom:1px solid #111;display:flex;align-items:center;gap:4px;">
+          <span style="color:${_GIT_STATUS_COLORS[f.status]||'#aaa'};font-size:0.6rem;width:55px;flex-shrink:0;">${f.status}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="gitShowDiff(${JSON.stringify(f.path)},true)" title="${_esc(f.path)}">${_esc(f.path)}</span>
+          <button onclick="gitUnstage(${JSON.stringify(f.path)})" style="background:none;border:none;color:#555;font-size:0.65rem;cursor:pointer;flex-shrink:0;">−</button>
+        </div>`).join('')
+      : '<div style="padding:4px 6px;color:#333;">nothing staged</div>';
+
+    const unstaged = document.getElementById('git-unstaged');
+    const all = [
+      ...s.unstaged.map(f => ({...f, untracked: false})),
+      ...s.untracked.map(p => ({path: p, status: 'untracked', untracked: true})),
+    ];
+    unstaged.innerHTML = all.length
+      ? all.map(f => `<div style="padding:2px 6px;border-bottom:1px solid #111;display:flex;align-items:center;gap:4px;">
+          <span style="color:${f.untracked?'#555':(_GIT_STATUS_COLORS[f.status]||'#aaa')};font-size:0.6rem;width:55px;flex-shrink:0;">${f.status}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="gitShowDiff(${JSON.stringify(f.path)},false)" title="${_esc(f.path)}">${_esc(f.path)}</span>
+          <button onclick="gitStage(${JSON.stringify(f.path)})" style="background:none;border:none;color:#81c784;font-size:0.65rem;cursor:pointer;flex-shrink:0;">+</button>
+        </div>`).join('')
+      : '<div style="padding:4px 6px;color:#333;">working tree clean</div>';
+  }
+
+  function _renderGitLog(commits) {
+    const log = document.getElementById('git-log');
+    log.innerHTML = commits.map(c => `
+      <div style="padding:3px 6px;border-bottom:1px solid #0d0d0d;display:flex;gap:5px;align-items:baseline;" title="${_esc(c.hash)}">
+        <span style="color:#555;flex-shrink:0;font-size:0.65rem;">${_esc(c.short)}</span>
+        <span style="color:#333;flex-shrink:0;font-size:0.62rem;">${_esc(c.date)}</span>
+        <span style="color:#ccc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(c.message)}</span>
+        <span style="color:#444;flex-shrink:0;font-size:0.62rem;">${_esc(c.author)}</span>
+      </div>`).join('');
+  }
+
+  async function gitShowDiff(path, staged) {
+    const pre = document.getElementById('git-diff');
+    pre.textContent = 'Loading diff…';
+    try {
+      const r = await fetch(`/api/git/diff?path=${encodeURIComponent(path)}&staged=${staged}`);
+      const data = await r.json();
+      if (!data.diff) { pre.textContent = '(no diff)'; pre.style.color = '#555'; return; }
+      pre.innerHTML = data.diff.split('\n').map(line => {
+        const color = line.startsWith('+') && !line.startsWith('+++') ? '#81c784'
+                    : line.startsWith('-') && !line.startsWith('---') ? '#ef5350'
+                    : line.startsWith('@@') ? '#4fc3f7'
+                    : '#666';
+        return `<span style="color:${color}">${_esc(line)}</span>`;
+      }).join('\n');
+    } catch(e) { pre.textContent = 'Error: ' + e.message; }
+  }
+
+  async function gitStage(path) {
+    await fetch('/api/git/stage', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({files:[path]})});
+    loadGit();
+  }
+
+  async function gitStageAll() {
+    await fetch('/api/git/stage', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({all:true})});
+    loadGit();
+  }
+
+  async function gitUnstage(path) {
+    await fetch('/api/git/unstage', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({files:[path]})});
+    loadGit();
+  }
+
+  async function gitCommit() {
+    const msg = document.getElementById('git-msg').value.trim();
+    if (!msg) { alert('Commit message required'); return; }
+    try {
+      const r = await fetch('/api/git/commit', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message: msg})});
+      const data = await r.json();
+      if (!r.ok) { gitMsg('Error: ' + (data.detail || 'commit failed')); return; }
+      document.getElementById('git-msg').value = '';
+      gitMsg(data.output || 'Committed.');
+      loadGit();
+    } catch(e) { gitMsg('Error: ' + e.message); }
+  }
+
+  async function gitPush() {
+    if (!confirm('Push to remote?')) return;
+    gitMsg('Pushing…');
+    try {
+      const r = await fetch('/api/git/push', {method:'POST'});
+      const data = await r.json();
+      gitMsg(r.ok ? (data.output || 'Pushed.') : 'Error: ' + data.detail);
+      if (r.ok) loadGit();
+    } catch(e) { gitMsg('Error: ' + e.message); }
+  }
+
+  async function gitPull() {
+    gitMsg('Pulling…');
+    try {
+      const r = await fetch('/api/git/pull', {method:'POST'});
+      const data = await r.json();
+      gitMsg(r.ok ? (data.output || 'Up to date.') : 'Error: ' + data.detail);
+      if (r.ok) loadGit();
+    } catch(e) { gitMsg('Error: ' + e.message); }
+  }
+
+  function gitMsg(msg) {
+    const el = document.getElementById('git-status-msg');
+    if (el) el.textContent = msg;
+  }
 
   // ── Config snapshots ─────────────────────────────────────────────────────
 
