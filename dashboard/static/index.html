@@ -755,6 +755,7 @@
         <button class="m-nav-btn" data-section="inspector" onclick="showMenuSection('inspector');loadInspector()">Inspector</button>
         <button class="m-nav-btn" data-section="health" onclick="showMenuSection('health');loadHealth()">Health</button>
         <button class="m-nav-btn" data-section="bench" onclick="showMenuSection('bench');loadBenchHistory()">Bench</button>
+        <button class="m-nav-btn" data-section="vramtl" onclick="showMenuSection('vramtl');startVramTimeline()">VRAM</button>
         <button class="m-nav-btn" data-section="prompts" onclick="showMenuSection('prompts');loadPrompts()">Prompts</button>
         <button class="m-nav-btn" data-section="voicetest" onclick="showMenuSection('voicetest')">STT Test</button>
         <button class="m-nav-btn" data-section="ttstest" onclick="showMenuSection('ttstest')">TTS Test</button>
@@ -1860,6 +1861,18 @@
                 style="background:none;border:1px solid #333;color:#666;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Cancel</button>
             </div>
           </div>
+        </div>
+
+        <!-- VRAM Timeline -->
+        <div id="m-section-vramtl" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="flex-shrink:0;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:0.68rem;color:#555;">GPU memory over time (5s interval, 10 min window)</span>
+            <button onclick="startVramTimeline()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;margin-left:auto;">↻</button>
+            <span id="vramtl-legend" style="font-size:0.68rem;color:#555;"></span>
+          </div>
+          <canvas id="vramtl-canvas" width="600" height="160"
+            style="width:100%;height:160px;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;display:block;flex-shrink:0;"></canvas>
+          <div id="vramtl-models" style="font-size:0.68rem;color:#555;flex-shrink:0;"></div>
         </div>
 
         <div id="m-section-bench" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
@@ -6493,6 +6506,82 @@
     if (!confirm(`Delete prompt "${name}"?`)) return;
     await fetch(`/api/prompts/${encodeURIComponent(name)}`, {method:'DELETE'});
     await loadPrompts();
+  }
+
+  // ── VRAM Timeline ─────────────────────────────────────────────────────────
+
+  let _vramTlTimer = null;
+  const _MODEL_COLORS = ['#4fc3f7','#81c784','#ffb74d','#ef9a9a','#ce93d8','#80cbc4'];
+
+  async function startVramTimeline() {
+    clearInterval(_vramTlTimer);
+    await _drawVramTimeline();
+    _vramTlTimer = setInterval(_drawVramTimeline, 5000);
+  }
+
+  async function _drawVramTimeline() {
+    const data = await fetch('/api/vram/timeline?n=120').then(r => r.json()).catch(() => null);
+    if (!data || !data.samples.length) return;
+    const samples = data.samples;
+    const total = samples[samples.length - 1].total_gb || 1;
+
+    const canvas = document.getElementById('vramtl-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const PAD = {t: 10, r: 8, b: 24, l: 38};
+    const cW = W - PAD.l - PAD.r, cH = H - PAD.t - PAD.b;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // grid
+    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1;
+    for (let g = 0; g <= 4; g++) {
+      const y = PAD.t + cH - (g / 4) * cH;
+      ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(PAD.l + cW, y); ctx.stroke();
+      ctx.fillStyle = '#444'; ctx.font = '9px monospace'; ctx.textAlign = 'right';
+      ctx.fillText((total * g / 4).toFixed(1) + 'G', PAD.l - 3, y + 3);
+    }
+
+    // collect all model names
+    const modelNames = [...new Set(samples.flatMap(s => Object.keys(s.models || {})))];
+
+    // stacked model areas
+    modelNames.forEach((name, mi) => {
+      ctx.fillStyle = _MODEL_COLORS[mi % _MODEL_COLORS.length] + '33';
+      ctx.beginPath();
+      let first = true;
+      for (let i = 0; i < samples.length; i++) {
+        const x = PAD.l + (i / (samples.length - 1 || 1)) * cW;
+        const gb = samples[i].models?.[name] || 0;
+        const y = PAD.t + cH - (gb / total) * cH;
+        if (first) { ctx.moveTo(x, PAD.t + cH); ctx.lineTo(x, y); first = false; }
+        else ctx.lineTo(x, y);
+      }
+      ctx.lineTo(PAD.l + cW, PAD.t + cH);
+      ctx.closePath(); ctx.fill();
+    });
+
+    // used line
+    ctx.strokeStyle = '#4fc3f7'; ctx.lineWidth = 1.5; ctx.beginPath();
+    samples.forEach((s, i) => {
+      const x = PAD.l + (i / (samples.length - 1 || 1)) * cW;
+      const y = PAD.t + cH - (s.used_gb / total) * cH;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // current value label
+    const last = samples[samples.length - 1];
+    const pct = total > 0 ? Math.round(last.used_gb / total * 100) : 0;
+    document.getElementById('vramtl-legend').textContent =
+      `${last.used_gb.toFixed(2)} / ${last.total_gb.toFixed(2)} GB (${pct}%)`;
+
+    // model legend
+    const modEl = document.getElementById('vramtl-models');
+    if (modEl) modEl.innerHTML = modelNames.map((n, i) =>
+      `<span style="color:${_MODEL_COLORS[i % _MODEL_COLORS.length]};margin-right:10px;">■ ${_esc(n)}</span>`
+    ).join('') || '<span style="color:#333;">No models loaded</span>';
   }
 
   // ── Benchmark panel ───────────────────────────────────────────────────────

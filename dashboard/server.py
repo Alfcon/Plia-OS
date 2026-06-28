@@ -1043,6 +1043,32 @@ async def run_tool(body: dict):
     return {"tool": tool_name, "result": result_str}
 
 
+import collections as _collections
+_VRAM_TIMELINE: _collections.deque = _collections.deque(maxlen=120)
+
+
+async def run_vram_sampler() -> None:
+    import time as _time
+    while True:
+        try:
+            s = get_vram_broker().status()
+            _VRAM_TIMELINE.append({
+                "ts": round(_time.time(), 1),
+                "used_gb": s["vram_used_gb"],
+                "total_gb": s["vram_total_gb"],
+                "models": {k: v["vram_gb"] for k, v in s.get("models", {}).items() if v.get("vram_gb", 0) > 0},
+            })
+        except Exception:
+            pass
+        await asyncio.sleep(5)
+
+
+@router.get("/api/vram/timeline")
+async def vram_timeline(n: int = 120):
+    samples = list(_VRAM_TIMELINE)[-min(n, 120):]
+    return {"samples": samples, "interval_s": 5}
+
+
 @router.get("/api/vram/status")
 async def vram_status():
     return get_vram_broker().status()
