@@ -20,7 +20,11 @@ from agents.network import network_node
 from agents.wifi import wifi_node
 from agents.file import file_node
 from agents.weather import weather_node
+import hashlib, json as _json
 logger = logging.getLogger(__name__)
+
+_RESPONSE_CACHE: dict[str, tuple[str, list]] = {}
+_CACHE_STATS: dict[str, int] = {"hits": 0, "misses": 0}
 
 _KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder", "network", "wifi", "file", "weather", "cron"}
 _HOP_LIMIT = 5
@@ -355,6 +359,16 @@ async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
     last_user = next(
         (m["content"] for m in reversed(messages) if m["role"] == "user"), ""
     )
+
+    if config.llm_cache_enabled and last_user:
+        _cache_key = hashlib.md5(_json.dumps(messages, sort_keys=True, default=str).encode()).hexdigest()
+        if _cache_key in _RESPONSE_CACHE:
+            _CACHE_STATS["hits"] += 1
+            return _RESPONSE_CACHE[_cache_key]
+        _CACHE_STATS["misses"] += 1
+    else:
+        _cache_key = None
+
     memory_context = "\n".join(store.recall(last_user)) if last_user else ""
 
     try:
@@ -396,5 +410,9 @@ async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
     if response:
         await asyncio.to_thread(add_message, "assistant", response)
 
+    if _cache_key is not None and response:
+        if len(_RESPONSE_CACHE) >= config.llm_cache_max:
+            _RESPONSE_CACHE.pop(next(iter(_RESPONSE_CACHE)))
+        _RESPONSE_CACHE[_cache_key] = (response, final_messages)
 
     return response, final_messages

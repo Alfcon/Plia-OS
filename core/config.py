@@ -134,6 +134,8 @@ class PliaConfig:
     cpu_alert_threshold: int = 90
     ram_alert_threshold: int = 90
     gpu_alert_threshold: int = 90
+    llm_cache_enabled: bool = False
+    llm_cache_max: int = 100
 
 
 _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {

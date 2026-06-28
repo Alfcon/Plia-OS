@@ -784,6 +784,9 @@
         <button class="m-nav-btn" data-section="historysearch" onclick="showMenuSection('historysearch')">Hist Search</button>
         <button class="m-nav-btn" data-section="ttsprev" onclick="showMenuSection('ttsprev')">TTS Preview</button>
         <button class="m-nav-btn" data-section="promptdiff" onclick="showMenuSection('promptdiff');loadPromptDiff()">Prompt Diff</button>
+        <button class="m-nav-btn" data-section="llmcache" onclick="showMenuSection('llmcache');loadCacheStats()">LLM Cache</button>
+        <button class="m-nav-btn" data-section="uptime" onclick="showMenuSection('uptime');loadUptime()">Uptime</button>
+        <button class="m-nav-btn" data-section="wfhistory" onclick="showMenuSection('wfhistory');loadWfHistory()">WF History</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2171,6 +2174,46 @@
             </span>
           </div>
           <div id="prompt-diff-view" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.72rem;font-family:monospace;white-space:pre-wrap;"></div>
+        </div>
+
+        <!-- LLM Cache -->
+        <div id="m-section-llmcache" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">In-memory LRU cache for identical prompts. Skips LLM on repeated queries.</div>
+          <div style="border:1px solid #1a1a1a;border-radius:3px;padding:10px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:0.72rem;color:#aaa;">Cache:</span>
+              <span id="cache-enabled-badge" style="font-size:0.7rem;padding:1px 7px;border-radius:10px;background:#1a0a0a;color:#ef9a9a;">off</span>
+              <button onclick="toggleCache()" style="background:none;border:1px solid #333;color:#4fc3f7;font-size:0.68rem;padding:2px 8px;border-radius:3px;cursor:pointer;margin-left:4px;">Toggle</button>
+              <button onclick="loadCacheStats()" style="background:none;border:none;color:#555;font-size:0.72rem;cursor:pointer;margin-left:auto;">↻</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;">
+              <div><div id="cache-size" style="font-size:1.2rem;color:#4fc3f7;">0</div><div style="font-size:0.62rem;color:#555;">size</div></div>
+              <div><div id="cache-hits" style="font-size:1.2rem;color:#a5d6a7;">0</div><div style="font-size:0.62rem;color:#555;">hits</div></div>
+              <div><div id="cache-misses" style="font-size:1.2rem;color:#ef9a9a;">0</div><div style="font-size:0.62rem;color:#555;">misses</div></div>
+              <div><div id="cache-rate" style="font-size:1.2rem;color:#e0e0e0;">0%</div><div style="font-size:0.62rem;color:#555;">hit rate</div></div>
+            </div>
+            <button onclick="flushCache()" style="background:#1a0a0a;border:1px solid #4d2e2e;color:#ef9a9a;font-size:0.72rem;padding:4px;border-radius:3px;cursor:pointer;">Flush cache</button>
+          </div>
+        </div>
+
+        <!-- Uptime -->
+        <div id="m-section-uptime" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Server uptime since last start.</div>
+          <div style="border:1px solid #1a1a1a;border-radius:3px;padding:20px;text-align:center;">
+            <div id="uptime-human" style="font-size:2rem;color:#4fc3f7;font-variant-numeric:tabular-nums;font-family:monospace;">—</div>
+            <div style="font-size:0.65rem;color:#555;margin-top:4px;">uptime</div>
+            <div id="uptime-started" style="font-size:0.68rem;color:#444;margin-top:8px;">started: —</div>
+          </div>
+        </div>
+
+        <!-- Workflow History -->
+        <div id="m-section-wfhistory" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Timeline of past workflow executions (name, steps, duration, success/fail).</div>
+          <div style="flex-shrink:0;display:flex;align-items:center;gap:6px;">
+            <button onclick="loadWfHistory()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻ Refresh</button>
+            <button onclick="clearWfHistory()" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;">Clear</button>
+          </div>
+          <div id="wf-history-log" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:5px;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -7591,6 +7634,77 @@
     await loadAgentTrace();
   }
 
+  // ── Uptime ────────────────────────────────────────────────────────────────
+
+  let _uptimeInterval = null;
+  async function loadUptime() {
+    const data = await fetch('/api/uptime').then(r=>r.json()).catch(()=>null);
+    if (!data) return;
+    const humanEl = document.getElementById('uptime-human');
+    const startedEl = document.getElementById('uptime-started');
+    if (humanEl) humanEl.textContent = data.human;
+    if (startedEl) startedEl.textContent = 'started: ' + new Date(data.started_at * 1000).toLocaleString();
+    clearInterval(_uptimeInterval);
+    let secs = data.uptime_seconds;
+    _uptimeInterval = setInterval(() => {
+      secs += 1;
+      const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = Math.floor(secs % 60);
+      if (humanEl) humanEl.textContent = h ? `${h}h ${m}m ${s}s` : (m ? `${m}m ${s}s` : `${s}s`);
+    }, 1000);
+  }
+
+  // ── LLM Cache ─────────────────────────────────────────────────────────────
+
+  async function loadCacheStats() {
+    const data = await fetch('/api/cache/stats').then(r=>r.json()).catch(()=>null);
+    if (!data) return;
+    const badge = document.getElementById('cache-enabled-badge');
+    if (badge) { badge.textContent = data.enabled ? 'on' : 'off'; badge.style.background = data.enabled ? '#0a1a0a' : '#1a0a0a'; badge.style.color = data.enabled ? '#a5d6a7' : '#ef9a9a'; }
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('cache-size', `${data.size}/${data.max}`);
+    set('cache-hits', data.hits);
+    set('cache-misses', data.misses);
+    set('cache-rate', data.hit_rate + '%');
+  }
+
+  async function toggleCache() {
+    const data = await fetch('/api/cache/stats').then(r=>r.json()).catch(()=>({enabled:false}));
+    await fetch('/api/cache/toggle', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({enabled:!data.enabled})});
+    await loadCacheStats();
+  }
+
+  async function flushCache() {
+    await fetch('/api/cache', {method:'DELETE'}).catch(()=>{});
+    await loadCacheStats();
+  }
+
+  // ── Workflow history ──────────────────────────────────────────────────────
+
+  async function loadWfHistory() {
+    const el = document.getElementById('wf-history-log');
+    if (!el) return;
+    const data = await fetch('/api/workflows/history').then(r=>r.json()).catch(()=>({history:[]}));
+    if (!data.history.length) { el.innerHTML='<div style="color:#444;font-size:0.75rem;">No runs yet.</div>'; return; }
+    el.innerHTML = data.history.map(h => {
+      const ts = new Date(h.ts*1000).toLocaleTimeString();
+      const color = h.success ? '#a5d6a7' : '#ef9a9a';
+      const icon = h.success ? '✓' : '✗';
+      return `<div style="border:1px solid #1a1a1a;border-radius:3px;padding:6px 8px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="color:${color};font-size:0.8rem;">${icon}</span>
+          <span style="color:#e0e0e0;font-size:0.73rem;font-family:monospace;">${h.name}</span>
+          <span style="color:#555;font-size:0.65rem;margin-left:auto;">${h.steps} steps · ${h.duration_ms}ms · ${ts}</span>
+        </div>
+        ${h.errors.length ? `<div style="color:#ef9a9a;font-size:0.65rem;margin-top:3px;">${h.errors.join('; ')}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  async function clearWfHistory() {
+    await fetch('/api/workflows/history', {method:'DELETE'}).catch(()=>{});
+    await loadWfHistory();
+  }
+
   // ── LLM model switcher ───────────────────────────────────────────────────
 
   async function loadOllamaModels() {
@@ -8031,6 +8145,8 @@
           style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.62rem;padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0;">CB</button>
         <button onclick="clipActivate(${JSON.stringify(c.filename)},'dramabox')" title="Set as Dramabox voice"
           style="background:#1a0d2a;border:1px solid #3a1b5e;color:#ce93d8;font-size:0.62rem;padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0;">DB</button>
+        ${c.filename.toLowerCase().endsWith('.wav') ? `<button onclick="clipTrim(${JSON.stringify(c.filename)})" title="Trim WAV"
+          style="background:#0a1a1a;border:1px solid #1b4e5e;color:#4fc3f7;font-size:0.62rem;padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0;">✂</button>` : ''}
         <button onclick="clipDelete(${JSON.stringify(c.filename)})" title="Delete"
           style="background:#2a0d0d;border:1px solid #5e1b1b;color:#ef5350;font-size:0.65rem;padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0;">✕</button>
       </div>`;
@@ -8065,6 +8181,23 @@
     if (player.src.endsWith(encodeURIComponent(filename))) {
       player.pause(); player.src = ''; player.style.display = 'none';
     }
+  }
+
+  async function clipTrim(filename) {
+    if (!filename.toLowerCase().endsWith('.wav')) { alert('Only WAV clips can be trimmed'); return; }
+    const startS = parseFloat(prompt('Trim start (seconds):', '0') || '0');
+    const endRaw = prompt('Trim end (seconds, blank = end of clip):', '');
+    const body = {start_s: startS};
+    if (endRaw !== null && endRaw.trim() !== '') body.end_s = parseFloat(endRaw);
+    const r = await fetch(`/api/clips/${encodeURIComponent(filename)}/trim`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>{}); alert(e?.detail || 'Trim failed'); return; }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename.replace(/\.wav$/i, '_trimmed.wav');
+    a.click();
   }
 
   function clipRename(filename, el) {

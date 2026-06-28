@@ -75,6 +75,10 @@ async def _broadcast(payload: dict) -> None:
 import collections as _collections_top
 import time as _time_top
 
+_SERVER_START: float = _time_top.time()
+
+_WORKFLOW_HISTORY: _collections_top.deque = _collections_top.deque(maxlen=100)
+
 _CONFIG_HISTORY: _collections_top.deque = _collections_top.deque(maxlen=200)
 
 _TOOL_STATS: dict[str, dict] = {}
@@ -2551,6 +2555,17 @@ async def clear_logs():
 
 # ── Workflows ─────────────────────────────────────────────────────────────────
 
+@router.get("/api/workflows/history")
+async def workflow_history(n: int = 50):
+    return {"history": list(_WORKFLOW_HISTORY)[:n]}
+
+
+@router.delete("/api/workflows/history")
+async def clear_workflow_history():
+    _WORKFLOW_HISTORY.clear()
+    return {"ok": True}
+
+
 @router.get("/api/workflows")
 async def list_workflows_endpoint():
     from agents.workflow_store import list_workflows
@@ -2582,11 +2597,23 @@ async def delete_workflow_endpoint(name: str):
 
 @router.post("/api/workflows/{name}/run")
 async def run_workflow_endpoint(name: str):
+    import time as _t
     from agents.workflow_store import run_workflow
+    t0 = _t.monotonic()
     try:
         results = await run_workflow(name)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    duration_ms = int((_t.monotonic() - t0) * 1000)
+    success = all(s.get("error") is None for s in results)
+    _WORKFLOW_HISTORY.appendleft({
+        "ts": _time_top.time(),
+        "name": name,
+        "steps": len(results),
+        "duration_ms": duration_ms,
+        "success": success,
+        "errors": [s["error"] for s in results if s.get("error")],
+    })
     return {"name": name, "steps": results}
 
 
@@ -3407,6 +3434,87 @@ async def set_alert_config(body: dict):
     if kwargs:
         await asyncio.to_thread(update_config, **kwargs)
     return {"ok": True}
+
+
+@router.get("/api/uptime")
+async def uptime():
+    elapsed = _time_top.time() - _SERVER_START
+    h = int(elapsed // 3600)
+    m = int((elapsed % 3600) // 60)
+    s = int(elapsed % 60)
+    human = f"{h}h {m}m {s}s" if h else (f"{m}m {s}s" if m else f"{s}s")
+    return {"uptime_seconds": round(elapsed, 1), "human": human, "started_at": _SERVER_START}
+
+
+@router.get("/api/cache/stats")
+async def llm_cache_stats():
+    from core.supervisor import _RESPONSE_CACHE, _CACHE_STATS
+    cfg = get_config()
+    return {
+        "enabled": cfg.llm_cache_enabled,
+        "size": len(_RESPONSE_CACHE),
+        "max": cfg.llm_cache_max,
+        "hits": _CACHE_STATS["hits"],
+        "misses": _CACHE_STATS["misses"],
+        "hit_rate": round(_CACHE_STATS["hits"] / max(_CACHE_STATS["hits"] + _CACHE_STATS["misses"], 1) * 100, 1),
+    }
+
+
+@router.delete("/api/cache")
+async def flush_llm_cache():
+    from core.supervisor import _RESPONSE_CACHE, _CACHE_STATS
+    _RESPONSE_CACHE.clear()
+    _CACHE_STATS["hits"] = 0
+    _CACHE_STATS["misses"] = 0
+    return {"ok": True}
+
+
+@router.post("/api/cache/toggle")
+async def toggle_llm_cache(body: dict):
+    enabled = bool(body.get("enabled", not get_config().llm_cache_enabled))
+    await asyncio.to_thread(update_config, llm_cache_enabled=enabled)
+    return {"ok": True, "enabled": enabled}
+
+
+@router.post("/api/clips/{filename}/trim")
+async def trim_clip(filename: str, body: dict):
+    try:
+        p = _clip_path(filename)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="Clip not found")
+    if p.suffix.lower() != ".wav":
+        raise HTTPException(status_code=400, detail="Only WAV clips can be trimmed")
+    start_s = float(body.get("start_s", 0))
+    end_s = body.get("end_s")
+    if start_s < 0:
+        raise HTTPException(status_code=400, detail="start_s must be >= 0")
+
+    def _trim() -> bytes:
+        import io
+        rate, data = wavfile.read(str(p))
+        start_idx = int(start_s * rate)
+        end_idx = int(end_s * rate) if end_s is not None else len(data)
+        end_idx = min(end_idx, len(data))
+        if start_idx >= end_idx:
+            raise ValueError("start_s must be less than end_s and clip duration")
+        trimmed = data[start_idx:end_idx]
+        buf = io.BytesIO()
+        wavfile.write(buf, rate, trimmed)
+        return buf.getvalue()
+
+    try:
+        wav_bytes = await asyncio.to_thread(_trim)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    from fastapi.responses import Response
+    stem = p.stem
+    return Response(
+        content=wav_bytes,
+        media_type="audio/wav",
+        headers={"Content-Disposition": f'attachment; filename="{stem}_trimmed.wav"'},
+    )
 
 
 @router.get("/api/config/history")
