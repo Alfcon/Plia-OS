@@ -2010,6 +2010,51 @@ async def delete_webhook_endpoint(slug: str):
     return {"ok": True}
 
 
+@router.get("/api/prompts")
+async def list_prompts_endpoint():
+    from agents.prompt_store import list_prompts
+    return {"prompts": await asyncio.to_thread(list_prompts)}
+
+
+@router.post("/api/prompts")
+async def save_prompt_endpoint(body: dict):
+    from agents.prompt_store import save_prompt
+    name = (body.get("name") or "").strip()
+    text = (body.get("text") or "").strip()
+    description = (body.get("description") or "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="'name' required")
+    if not text:
+        raise HTTPException(status_code=422, detail="'text' required")
+    try:
+        await asyncio.to_thread(save_prompt, name, text, description)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"ok": True, "name": name}
+
+
+@router.delete("/api/prompts/{name}")
+async def delete_prompt_endpoint(name: str):
+    from agents.prompt_store import delete_prompt
+    deleted = await asyncio.to_thread(delete_prompt, name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Prompt {name!r} not found")
+    return {"ok": True}
+
+
+@router.post("/api/prompts/{name}/apply")
+async def apply_prompt_endpoint(name: str):
+    from agents.prompt_store import get_prompt
+    prompt = await asyncio.to_thread(get_prompt, name)
+    if prompt is None:
+        raise HTTPException(status_code=404, detail=f"Prompt {name!r} not found")
+    try:
+        config = update_config(system_prompt=prompt["text"])
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"ok": True, "system_prompt": config.system_prompt}
+
+
 @router.post("/api/webhooks/{slug}/test")
 async def test_webhook(slug: str, body: dict):
     """Fire a webhook from the dashboard — skips secret check, adds timing."""

@@ -755,6 +755,7 @@
         <button class="m-nav-btn" data-section="inspector" onclick="showMenuSection('inspector');loadInspector()">Inspector</button>
         <button class="m-nav-btn" data-section="health" onclick="showMenuSection('health');loadHealth()">Health</button>
         <button class="m-nav-btn" data-section="bench" onclick="showMenuSection('bench');loadBenchHistory()">Bench</button>
+        <button class="m-nav-btn" data-section="prompts" onclick="showMenuSection('prompts');loadPrompts()">Prompts</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1712,6 +1713,45 @@
         </div>
 
         <!-- Benchmark panel -->
+        <!-- Prompt Library -->
+        <div id="m-section-prompts" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <!-- Save current prompt -->
+          <div style="flex-shrink:0;display:flex;flex-direction:column;gap:5px;border:1px solid #1a1a1a;border-radius:3px;padding:8px;">
+            <div style="font-size:0.68rem;color:#555;margin-bottom:2px;">Save current system prompt</div>
+            <div style="display:flex;gap:5px;">
+              <input id="prompt-save-name" type="text" placeholder="Name (e.g. concise)"
+                style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 7px;font-size:0.73rem;"
+                onkeydown="if(event.key==='Enter')promptSaveCurrent()">
+              <button onclick="promptSaveCurrent()"
+                style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Save</button>
+            </div>
+            <input id="prompt-save-desc" type="text" placeholder="Description (optional)"
+              style="background:#111;border:1px solid #333;color:#888;border-radius:3px;padding:3px 7px;font-size:0.7rem;">
+            <div id="prompt-save-status" style="font-size:0.68rem;color:#555;min-height:1em;"></div>
+          </div>
+          <!-- Library list -->
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+            <span style="font-size:0.68rem;color:#444;">Saved prompts</span>
+            <span style="flex:1;"></span>
+            <button onclick="loadPrompts()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻</button>
+          </div>
+          <div id="prompt-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+          <!-- Editor (shown when editing) -->
+          <div id="prompt-editor" style="display:none;flex-shrink:0;flex-direction:column;gap:5px;border:1px solid #1b3a5e;border-radius:3px;padding:8px;">
+            <div style="font-size:0.68rem;color:#4fc3f7;">Editing: <span id="prompt-edit-name-label"></span></div>
+            <textarea id="prompt-edit-text" rows="6"
+              style="background:#0a0a0a;border:1px solid #222;color:#e0e0e0;border-radius:3px;padding:5px 7px;font-size:0.72rem;font-family:monospace;resize:vertical;"></textarea>
+            <input id="prompt-edit-desc" type="text" placeholder="Description"
+              style="background:#111;border:1px solid #333;color:#888;border-radius:3px;padding:3px 7px;font-size:0.7rem;">
+            <div style="display:flex;gap:5px;">
+              <button onclick="promptSaveEdit()"
+                style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 12px;border-radius:3px;cursor:pointer;">Save</button>
+              <button onclick="promptCancelEdit()"
+                style="background:none;border:1px solid #333;color:#666;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Cancel</button>
+            </div>
+          </div>
+        </div>
+
         <div id="m-section-bench" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
           <div style="flex-shrink:0;display:flex;flex-direction:column;gap:6px;">
             <textarea id="bench-prompt" rows="3"
@@ -5866,6 +5906,109 @@
         <span style="font-size:0.62rem;color:${color};border:1px solid ${border};border-radius:3px;padding:1px 6px;flex-shrink:0;">${st}</span>
       </div>`;
     }).join('');
+  }
+
+  // ── Prompt Library ────────────────────────────────────────────────────────
+
+  let _editingPromptName = null;
+
+  async function loadPrompts() {
+    const list = document.getElementById('prompt-list');
+    list.innerHTML = '<div style="font-size:0.7rem;color:#444;">Loading…</div>';
+    let data;
+    try {
+      const r = await fetch('/api/prompts');
+      if (!r.ok) { list.innerHTML = '<div style="color:#ef5350;font-size:0.7rem;">Error</div>'; return; }
+      data = await r.json();
+    } catch(e) { list.innerHTML = `<div style="color:#ef5350;font-size:0.7rem;">${_esc(e.message)}</div>`; return; }
+    if (!data.prompts.length) {
+      list.innerHTML = '<div style="font-size:0.7rem;color:#444;">No saved prompts. Save the current system prompt above.</div>';
+      return;
+    }
+    // get active prompt for comparison
+    let activePrompt = '';
+    try { activePrompt = (await fetch('/api/config').then(r => r.json())).system_prompt || ''; } catch(_) {}
+    list.innerHTML = data.prompts.map(p => {
+      const isActive = p.text === activePrompt;
+      const activeBadge = isActive ? `<span style="font-size:0.6rem;color:#81c784;border:1px solid #1b5e20;border-radius:2px;padding:0 4px;">active</span>` : '';
+      return `<div style="background:#0d0d0d;border:1px solid ${isActive?'#1b5e20':'#1a1a1a'};border-radius:3px;padding:7px 10px;display:flex;flex-direction:column;gap:3px;">
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+          <span style="font-weight:600;font-size:0.75rem;color:#e0e0e0;">${_esc(p.name)}</span>
+          ${activeBadge}
+          <span style="flex:1;"></span>
+          ${isActive ? '' : `<button onclick="promptApply(${JSON.stringify(p.name)})"
+            style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.65rem;padding:2px 7px;border-radius:3px;cursor:pointer;">Apply</button>`}
+          <button onclick="promptEdit(${JSON.stringify(p.name)},${JSON.stringify(p.text)},${JSON.stringify(p.description||'')})"
+            style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.65rem;padding:2px 7px;border-radius:3px;cursor:pointer;">Edit</button>
+          <button onclick="promptDelete(${JSON.stringify(p.name)})"
+            style="background:#2a0d0d;border:1px solid #5e1b1b;color:#ef5350;font-size:0.65rem;padding:2px 6px;border-radius:3px;cursor:pointer;">✕</button>
+        </div>
+        ${p.description ? `<div style="font-size:0.68rem;color:#555;">${_esc(p.description)}</div>` : ''}
+        <div style="font-size:0.65rem;color:#333;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(p.text.substring(0,100))}${p.text.length>100?'…':''}</div>
+      </div>`;
+    }).join('');
+  }
+
+  async function promptSaveCurrent() {
+    const name = document.getElementById('prompt-save-name').value.trim();
+    const desc = document.getElementById('prompt-save-desc').value.trim();
+    const statusEl = document.getElementById('prompt-save-status');
+    if (!name) { statusEl.style.color='#ef5350'; statusEl.textContent='Name required.'; return; }
+    let activePrompt = '';
+    try { activePrompt = (await fetch('/api/config').then(r => r.json())).system_prompt || ''; } catch(_) {}
+    if (!activePrompt) { statusEl.style.color='#ef5350'; statusEl.textContent='No active system prompt.'; return; }
+    const r = await fetch('/api/prompts', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, text: activePrompt, description: desc}),
+    });
+    if (r.ok) {
+      statusEl.style.color='#81c784'; statusEl.textContent=`Saved "${name}".`;
+      document.getElementById('prompt-save-name').value = '';
+      document.getElementById('prompt-save-desc').value = '';
+      await loadPrompts();
+    } else {
+      const err = await r.json().catch(()=>({}));
+      statusEl.style.color='#ef5350'; statusEl.textContent = err.detail || 'Error';
+    }
+  }
+
+  async function promptApply(name) {
+    const r = await fetch(`/api/prompts/${encodeURIComponent(name)}/apply`, {method:'POST'});
+    if (r.ok) { await loadPrompts(); }
+    else { alert('Failed to apply prompt.'); }
+  }
+
+  function promptEdit(name, text, desc) {
+    _editingPromptName = name;
+    document.getElementById('prompt-edit-name-label').textContent = name;
+    document.getElementById('prompt-edit-text').value = text;
+    document.getElementById('prompt-edit-desc').value = desc;
+    document.getElementById('prompt-editor').style.display = 'flex';
+    document.getElementById('prompt-editor').scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  async function promptSaveEdit() {
+    const name = _editingPromptName;
+    const text = document.getElementById('prompt-edit-text').value.trim();
+    const desc = document.getElementById('prompt-edit-desc').value.trim();
+    if (!text) { alert('Text required.'); return; }
+    const r = await fetch('/api/prompts', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, text, description: desc}),
+    });
+    if (r.ok) { promptCancelEdit(); await loadPrompts(); }
+    else { alert('Save failed.'); }
+  }
+
+  function promptCancelEdit() {
+    _editingPromptName = null;
+    document.getElementById('prompt-editor').style.display = 'none';
+  }
+
+  async function promptDelete(name) {
+    if (!confirm(`Delete prompt "${name}"?`)) return;
+    await fetch(`/api/prompts/${encodeURIComponent(name)}`, {method:'DELETE'});
+    await loadPrompts();
   }
 
   // ── Benchmark panel ───────────────────────────────────────────────────────
