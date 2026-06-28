@@ -2105,6 +2105,82 @@ async def delete_snapshot_endpoint(name: str):
     return {"ok": True}
 
 
+# ── Conversation forks ───────────────────────────────────────────────────────
+
+@router.get("/api/chat/forks")
+async def list_chat_forks():
+    from core.fork_store import list_forks
+    return {"forks": await asyncio.to_thread(list_forks)}
+
+
+@router.post("/api/chat/forks")
+async def save_chat_fork(body: dict):
+    from core.fork_store import save_fork
+    from agents.chat_history import get_recent
+    label = body.get("label", "")
+    turns = await asyncio.to_thread(get_recent, 500)
+    if not turns:
+        raise HTTPException(status_code=400, detail="No chat history to fork")
+    name = await asyncio.to_thread(save_fork, label, turns)
+    return {"ok": True, "name": name, "turn_count": len(turns)}
+
+
+@router.get("/api/chat/forks/{name}")
+async def get_chat_fork(name: str):
+    from core.fork_store import get_fork
+    fork = await asyncio.to_thread(get_fork, name)
+    if fork is None:
+        raise HTTPException(status_code=404, detail="Fork not found")
+    return fork
+
+
+@router.post("/api/chat/forks/{name}/restore")
+async def restore_chat_fork(name: str):
+    from core.fork_store import get_fork, save_fork
+    from agents.chat_history import get_recent, add_message, clear
+    fork = await asyncio.to_thread(get_fork, name)
+    if fork is None:
+        raise HTTPException(status_code=404, detail="Fork not found")
+    # Auto-save current history before overwriting
+    current = await asyncio.to_thread(get_recent, 500)
+    if current:
+        await asyncio.to_thread(save_fork, "pre-restore", current)
+    await asyncio.to_thread(clear)
+    turns = fork.get("turns", [])
+    for turn in turns:
+        await asyncio.to_thread(add_message, turn["role"], turn["content"])
+    await events.emit("clear_history", {})
+    return {"ok": True, "restored": name, "turn_count": len(turns)}
+
+
+@router.delete("/api/chat/forks/{name}")
+async def delete_chat_fork(name: str):
+    from core.fork_store import delete_fork
+    deleted = await asyncio.to_thread(delete_fork, name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Fork not found")
+    return {"ok": True}
+
+
+# ── Pipeline replay ───────────────────────────────────────────────────────────
+
+@router.post("/api/pipeline/replay")
+async def pipeline_replay(body: dict):
+    from core.supervisor import run_turn
+    message = (body.get("message") or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="message required")
+    cfg = get_config()
+    messages = [
+        {"role": "system", "content": cfg.system_prompt},
+        {"role": "user", "content": message},
+    ]
+    t0 = asyncio.get_event_loop().time()
+    response, _ = await run_turn(messages)
+    latency_ms = int((asyncio.get_event_loop().time() - t0) * 1000)
+    return {"response": response, "latency_ms": latency_ms}
+
+
 # ── Git panel ─────────────────────────────────────────────────────────────────
 
 _GIT_ROOT = Path(__file__).resolve().parent.parent

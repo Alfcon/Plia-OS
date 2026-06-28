@@ -766,6 +766,8 @@
         <button class="m-nav-btn" data-section="audiodev" onclick="showMenuSection('audiodev');loadAudioDevices()">Audio Devices</button>
         <button class="m-nav-btn" data-section="audiolevel" onclick="showMenuSection('audiolevel');startAudioLevelMeter()">Audio Level</button>
         <button class="m-nav-btn" data-section="llmstream" onclick="showMenuSection('llmstream')">LLM Stream</button>
+        <button class="m-nav-btn" data-section="chatfork" onclick="showMenuSection('chatfork');loadChatForks()">Chat Forks</button>
+        <button class="m-nav-btn" data-section="replay" onclick="showMenuSection('replay');loadReplayHistory()">Replay</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1859,6 +1861,39 @@
           </div>
           <div id="llms-meta" style="font-size:0.68rem;color:#444;flex-shrink:0;min-height:14px;"></div>
           <div id="llms-output" style="flex:1;min-height:120px;overflow-y:auto;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;padding:8px;font-size:0.75rem;font-family:monospace;color:#e0e0e0;white-space:pre-wrap;word-break:break-word;"></div>
+        </div>
+
+        <!-- Chat Forks -->
+        <div id="m-section-chatfork" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Save and restore named snapshots of chat history. Restoring auto-saves current history first.</div>
+          <div style="flex-shrink:0;display:flex;gap:5px;align-items:center;">
+            <input id="fork-label" type="text" placeholder="Label (optional)"
+              style="flex:1;background:#111;border:1px solid #333;color:#ccc;border-radius:3px;padding:3px 7px;font-size:0.75rem;"
+              onkeydown="if(event.key==='Enter')saveChatFork()">
+            <button onclick="saveChatFork()"
+              style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.7rem;padding:3px 12px;border-radius:3px;cursor:pointer;">Fork Now</button>
+            <button onclick="loadChatForks()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
+          </div>
+          <div id="fork-status" style="font-size:0.68rem;color:#555;flex-shrink:0;min-height:14px;"></div>
+          <div id="fork-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;"></div>
+        </div>
+
+        <!-- Pipeline Replay -->
+        <div id="m-section-replay" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Re-run any message through the pipeline with the current config. Result is added to chat history.</div>
+          <div style="flex-shrink:0;display:flex;flex-direction:column;gap:5px;">
+            <textarea id="replay-msg" rows="3" placeholder="Message to replay…"
+              style="width:100%;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:6px 8px;font-size:0.75rem;font-family:monospace;resize:vertical;box-sizing:border-box;"
+              onkeydown="if(event.ctrlKey&&event.key==='Enter')runReplay()"></textarea>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button onclick="runReplay()" id="replay-run-btn"
+                style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.73rem;padding:5px 14px;border-radius:3px;cursor:pointer;">▶ Replay</button>
+              <span id="replay-meta" style="font-size:0.68rem;color:#444;"></span>
+            </div>
+          </div>
+          <div style="font-size:0.63rem;color:#333;flex-shrink:0;">Recent turns — click to pre-fill:</div>
+          <div id="replay-history" style="flex-shrink:0;display:flex;flex-direction:column;gap:3px;max-height:100px;overflow-y:auto;"></div>
+          <div id="replay-output" style="flex:1;min-height:80px;overflow-y:auto;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;padding:8px;font-size:0.75rem;font-family:monospace;color:#e0e0e0;white-space:pre-wrap;word-break:break-word;display:none;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -6857,6 +6892,99 @@
   function llmsClear() {
     document.getElementById('llms-output').textContent = '';
     document.getElementById('llms-meta').textContent = '';
+  }
+
+  // ── Chat Forks ────────────────────────────────────────────────────────────
+
+  async function loadChatForks() {
+    const r = await fetch('/api/chat/forks').then(x => x.json()).catch(() => null);
+    const el = document.getElementById('fork-list');
+    if (!r) { el.innerHTML = '<div style="padding:6px;color:#555;">Error loading forks</div>'; return; }
+    if (!r.forks.length) { el.innerHTML = '<div style="padding:6px;color:#333;">No forks yet.</div>'; return; }
+    el.innerHTML = r.forks.map(f => {
+      const d = new Date(f.created_at * 1000);
+      const ts = d.toLocaleString();
+      const label = f.label ? `<b>${_esc(f.label)}</b>` : `<span style="color:#333">${_esc(f.name)}</span>`;
+      return `<div style="padding:5px 8px;border-bottom:1px solid #111;display:flex;align-items:center;gap:6px;">
+        <div style="flex:1;min-width:0;">
+          <div>${label}</div>
+          <div style="font-size:0.65rem;color:#444;">${ts} · ${f.turn_count} turns</div>
+        </div>
+        <button onclick="restoreChatFork('${_esc(f.name)}')"
+          style="background:#0d1a2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.65rem;padding:2px 8px;border-radius:3px;cursor:pointer;">Restore</button>
+        <button onclick="deleteChatFork('${_esc(f.name)}')"
+          style="background:none;border:none;color:#555;font-size:0.65rem;cursor:pointer;">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  async function saveChatFork() {
+    const label = document.getElementById('fork-label').value.trim();
+    const st = document.getElementById('fork-status');
+    st.textContent = 'Saving…';
+    const r = await fetch('/api/chat/forks', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({label}),
+    }).then(x => x.json()).catch(() => null);
+    if (!r || !r.ok) { st.textContent = r?.detail || 'Error'; return; }
+    st.textContent = `Saved ${r.turn_count} turns as ${r.name}`;
+    document.getElementById('fork-label').value = '';
+    await loadChatForks();
+  }
+
+  async function restoreChatFork(name) {
+    const st = document.getElementById('fork-status');
+    st.textContent = 'Restoring…';
+    const r = await fetch(`/api/chat/forks/${encodeURIComponent(name)}/restore`, {
+      method: 'POST',
+    }).then(x => x.json()).catch(() => null);
+    if (!r || !r.ok) { st.textContent = r?.detail || 'Error'; return; }
+    st.textContent = `Restored ${r.turn_count} turns from ${r.restored}`;
+    await loadChatForks();
+  }
+
+  async function deleteChatFork(name) {
+    const r = await fetch(`/api/chat/forks/${encodeURIComponent(name)}`, {method: 'DELETE'})
+      .then(x => x.json()).catch(() => null);
+    if (r && r.ok) await loadChatForks();
+  }
+
+  // ── Pipeline Replay ───────────────────────────────────────────────────────
+
+  async function loadReplayHistory() {
+    const r = await fetch('/api/history').then(x => x.json()).catch(() => null);
+    const el = document.getElementById('replay-history');
+    if (!r || !r.messages) { el.innerHTML = ''; return; }
+    const userMsgs = r.messages.filter(m => m.role === 'user').slice(-10).reverse();
+    el.innerHTML = userMsgs.map(m => {
+      const preview = m.content.length > 80 ? m.content.slice(0,80)+'…' : m.content;
+      return `<div onclick="document.getElementById('replay-msg').value=${JSON.stringify(m.content)}"
+        style="padding:3px 7px;border:1px solid #1a1a1a;border-radius:3px;cursor:pointer;color:#888;font-size:0.68rem;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+        title="${_esc(m.content)}">${_esc(preview)}</div>`;
+    }).join('');
+  }
+
+  async function runReplay() {
+    const message = document.getElementById('replay-msg').value.trim();
+    if (!message) return;
+    const btn = document.getElementById('replay-run-btn');
+    const meta = document.getElementById('replay-meta');
+    const out = document.getElementById('replay-output');
+    btn.disabled = true;
+    meta.textContent = 'Running…';
+    out.style.display = 'none';
+    const r = await fetch('/api/pipeline/replay', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message}),
+    }).then(x => x.json()).catch(e => ({error: e.message}));
+    btn.disabled = false;
+    if (r.error || r.detail) {
+      meta.textContent = 'Error: ' + (r.error || r.detail);
+      return;
+    }
+    meta.textContent = `${r.latency_ms}ms`;
+    out.textContent = r.response;
+    out.style.display = 'block';
   }
 
   // ── Benchmark panel ───────────────────────────────────────────────────────
