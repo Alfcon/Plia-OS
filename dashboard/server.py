@@ -4141,6 +4141,182 @@ async def docker_start(container_id: str):
     return await _docker_action(container_id, "start")
 
 
+# ── Systemd services ──────────────────────────────────────────────────────────
+
+async def _systemctl_action(name: str, action: str) -> dict:
+    safe_name = re.sub(r"[^a-zA-Z0-9@._\-]", "", name)
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid service name")
+    proc = await asyncio.create_subprocess_exec(
+        "systemctl", action, safe_name,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise HTTPException(status_code=500, detail=stderr.decode(errors="replace").strip())
+    return {"ok": True, "action": action, "service": safe_name}
+
+
+@router.get("/api/services")
+async def list_services(filter: str = ""):
+    proc = await asyncio.create_subprocess_exec(
+        "systemctl", "list-units", "--no-pager", "--no-legend",
+        "--type=service", "--all", "--output=json",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise HTTPException(
+            status_code=503,
+            detail=f"systemctl unavailable: {stderr.decode(errors='replace').strip()}",
+        )
+    try:
+        units = json.loads(stdout.decode(errors="replace"))
+    except Exception:
+        units = []
+    if filter:
+        fl = filter.lower()
+        units = [u for u in units if fl in (u.get("unit", "") + u.get("description", "")).lower()]
+    return {"units": units, "total": len(units)}
+
+
+@router.post("/api/services/{name}/restart")
+async def service_restart(name: str):
+    return await _systemctl_action(name, "restart")
+
+
+@router.post("/api/services/{name}/start")
+async def service_start(name: str):
+    return await _systemctl_action(name, "start")
+
+
+@router.post("/api/services/{name}/stop")
+async def service_stop(name: str):
+    return await _systemctl_action(name, "stop")
+
+
+# ── QR code ───────────────────────────────────────────────────────────────────
+
+@router.post("/api/qr")
+async def generate_qr(body: dict):
+    import base64 as _b64
+    import os as _os
+    import tempfile as _tmp
+    text = (body.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="text required")
+    size = min(max(int(body.get("size", 8)), 1), 50)
+
+    with _tmp.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        fname = f.name
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "qrencode", "-o", fname, "-s", str(size), "--", text,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await proc.communicate()
+        if proc.returncode == 0 and _os.path.getsize(fname) > 0:
+            data = Path(fname).read_bytes()
+            return {"image": _b64.b64encode(data).decode(), "size": len(data)}
+    finally:
+        try:
+            _os.unlink(fname)
+        except Exception:
+            pass
+
+    try:
+        import qrcode as _qrcode
+        import io as _io
+        qr = _qrcode.QRCode(box_size=size)
+        qr.add_data(text)
+        qr.make(fit=True)
+        img = qr.make_image()
+        buf = _io.BytesIO()
+        img.save(buf, format="PNG")
+        data = buf.getvalue()
+        return {"image": _b64.b64encode(data).decode(), "size": len(data)}
+    except ImportError:
+        pass
+
+    raise HTTPException(
+        status_code=503,
+        detail="No QR tool available (install qrencode or: pip install 'qrcode[pil]')",
+    )
+
+
+# ── File watcher (SSE) ────────────────────────────────────────────────────────
+
+@router.get("/api/watch")
+async def file_watch_sse(path: str = "/tmp", request: Request = None):
+    async def event_gen():
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "inotifywait", "-m", "-r", "--format", "%e\t%w%f",
+                "-e", "create,delete,modify,moved_to,moved_from",
+                path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+        except FileNotFoundError:
+            yield f"data: {json.dumps({'error': 'inotifywait not found; install inotify-tools'})}\n\n"
+            return
+        try:
+            while True:
+                if request and await request.is_disconnected():
+                    break
+                try:
+                    line = await asyncio.wait_for(proc.stdout.readline(), timeout=30.0)
+                except asyncio.TimeoutError:
+                    yield f"data: {json.dumps({'ping': True})}\n\n"
+                    continue
+                if not line:
+                    break
+                parts = line.decode(errors="replace").strip().split("\t", 1)
+                evt = parts[0] if parts else ""
+                fpath = parts[1] if len(parts) > 1 else ""
+                yield f"data: {json.dumps({'event': evt, 'path': fpath})}\n\n"
+        finally:
+            try:
+                proc.kill()
+                await proc.communicate()
+            except Exception:
+                pass
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
+# ── Text diff ─────────────────────────────────────────────────────────────────
+
+@router.post("/api/diff")
+async def text_diff(body: dict):
+    import difflib
+    a = body.get("a") or ""
+    b = body.get("b") or ""
+    fname_a = body.get("filename_a", "a")
+    fname_b = body.get("filename_b", "b")
+    a_lines = a.splitlines(keepends=True)
+    b_lines = b.splitlines(keepends=True)
+    raw = list(difflib.unified_diff(a_lines, b_lines, fromfile=fname_a, tofile=fname_b))
+    lines = []
+    for line in raw:
+        if line.startswith("+") and not line.startswith("+++"):
+            lines.append({"type": "add", "text": line[1:]})
+        elif line.startswith("-") and not line.startswith("---"):
+            lines.append({"type": "remove", "text": line[1:]})
+        elif line.startswith("@@"):
+            lines.append({"type": "header", "text": line})
+        else:
+            lines.append({"type": "context", "text": line[1:] if line.startswith(" ") else line})
+    return {
+        "unified": "".join(raw),
+        "lines": lines,
+        "added": sum(1 for l in lines if l["type"] == "add"),
+        "removed": sum(1 for l in lines if l["type"] == "remove"),
+    }
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()

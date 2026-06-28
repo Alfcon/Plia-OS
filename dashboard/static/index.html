@@ -805,6 +805,10 @@
         <button class="m-nav-btn" data-section="shellrun" onclick="showMenuSection('shellrun');loadShellHistory()">Shell</button>
         <button class="m-nav-btn" data-section="httpprobe" onclick="showMenuSection('httpprobe');loadProbeHistory()">HTTP Probe</button>
         <button class="m-nav-btn" data-section="docker" onclick="showMenuSection('docker');loadDocker()">Docker</button>
+        <button class="m-nav-btn" data-section="services" onclick="showMenuSection('services');loadServices()">Services</button>
+        <button class="m-nav-btn" data-section="qrcode" onclick="showMenuSection('qrcode')">QR Code</button>
+        <button class="m-nav-btn" data-section="filewatcher" onclick="showMenuSection('filewatcher')">File Watch</button>
+        <button class="m-nav-btn" data-section="textdiff" onclick="showMenuSection('textdiff')">Diff</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2491,6 +2495,61 @@
           </div>
           <div id="docker-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
           <div id="docker-status" style="font-size:0.7rem;color:#888;flex-shrink:0;min-height:1rem;"></div>
+        </div>
+
+        <!-- Systemd Services -->
+        <div id="m-section-services" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">List and control systemd services.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;flex-wrap:wrap;">
+            <input id="svc-filter" type="text" placeholder="filter…" style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 8px;font-size:0.72rem;" oninput="loadServices()">
+            <button onclick="loadServices()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻</button>
+            <span id="svc-total" style="font-size:0.68rem;color:#555;"></span>
+          </div>
+          <div id="svc-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;font-size:0.68rem;font-family:monospace;"></div>
+          <div id="svc-status" style="font-size:0.7rem;color:#888;flex-shrink:0;min-height:1rem;"></div>
+        </div>
+
+        <!-- QR Code -->
+        <div id="m-section-qrcode" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Generate a QR code from any text or URL.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;flex-wrap:wrap;">
+            <input id="qr-text" type="text" placeholder="https://… or any text"
+              style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 8px;font-size:0.72rem;"
+              onkeydown="if(event.key==='Enter')generateQR()">
+            <input type="number" id="qr-size" value="8" min="1" max="50" style="width:45px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 5px;font-size:0.72rem;text-align:center;" title="pixel size per cell">
+            <button onclick="generateQR()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Generate</button>
+            <button id="qr-save-btn" onclick="saveQR()" style="display:none;background:none;border:1px solid #333;color:#aaa;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">⬇ PNG</button>
+          </div>
+          <div id="qr-status" style="font-size:0.68rem;color:#555;flex-shrink:0;min-height:1rem;"></div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0;">
+            <img id="qr-img" style="display:none;image-rendering:pixelated;max-width:100%;max-height:300px;" alt="QR code">
+          </div>
+        </div>
+
+        <!-- File Watcher -->
+        <div id="m-section-filewatcher" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Stream filesystem events via inotifywait.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;flex-wrap:wrap;">
+            <input id="watch-path" type="text" value="/tmp" style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 8px;font-size:0.72rem;">
+            <button onclick="startFileWatch()" style="background:#0a1a0a;border:1px solid #2e4d2e;color:#a5d6a7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;" id="watch-start-btn">▶ Watch</button>
+            <button onclick="stopFileWatch()" style="display:none;background:#1a0a0a;border:1px solid #4d2e2e;color:#ef9a9a;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;" id="watch-stop-btn">■ Stop</button>
+          </div>
+          <span id="watch-status" style="font-size:0.68rem;color:#555;flex-shrink:0;"></span>
+          <div id="watch-log" style="flex:1;min-height:0;overflow-y:auto;font-size:0.68rem;font-family:monospace;border:1px solid #1a1a1a;border-radius:3px;padding:4px;display:flex;flex-direction:column-reverse;gap:1px;max-height:300px;"></div>
+        </div>
+
+        <!-- Text Diff -->
+        <div id="m-section-textdiff" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Compare two texts. Unified diff with coloured lines.</div>
+          <div style="display:flex;gap:6px;flex:0 0 auto;min-height:0;">
+            <textarea id="diff-a" placeholder="Original (A)…" rows="6" style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:6px;font-size:0.68rem;font-family:monospace;resize:none;"></textarea>
+            <textarea id="diff-b" placeholder="Modified (B)…" rows="6" style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:6px;font-size:0.68rem;font-family:monospace;resize:none;"></textarea>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <button onclick="runDiff()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Diff</button>
+            <span id="diff-summary" style="font-size:0.68rem;color:#555;"></span>
+          </div>
+          <div id="diff-output" style="flex:1;min-height:0;overflow-y:auto;font-size:0.68rem;font-family:monospace;border:1px solid #1a1a1a;border-radius:3px;padding:4px;display:flex;flex-direction:column;gap:0;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -7516,6 +7575,151 @@
       else { const e = await r.json(); status.textContent = `Error: ${e.detail}`; }
       await loadDocker();
     } catch(e) { status.textContent = 'Network error'; }
+  }
+
+  // ── Systemd Services ─────────────────────────────────────────────────────
+
+  async function loadServices() {
+    const filter = document.getElementById('svc-filter')?.value || '';
+    const list = document.getElementById('svc-list');
+    const total = document.getElementById('svc-total');
+    try {
+      const r = await fetch(`/api/services?filter=${encodeURIComponent(filter)}`);
+      if (!r.ok) {
+        const e = await r.json();
+        list.innerHTML = `<div style="color:#ef9a9a;">${_esc(e.detail)}</div>`;
+        return;
+      }
+      const d = await r.json();
+      total.textContent = `${d.total} units`;
+      list.innerHTML = d.units.map(u => {
+        const active = (u.active || '').toLowerCase() === 'active';
+        const name = u.unit || '';
+        return `<div style="display:flex;align-items:center;gap:6px;padding:3px 4px;background:#0a0a0a;border-radius:2px;flex-wrap:wrap;">
+          <span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:${active?'#a5d6a7':'#555'};"></span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e0e0e0;">${_esc(name)}</span>
+          <span style="color:#555;font-size:0.65rem;flex-shrink:0;">${_esc(u.sub||'')}</span>
+          <div style="display:flex;gap:3px;flex-shrink:0;">
+            <button onclick="svcAction(${JSON.stringify(name).replace(/</g,'&lt;')},'start')" style="background:none;border:1px solid #2e4d2e;color:#a5d6a7;font-size:0.6rem;padding:1px 5px;border-radius:2px;cursor:pointer;">▶</button>
+            <button onclick="svcAction(${JSON.stringify(name).replace(/</g,'&lt;')},'restart')" style="background:none;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.6rem;padding:1px 5px;border-radius:2px;cursor:pointer;">⟳</button>
+            <button onclick="svcAction(${JSON.stringify(name).replace(/</g,'&lt;')},'stop')" style="background:none;border:1px solid #4d2e2e;color:#ef9a9a;font-size:0.6rem;padding:1px 5px;border-radius:2px;cursor:pointer;">■</button>
+          </div>
+        </div>`;
+      }).join('') || '<div style="color:#444;font-size:0.68rem;">No services found</div>';
+    } catch(e) { list.textContent = 'Error'; }
+  }
+
+  async function svcAction(name, action) {
+    const status = document.getElementById('svc-status');
+    status.textContent = `${action} ${name}…`;
+    try {
+      const r = await fetch(`/api/services/${encodeURIComponent(name)}/${action}`, {method:'POST'});
+      if (r.ok) { status.textContent = `${action} OK`; }
+      else { const e = await r.json(); status.textContent = `Error: ${e.detail}`; }
+      await loadServices();
+    } catch(e) { status.textContent = 'Network error'; }
+  }
+
+  // ── QR Code ───────────────────────────────────────────────────────────────
+
+  let _qrData = null;
+
+  async function generateQR() {
+    const text = document.getElementById('qr-text').value.trim();
+    const size = parseInt(document.getElementById('qr-size').value || '8', 10);
+    const status = document.getElementById('qr-status');
+    const img = document.getElementById('qr-img');
+    const saveBtn = document.getElementById('qr-save-btn');
+    if (!text) return;
+    status.textContent = 'Generating…';
+    img.style.display = 'none';
+    saveBtn.style.display = 'none';
+    _qrData = null;
+    try {
+      const r = await fetch('/api/qr', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({text, size}),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        _qrData = d.image;
+        img.src = 'data:image/png;base64,' + d.image;
+        img.style.display = 'block';
+        saveBtn.style.display = 'inline-block';
+        status.textContent = `${(d.size/1024).toFixed(1)} KB`;
+      } else {
+        const e = await r.json();
+        status.textContent = `Error: ${e.detail}`;
+      }
+    } catch(e) { status.textContent = 'Failed'; }
+  }
+
+  function saveQR() {
+    if (!_qrData) return;
+    const a = document.createElement('a');
+    a.href = 'data:image/png;base64,' + _qrData;
+    a.download = `qr_${Date.now()}.png`;
+    a.click();
+  }
+
+  // ── File Watcher ──────────────────────────────────────────────────────────
+
+  let _watchES = null;
+
+  function startFileWatch() {
+    const path = document.getElementById('watch-path').value.trim() || '/tmp';
+    const log = document.getElementById('watch-log');
+    const status = document.getElementById('watch-status');
+    stopFileWatch();
+    log.innerHTML = '';
+    status.textContent = `Watching ${path}…`;
+    document.getElementById('watch-start-btn').style.display = 'none';
+    document.getElementById('watch-stop-btn').style.display = 'inline-block';
+    _watchES = new EventSource(`/api/watch?path=${encodeURIComponent(path)}`);
+    _watchES.onmessage = (e) => {
+      const d = JSON.parse(e.data);
+      if (d.ping) return;
+      if (d.error) { status.textContent = d.error; stopFileWatch(); return; }
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:1px 0;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      div.textContent = `${d.event}  ${d.path}`;
+      log.prepend(div);
+      if (log.children.length > 200) log.lastChild.remove();
+    };
+    _watchES.onerror = () => { status.textContent = 'Connection lost'; stopFileWatch(); };
+  }
+
+  function stopFileWatch() {
+    if (_watchES) { _watchES.close(); _watchES = null; }
+    document.getElementById('watch-start-btn').style.display = 'inline-block';
+    document.getElementById('watch-stop-btn').style.display = 'none';
+    const status = document.getElementById('watch-status');
+    if (status) status.textContent = 'Stopped';
+  }
+
+  // ── Text Diff ─────────────────────────────────────────────────────────────
+
+  async function runDiff() {
+    const a = document.getElementById('diff-a').value;
+    const b = document.getElementById('diff-b').value;
+    const output = document.getElementById('diff-output');
+    const summary = document.getElementById('diff-summary');
+    output.innerHTML = '';
+    summary.textContent = '';
+    try {
+      const r = await fetch('/api/diff', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({a, b}),
+      });
+      if (!r.ok) { output.textContent = 'Error'; return; }
+      const d = await r.json();
+      summary.textContent = `+${d.added} −${d.removed}`;
+      output.innerHTML = d.lines.map(l => {
+        const colors = {add:'#0d2a0d', remove:'#2a0d0d', header:'#0d1b2a', context:''};
+        const text_colors = {add:'#a5d6a7', remove:'#ef9a9a', header:'#4fc3f7', context:'#666'};
+        return `<div style="background:${colors[l.type]||''};color:${text_colors[l.type]||'#666'};padding:0 4px;white-space:pre;overflow:hidden;text-overflow:ellipsis;">${_esc(l.text)}</div>`;
+      }).join('');
+    } catch(e) { output.textContent = 'Error'; }
   }
 
   // ── Tool playground ──────────────────────────────────────────────────────
