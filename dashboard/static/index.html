@@ -797,6 +797,10 @@
         <button class="m-nav-btn" data-section="notify" onclick="showMenuSection('notify');loadNotifyHistory()">Notify</button>
         <button class="m-nav-btn" data-section="logtail" onclick="showMenuSection('logtail');startLogTail()">Log Tail</button>
         <button class="m-nav-btn" data-section="benchchart" onclick="showMenuSection('benchchart');loadBenchChart()">Bench Chart</button>
+        <button class="m-nav-btn" data-section="clipboard" onclick="showMenuSection('clipboard');loadClipboard()">Clipboard</button>
+        <button class="m-nav-btn" data-section="audioupload" onclick="showMenuSection('audioupload')">Audio Upload</button>
+        <button class="m-nav-btn" data-section="watchdog" onclick="showMenuSection('watchdog');loadWatchdog()">Watchdog</button>
+        <button class="m-nav-btn" data-section="chatexport" onclick="showMenuSection('chatexport');loadChatExportCount()">Chat Export</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2372,6 +2376,64 @@
           </div>
           <div id="bulk-rem-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;font-size:0.72rem;font-family:monospace;"></div>
           <div id="bulk-rem-status" style="font-size:0.7rem;color:#888;flex-shrink:0;min-height:1rem;"></div>
+        </div>
+
+        <!-- Clipboard -->
+        <div id="m-section-clipboard" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Read or write the system clipboard via xclip/xsel.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button onclick="loadClipboard()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">↻ Read</button>
+            <button onclick="writeClipboard()" style="background:#0a1a0a;border:1px solid #2e4d2e;color:#a5d6a7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">⬆ Write</button>
+          </div>
+          <textarea id="clipboard-text" rows="6" style="flex:1;min-height:0;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:6px;font-size:0.72rem;font-family:monospace;resize:none;" placeholder="Clipboard content…"></textarea>
+          <div id="clipboard-status" style="font-size:0.7rem;color:#888;flex-shrink:0;min-height:1rem;"></div>
+        </div>
+
+        <!-- Audio Upload -->
+        <div id="m-section-audioupload" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Upload a WAV/MP3/OGG/FLAC file. Saved to uploads/; play back or send to transcriber.</div>
+          <div id="audioupload-drop" ondragover="event.preventDefault()" ondrop="handleAudioDrop(event)"
+            style="flex-shrink:0;border:2px dashed #333;border-radius:4px;padding:20px;text-align:center;color:#555;font-size:0.72rem;cursor:pointer;"
+            onclick="document.getElementById('audioupload-file').click()">
+            Drag &amp; drop audio file or click to browse
+          </div>
+          <input type="file" id="audioupload-file" accept=".wav,.mp3,.ogg,.flac" style="display:none" onchange="handleAudioFileSelect(this)">
+          <div id="audioupload-status" style="font-size:0.7rem;color:#888;flex-shrink:0;min-height:1rem;"></div>
+          <audio id="audioupload-player" controls style="display:none;width:100%;flex-shrink:0;" preload="none"></audio>
+          <div id="audioupload-actions" style="display:none;flex-shrink:0;display:flex;gap:6px;flex-wrap:wrap;">
+            <button id="audioupload-transcribe-btn" onclick="transcribeUploadedAudio()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">→ Transcribe</button>
+          </div>
+          <div id="audioupload-transcript" style="font-size:0.72rem;color:#aaa;font-family:monospace;min-height:1rem;white-space:pre-wrap;"></div>
+        </div>
+
+        <!-- Watchdog -->
+        <div id="m-section-watchdog" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Background asyncio task monitor. Registered tasks can be restarted.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button onclick="loadWatchdog()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻ Refresh</button>
+            <span id="watchdog-total" style="font-size:0.68rem;color:#555;margin-left:auto;"></span>
+          </div>
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Registered tasks</div>
+          <div id="watchdog-named" style="flex-shrink:0;display:flex;flex-wrap:wrap;gap:6px;"></div>
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">All asyncio tasks</div>
+          <div id="watchdog-list" style="flex:1;min-height:0;overflow-y:auto;font-size:0.68rem;font-family:monospace;color:#aaa;display:flex;flex-direction:column;gap:2px;"></div>
+        </div>
+
+        <!-- Chat Export -->
+        <div id="m-section-chatexport" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Download full chat history. Formats: JSON, Markdown, PDF.</div>
+          <div style="flex-shrink:0;display:flex;align-items:center;gap:10px;border:1px solid #1a1a1a;border-radius:3px;padding:10px;">
+            <div>
+              <div id="chatexport-count" style="font-size:1.6rem;color:#4fc3f7;font-variant-numeric:tabular-nums;">—</div>
+              <div style="font-size:0.65rem;color:#555;">messages</div>
+            </div>
+            <button onclick="loadChatExportCount()" style="background:none;border:none;color:#555;font-size:0.72rem;cursor:pointer;margin-left:auto;">↻</button>
+          </div>
+          <div style="flex-shrink:0;display:flex;gap:6px;flex-wrap:wrap;">
+            <a id="chatexport-json-btn" href="/api/history/export?fmt=json" download style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:6px 16px;border-radius:3px;cursor:pointer;text-decoration:none;">⬇ JSON</a>
+            <a href="/api/history/export?fmt=markdown" download style="background:#0a1a0a;border:1px solid #2e4d2e;color:#a5d6a7;font-size:0.72rem;padding:6px 16px;border-radius:3px;cursor:pointer;text-decoration:none;">⬇ Markdown</a>
+            <a href="/api/history/export/pdf" download style="background:#1a0a1a;border:1px solid #4d2e4d;color:#ce93d8;font-size:0.72rem;padding:6px 16px;border-radius:3px;cursor:pointer;text-decoration:none;">⬇ PDF</a>
+          </div>
         </div>
 
         <!-- Wake Word Test -->
@@ -7079,6 +7141,154 @@
       status.textContent = `Deleted ${d.deleted} done reminder(s).`;
       await loadBulkReminders();
     } else { status.textContent = `Error: ${r.status}`; }
+  }
+
+  // ── Clipboard ────────────────────────────────────────────────────────────
+
+  async function loadClipboard() {
+    const status = document.getElementById('clipboard-status');
+    status.textContent = 'Reading…';
+    try {
+      const r = await fetch('/api/clipboard');
+      if (r.ok) {
+        const d = await r.json();
+        document.getElementById('clipboard-text').value = d.text;
+        status.textContent = `${d.text.length} chars`;
+      } else {
+        const e = await r.json();
+        status.textContent = `Error: ${e.detail}`;
+      }
+    } catch(e) { status.textContent = 'Network error'; }
+  }
+
+  async function writeClipboard() {
+    const text = document.getElementById('clipboard-text').value;
+    const status = document.getElementById('clipboard-status');
+    status.textContent = 'Writing…';
+    try {
+      const r = await fetch('/api/clipboard', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({text}),
+      });
+      if (r.ok) { status.textContent = `Written (${text.length} chars)`; }
+      else { const e = await r.json(); status.textContent = `Error: ${e.detail}`; }
+    } catch(e) { status.textContent = 'Network error'; }
+  }
+
+  // ── Audio Upload ──────────────────────────────────────────────────────────
+
+  let _uploadedClipName = null;
+
+  function handleAudioDrop(event) {
+    event.preventDefault();
+    const file = event.dataTransfer.files[0];
+    if (file) _doAudioUpload(file);
+  }
+
+  function handleAudioFileSelect(input) {
+    const file = input.files[0];
+    if (file) _doAudioUpload(file);
+  }
+
+  async function _doAudioUpload(file) {
+    const status = document.getElementById('audioupload-status');
+    const player = document.getElementById('audioupload-player');
+    const actions = document.getElementById('audioupload-actions');
+    status.textContent = `Uploading ${file.name}…`;
+    player.style.display = 'none';
+    actions.style.display = 'none';
+    document.getElementById('audioupload-transcript').textContent = '';
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const r = await fetch('/api/clips/upload', {method: 'POST', body: form});
+      if (r.ok) {
+        const d = await r.json();
+        _uploadedClipName = d.filename;
+        status.textContent = `Uploaded: ${d.filename} (${(d.size/1024).toFixed(1)} KB)`;
+        player.src = `/api/clips/${encodeURIComponent(d.filename)}`;
+        player.style.display = 'block';
+        actions.style.display = 'flex';
+      } else {
+        const e = await r.json();
+        status.textContent = `Error: ${e.detail}`;
+      }
+    } catch(e) { status.textContent = 'Upload failed'; }
+  }
+
+  async function transcribeUploadedAudio() {
+    if (!_uploadedClipName) return;
+    const status = document.getElementById('audioupload-status');
+    const transcript = document.getElementById('audioupload-transcript');
+    status.textContent = 'Fetching audio…';
+    try {
+      const clipR = await fetch(`/api/clips/${encodeURIComponent(_uploadedClipName)}`);
+      if (!clipR.ok) { status.textContent = 'Failed to fetch clip'; return; }
+      const blob = await clipR.blob();
+      const arr = await blob.arrayBuffer();
+      status.textContent = 'Transcribing…';
+      const r = await fetch('/api/voice/transcribe', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/octet-stream'},
+        body: arr,
+      });
+      if (r.ok) {
+        const d = await r.json();
+        transcript.textContent = d.text || '(empty)';
+        status.textContent = 'Transcription complete';
+      } else {
+        const e = await r.json();
+        status.textContent = `Transcribe error: ${e.detail}`;
+      }
+    } catch(e) { status.textContent = 'Transcribe failed'; }
+  }
+
+  // ── Watchdog ──────────────────────────────────────────────────────────────
+
+  async function loadWatchdog() {
+    const list = document.getElementById('watchdog-list');
+    const named = document.getElementById('watchdog-named');
+    const total = document.getElementById('watchdog-total');
+    try {
+      const r = await fetch('/api/watchdog');
+      if (!r.ok) { list.textContent = 'Error'; return; }
+      const d = await r.json();
+      total.textContent = `${d.total} tasks`;
+      named.innerHTML = Object.entries(d.named).map(([name, info]) =>
+        `<span style="display:inline-flex;align-items:center;gap:4px;background:#111;border:1px solid ${info.running?'#2e4d2e':'#4d2e2e'};border-radius:3px;padding:3px 8px;font-size:0.68rem;font-family:monospace;">
+          <span style="width:6px;height:6px;border-radius:50%;background:${info.running?'#a5d6a7':'#ef9a9a'};"></span>
+          ${_esc(name)}
+          <button onclick="restartWatchdogTask('${_esc(name)}')" style="background:none;border:none;color:#555;font-size:0.65rem;cursor:pointer;padding:0 2px;">⟳</button>
+        </span>`
+      ).join('') || '<span style="font-size:0.68rem;color:#444;">none registered</span>';
+      list.innerHTML = d.tasks.map(t =>
+        `<div style="display:flex;align-items:center;gap:6px;padding:1px 0;">
+          <span style="width:5px;height:5px;border-radius:50%;background:${t.done?'#555':'#4fc3f7'};flex-shrink:0;"></span>
+          <span style="color:${t.done?'#444':'#888'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(t.name)}</span>
+        </div>`
+      ).join('');
+    } catch(e) { list.textContent = 'Error'; }
+  }
+
+  async function restartWatchdogTask(name) {
+    const r = await fetch(`/api/watchdog/restart/${encodeURIComponent(name)}`, {method:'POST'});
+    await loadWatchdog();
+  }
+
+  // ── Chat Export ───────────────────────────────────────────────────────────
+
+  async function loadChatExportCount() {
+    const el = document.getElementById('chatexport-count');
+    try {
+      const r = await fetch('/api/history?n=1');
+      if (r.ok) {
+        const d = await r.json();
+        const count = d.messages ? d.messages.length : '?';
+        el.textContent = count;
+        const r2 = await fetch('/api/history?n=10000');
+        if (r2.ok) { const d2 = await r2.json(); el.textContent = d2.messages ? d2.messages.length : '?'; }
+      }
+    } catch(e) { el.textContent = '?'; }
   }
 
   // ── Tool playground ──────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import asyncio
 import json
 import dataclasses
 import logging
+import re
 import shutil
 import threading
 import numpy as np
@@ -2346,6 +2347,21 @@ async def list_clips():
     return {"clips": clips}
 
 
+@router.post("/api/clips/upload")
+async def upload_clip(file: UploadFile = File(...)):
+    import time as _t
+    allowed = {".wav", ".mp3", ".ogg", ".flac"}
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in allowed:
+        raise HTTPException(status_code=415, detail=f"Unsupported format; allowed: {', '.join(sorted(allowed))}")
+    ts = int(_t.time())
+    safe_orig = re.sub(r"[^a-zA-Z0-9._-]", "_", Path(file.filename or "unnamed").name)
+    dest = UPLOADS_DIR / f"upload_{ts}_{safe_orig}"
+    data = await file.read()
+    dest.write_bytes(data)
+    return {"ok": True, "filename": dest.name, "size": len(data)}
+
+
 @router.get("/api/clips/{filename}")
 async def serve_clip(filename: str):
     try:
@@ -3862,6 +3878,86 @@ async def benchmark_chart_data(n: int = 50):
         "tokens_per_sec": [h["tokens_per_sec"] for h in history],
         "models": [h["model"] for h in history],
     }
+
+
+# ── Clipboard ────────────────────────────────────────────────────────────────
+
+async def _run_clip_proc(*args, stdin: bytes | None = None) -> tuple[int, str]:
+    proc = await asyncio.create_subprocess_exec(
+        *args,
+        stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate(input=stdin)
+    return proc.returncode, stdout.decode(errors="replace").strip()
+
+
+@router.get("/api/clipboard")
+async def read_clipboard():
+    rc, text = await _run_clip_proc("xclip", "-o", "-selection", "clipboard")
+    if rc != 0:
+        rc, text = await _run_clip_proc("xsel", "--clipboard", "--output")
+    if rc != 0:
+        raise HTTPException(status_code=503, detail="No clipboard tool available (install xclip or xsel)")
+    return {"text": text}
+
+
+@router.post("/api/clipboard")
+async def write_clipboard(body: dict):
+    text = body.get("text", "")
+    encoded = text.encode()
+    rc, _ = await _run_clip_proc("xclip", "-i", "-selection", "clipboard", stdin=encoded)
+    if rc != 0:
+        rc, _ = await _run_clip_proc("xsel", "--clipboard", "--input", stdin=encoded)
+    if rc != 0:
+        raise HTTPException(status_code=503, detail="No clipboard tool available (install xclip or xsel)")
+    return {"ok": True, "length": len(text)}
+
+
+# ── Watchdog ──────────────────────────────────────────────────────────────────
+
+_WATCHDOG_REGISTRY: dict = {}
+
+
+def register_watchdog_task(name: str, factory) -> None:
+    _WATCHDOG_REGISTRY[name] = {"factory": factory, "task": None}
+
+
+def _watchdog_set_task(name: str, task) -> None:
+    if name in _WATCHDOG_REGISTRY:
+        _WATCHDOG_REGISTRY[name]["task"] = task
+
+
+@router.get("/api/watchdog")
+async def get_watchdog():
+    all_tasks = list(asyncio.all_tasks())
+    task_list = [
+        {"name": t.get_name(), "done": t.done()}
+        for t in sorted(all_tasks, key=lambda t: t.get_name())
+    ]
+    named = {
+        name: {"running": bool(info.get("task") and not info["task"].done())}
+        for name, info in _WATCHDOG_REGISTRY.items()
+    }
+    return {"tasks": task_list, "total": len(all_tasks), "named": named}
+
+
+@router.post("/api/watchdog/restart/{name}")
+async def restart_watchdog_task(name: str):
+    if name not in _WATCHDOG_REGISTRY:
+        raise HTTPException(status_code=404, detail=f"No registered task '{name}'")
+    info = _WATCHDOG_REGISTRY[name]
+    old = info.get("task")
+    if old and not old.done():
+        old.cancel()
+        try:
+            await asyncio.wait_for(asyncio.shield(old), timeout=2.0)
+        except (asyncio.CancelledError, Exception):
+            pass
+    new_task = asyncio.create_task(info["factory"]())
+    _WATCHDOG_REGISTRY[name]["task"] = new_task
+    return {"ok": True, "name": name}
 
 
 @router.websocket("/ws")
