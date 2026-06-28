@@ -270,6 +270,31 @@ async def get_config_route():
     return dataclasses.asdict(get_config())
 
 
+@router.get("/api/ollama/models")
+async def ollama_models():
+    import httpx
+    cfg = get_config()
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.get(f"{cfg.ollama_url}/api/tags")
+            r.raise_for_status()
+            data = r.json()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Ollama unreachable: {exc}")
+    models = [m["name"] for m in data.get("models", [])]
+    return {"models": models, "current": cfg.ollama_model}
+
+
+@router.post("/api/ollama/model")
+async def set_ollama_model(body: dict):
+    model = (body.get("model") or "").strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="model required")
+    await asyncio.to_thread(update_config, ollama_model=model)
+    await events.emit("config_changed", {"key": "ollama_model", "value": model})
+    return {"ok": True, "model": model}
+
+
 @router.post("/api/config")
 async def post_config(updates: dict):
     updates.pop("system_prompt_backup", None)  # internal field — not settable via public API
@@ -325,6 +350,54 @@ async def undo_system_prompt():
 async def reset_system_prompt():
     default = await asyncio.to_thread(reset_system_prompt_to_default)
     return {"system_prompt": default}
+
+
+@router.get("/api/system-prompt/diff")
+async def system_prompt_diff():
+    import difflib, dataclasses as _dc
+    cfg = get_config()
+    default_prompt: str = _dc.fields(cfg.__class__)[
+        next(i for i, f in enumerate(_dc.fields(cfg.__class__)) if f.name == "system_prompt")
+    ].default
+    current = cfg.system_prompt
+    backup = cfg.system_prompt_backup or ""
+
+    def _diff(a: str, b: str, label_a: str, label_b: str) -> list[dict]:
+        lines = list(difflib.unified_diff(
+            a.splitlines(keepends=True),
+            b.splitlines(keepends=True),
+            fromfile=label_a,
+            tofile=label_b,
+        ))
+        return [{"line": ln.rstrip("\n"), "kind": "add" if ln.startswith("+") else "remove" if ln.startswith("-") else "meta" if ln.startswith("@") else "context"} for ln in lines]
+
+    return {
+        "vs_default": _diff(default_prompt, current, "default", "current"),
+        "vs_backup": _diff(backup, current, "backup", "current") if backup else [],
+        "has_backup": bool(backup),
+    }
+
+
+@router.post("/api/tts/preview")
+async def tts_preview(body: dict):
+    import time, io
+    text = (body.get("text") or "Hello, I am Plia.").strip()[:200]
+    from voice.tts import get_tts_service as _get_tts
+    svc = _get_tts()
+    if svc is None:
+        raise HTTPException(status_code=503, detail="TTS service not loaded")
+    t0 = time.monotonic()
+    try:
+        audio = await asyncio.to_thread(svc.synthesise, text)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    latency_ms = int((time.monotonic() - t0) * 1000)
+    buf = io.BytesIO()
+    wavfile.write(buf, 24000, audio)
+    from fastapi.responses import Response
+    r = Response(content=buf.getvalue(), media_type="audio/wav")
+    r.headers["X-Latency-Ms"] = str(latency_ms)
+    return r
 
 
 @router.post("/api/upload-reference-audio")
@@ -492,6 +565,29 @@ async def export_history(n: int = 10000, fmt: str = "json"):
         media_type="application/json",
         headers={"Content-Disposition": 'attachment; filename="chat_export.json"'},
     )
+
+
+@router.get("/api/history/search")
+async def history_search(q: str = "", n: int = 50):
+    if not q.strip():
+        return {"query": q, "results": [], "total": 0}
+    from agents.chat_history import search as _search
+    rows = await asyncio.to_thread(_search, q, n)
+    ql = q.lower()
+    def _snippet(content: str, window: int = 80) -> str:
+        idx = content.lower().find(ql)
+        if idx == -1:
+            return content[:window]
+        start = max(0, idx - window // 2)
+        end = min(len(content), idx + len(q) + window // 2)
+        snippet = content[start:end]
+        if start > 0:
+            snippet = "…" + snippet
+        if end < len(content):
+            snippet = snippet + "…"
+        return snippet
+    results = [{"role": r["role"], "ts": r["ts"], "snippet": _snippet(r["content"]), "content": r["content"]} for r in rows]
+    return {"query": q, "results": results, "total": len(results)}
 
 
 @router.get("/api/history/export/pdf")

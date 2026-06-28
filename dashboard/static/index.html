@@ -780,6 +780,10 @@
         <button class="m-nav-btn" data-section="agenttrace" onclick="showMenuSection('agenttrace');loadAgentTrace()">Agent Trace</button>
         <button class="m-nav-btn" data-section="tokencount" onclick="showMenuSection('tokencount');loadTokenCount()">Token Count</button>
         <button class="m-nav-btn" data-section="pipelinerestart" onclick="showMenuSection('pipelinerestart')">Pipeline Ctrl</button>
+        <button class="m-nav-btn" data-section="ollamamodels" onclick="showMenuSection('ollamamodels');loadOllamaModels()">LLM Switch</button>
+        <button class="m-nav-btn" data-section="historysearch" onclick="showMenuSection('historysearch')">Hist Search</button>
+        <button class="m-nav-btn" data-section="ttsprev" onclick="showMenuSection('ttsprev')">TTS Preview</button>
+        <button class="m-nav-btn" data-section="promptdiff" onclick="showMenuSection('promptdiff');loadPromptDiff()">Prompt Diff</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2112,6 +2116,61 @@
             </div>
             <div id="plctrl-log" style="font-size:0.72rem;color:#555;font-family:monospace;min-height:24px;"></div>
           </div>
+        </div>
+
+        <!-- LLM Model Switcher -->
+        <div id="m-section-ollamamodels" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Switch the active Ollama model live. Fetched from your Ollama instance.</div>
+          <div style="flex-shrink:0;border:1px solid #1a1a1a;border-radius:3px;padding:8px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:0.72rem;color:#aaa;">Active:</span>
+              <span id="ollama-current-model" style="font-size:0.73rem;color:#4fc3f7;font-family:monospace;">—</span>
+              <button onclick="loadOllamaModels()" style="background:none;border:none;color:#555;font-size:0.72rem;cursor:pointer;margin-left:auto;">↻</button>
+            </div>
+            <div id="ollama-model-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+          </div>
+          <div id="ollama-switch-status" style="font-size:0.7rem;color:#555;font-family:monospace;"></div>
+        </div>
+
+        <!-- History Search -->
+        <div id="m-section-historysearch" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Full-text search across chat history.</div>
+          <div style="flex-shrink:0;display:flex;gap:6px;">
+            <input type="text" id="hist-search-q" placeholder="Search messages…"
+              style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:5px 8px;font-size:0.73rem;"
+              oninput="schedHistSearch()" onkeydown="if(event.key==='Enter')runHistSearch()">
+            <span id="hist-search-count" style="font-size:0.68rem;color:#555;align-self:center;white-space:nowrap;"></span>
+          </div>
+          <div id="hist-search-results" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:5px;"></div>
+        </div>
+
+        <!-- TTS Preview -->
+        <div id="m-section-ttsprev" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Synthesize a phrase with current TTS settings to audition voice.</div>
+          <div style="flex-shrink:0;border:1px solid #1a1a1a;border-radius:3px;padding:8px;display:flex;flex-direction:column;gap:8px;">
+            <textarea id="tts-prev-text" rows="3"
+              style="background:#0a0a0a;border:1px solid #2a2a2a;color:#e0e0e0;border-radius:3px;padding:6px 8px;font-size:0.73rem;resize:vertical;font-family:inherit;">Hello, I am Plia.</textarea>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button onclick="runTtsPreview()" style="background:#0a0a1a;border:1px solid #2e2e4d;color:#b39ddb;font-size:0.73rem;padding:5px 16px;border-radius:3px;cursor:pointer;">▶ Preview</button>
+              <span id="tts-prev-latency" style="font-size:0.68rem;color:#555;font-family:monospace;"></span>
+            </div>
+            <audio id="tts-prev-audio" controls style="width:100%;display:none;margin-top:4px;"></audio>
+          </div>
+        </div>
+
+        <!-- Prompt Diff -->
+        <div id="m-section-promptdiff" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Unified diff of current system prompt vs default and vs last backup.</div>
+          <div style="flex-shrink:0;display:flex;align-items:center;gap:6px;">
+            <button onclick="loadPromptDiff()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻ Refresh</button>
+            <span id="prompt-diff-tabs" style="display:flex;gap:4px;margin-left:8px;">
+              <button onclick="showPromptDiffTab('default')" id="pdt-default"
+                style="background:#1a1a1a;border:1px solid #4fc3f7;color:#4fc3f7;font-size:0.68rem;padding:2px 8px;border-radius:3px;cursor:pointer;">vs default</button>
+              <button onclick="showPromptDiffTab('backup')" id="pdt-backup"
+                style="background:none;border:1px solid #333;color:#555;font-size:0.68rem;padding:2px 8px;border-radius:3px;cursor:pointer;">vs backup</button>
+            </span>
+          </div>
+          <div id="prompt-diff-view" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.72rem;font-family:monospace;white-space:pre-wrap;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -7530,6 +7589,112 @@
   async function clearAgentTrace() {
     await fetch('/api/trace/recent', {method:'DELETE'}).catch(()=>{});
     await loadAgentTrace();
+  }
+
+  // ── LLM model switcher ───────────────────────────────────────────────────
+
+  async function loadOllamaModels() {
+    const listEl = document.getElementById('ollama-model-list');
+    const currentEl = document.getElementById('ollama-current-model');
+    if (!listEl) return;
+    const data = await fetch('/api/ollama/models').then(r=>r.json()).catch(()=>null);
+    if (!data) { listEl.innerHTML = '<div style="color:#ef9a9a;font-size:0.72rem;">Ollama unreachable</div>'; return; }
+    if (currentEl) currentEl.textContent = data.current || '—';
+    listEl.innerHTML = data.models.map(m => {
+      const active = m === data.current;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:3px;background:${active?'#0a1a0a':'none'};">
+        <span style="flex:1;font-size:0.73rem;font-family:monospace;color:${active?'#a5d6a7':'#aaa'};">${m}</span>
+        ${active ? '<span style="font-size:0.65rem;color:#4caf50;">✓ active</span>' :
+          `<button onclick="switchOllamaModel('${m}')" style="background:none;border:1px solid #333;color:#4fc3f7;font-size:0.68rem;padding:2px 8px;border-radius:3px;cursor:pointer;">Use</button>`}
+      </div>`;
+    }).join('');
+  }
+
+  async function switchOllamaModel(model) {
+    const statusEl = document.getElementById('ollama-switch-status');
+    if (statusEl) statusEl.textContent = `Switching to ${model}…`;
+    await fetch('/api/ollama/model', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model})});
+    if (statusEl) statusEl.textContent = `Active: ${model}`;
+    await loadOllamaModels();
+  }
+
+  // ── History search ────────────────────────────────────────────────────────
+
+  let _histSearchTimer = null;
+  function schedHistSearch() { clearTimeout(_histSearchTimer); _histSearchTimer = setTimeout(runHistSearch, 350); }
+
+  async function runHistSearch() {
+    const q = (document.getElementById('hist-search-q')?.value || '').trim();
+    const countEl = document.getElementById('hist-search-count');
+    const resultsEl = document.getElementById('hist-search-results');
+    if (!q) { if (resultsEl) resultsEl.innerHTML=''; if (countEl) countEl.textContent=''; return; }
+    const data = await fetch(`/api/history/search?q=${encodeURIComponent(q)}`).then(r=>r.json()).catch(()=>({results:[],total:0}));
+    if (countEl) countEl.textContent = `${data.total} match${data.total===1?'':'es'}`;
+    if (!resultsEl) return;
+    if (!data.results.length) { resultsEl.innerHTML='<div style="color:#444;font-size:0.75rem;">No matches.</div>'; return; }
+    const ql = q.toLowerCase();
+    resultsEl.innerHTML = data.results.map(r => {
+      const roleColor = r.role === 'user' ? '#4fc3f7' : '#a5d6a7';
+      const snippet = r.snippet.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),
+        '<mark style="background:#3d3100;color:#ffe082;">$1</mark>');
+      return `<div style="border:1px solid #1a1a1a;border-radius:3px;padding:6px 8px;">
+        <div style="display:flex;gap:6px;margin-bottom:3px;">
+          <span style="color:${roleColor};font-size:0.65rem;text-transform:uppercase;">${r.role}</span>
+          <span style="color:#444;font-size:0.65rem;">${r.ts||''}</span>
+        </div>
+        <div style="font-size:0.73rem;color:#ccc;line-height:1.5;">${snippet}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── TTS Preview ───────────────────────────────────────────────────────────
+
+  async function runTtsPreview() {
+    const text = (document.getElementById('tts-prev-text')?.value || '').trim();
+    const latEl = document.getElementById('tts-prev-latency');
+    const audioEl = document.getElementById('tts-prev-audio');
+    if (!text) return;
+    if (latEl) latEl.textContent = 'Synthesizing…';
+    const r = await fetch('/api/tts/preview', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text})}).catch(()=>null);
+    if (!r || !r.ok) { if (latEl) latEl.textContent = 'TTS error'; return; }
+    const latMs = r.headers.get('X-Latency-Ms');
+    if (latEl) latEl.textContent = latMs ? `${latMs}ms` : '';
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    if (audioEl) { audioEl.src = url; audioEl.style.display = 'block'; audioEl.play(); }
+  }
+
+  // ── Prompt diff ───────────────────────────────────────────────────────────
+
+  let _promptDiffData = null;
+  let _promptDiffTab = 'default';
+
+  async function loadPromptDiff() {
+    _promptDiffData = await fetch('/api/system-prompt/diff').then(r=>r.json()).catch(()=>null);
+    showPromptDiffTab(_promptDiffTab);
+    const backupBtn = document.getElementById('pdt-backup');
+    if (backupBtn && _promptDiffData) {
+      backupBtn.style.opacity = _promptDiffData.has_backup ? '1' : '0.4';
+    }
+  }
+
+  function showPromptDiffTab(tab) {
+    _promptDiffTab = tab;
+    const el = document.getElementById('prompt-diff-view');
+    if (!el || !_promptDiffData) return;
+    const lines = _promptDiffData[tab === 'backup' ? 'vs_backup' : 'vs_default'] || [];
+    ['default','backup'].forEach(t => {
+      const btn = document.getElementById(`pdt-${t}`);
+      if (!btn) return;
+      btn.style.background = t === tab ? '#1a1a1a' : 'none';
+      btn.style.color = t === tab ? '#4fc3f7' : '#555';
+      btn.style.borderColor = t === tab ? '#4fc3f7' : '#333';
+    });
+    if (!lines.length) { el.innerHTML = '<span style="color:#444;">No differences.</span>'; return; }
+    el.innerHTML = lines.map(l => {
+      const color = l.kind === 'add' ? '#a5d6a7' : l.kind === 'remove' ? '#ef9a9a' : l.kind === 'meta' ? '#4fc3f7' : '#555';
+      return `<span style="color:${color};display:block;">${_esc(l.line)}</span>`;
+    }).join('');
   }
 
   // ── Token count ───────────────────────────────────────────────────────────
