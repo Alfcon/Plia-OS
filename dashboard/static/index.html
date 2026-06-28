@@ -758,6 +758,7 @@
         <button class="m-nav-btn" data-section="prompts" onclick="showMenuSection('prompts');loadPrompts()">Prompts</button>
         <button class="m-nav-btn" data-section="voicetest" onclick="showMenuSection('voicetest')">STT Test</button>
         <button class="m-nav-btn" data-section="ttstest" onclick="showMenuSection('ttstest')">TTS Test</button>
+        <button class="m-nav-btn" data-section="waketest" onclick="showMenuSection('waketest');loadWakeModels()">Wake Test</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1778,6 +1779,20 @@
           </div>
           <div style="font-size:0.68rem;color:#444;flex-shrink:0;">Recent tests</div>
           <div id="tts-history" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;"></div>
+        </div>
+
+        <!-- Wake Word Test -->
+        <div id="m-section-waketest" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="flex-shrink:0;display:flex;flex-direction:column;gap:6px;border:1px solid #1a1a1a;border-radius:3px;padding:8px;">
+            <div style="font-size:0.68rem;color:#555;">Record audio and test against all pretrained wake word models</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <button id="wt-rec-btn" onclick="wtToggleRecord()"
+                style="background:#1a0a0a;border:1px solid #4d2e2e;color:#ef9a9a;font-size:0.73rem;padding:5px 14px;border-radius:3px;cursor:pointer;">⏺ Record</button>
+              <span id="wt-rec-status" style="font-size:0.7rem;color:#555;"></span>
+              <span id="wt-threshold-chip" style="font-size:0.68rem;color:#444;margin-left:auto;">threshold: —</span>
+            </div>
+          </div>
+          <div id="wt-scores" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:5px;"></div>
         </div>
 
         <!-- Prompt Library -->
@@ -6086,6 +6101,90 @@
         <div style="font-size:0.72rem;color:#ccc;font-style:italic;">"${_esc(h.text)}${h.text.length >= 80 ? '…' : ''}"</div>
       </div>`;
     }).join('');
+  }
+
+  // ── Wake Word Test ────────────────────────────────────────────────────────
+
+  let _wtStream = null, _wtCtx = null, _wtProcessor = null, _wtChunks = [], _wtRecording = false;
+  let _wtThreshold = 0.5;
+
+  async function loadWakeModels() {
+    const r = await fetch('/api/wake/models').then(x => x.json()).catch(() => null);
+    if (!r) return;
+    _wtThreshold = r.threshold;
+    document.getElementById('wt-threshold-chip').textContent = 'threshold: ' + r.threshold;
+  }
+
+  async function wtToggleRecord() {
+    if (_wtRecording) await _wtStop(); else await _wtStart();
+  }
+
+  async function _wtStart() {
+    const btn = document.getElementById('wt-rec-btn');
+    const status = document.getElementById('wt-rec-status');
+    try {
+      _wtStream = await navigator.mediaDevices.getUserMedia({audio: true});
+    } catch(e) { status.textContent = 'Mic denied'; return; }
+    _wtCtx = new AudioContext({sampleRate: 16000});
+    const src = _wtCtx.createMediaStreamSource(_wtStream);
+    _wtProcessor = _wtCtx.createScriptProcessor(4096, 1, 1);
+    _wtChunks = [];
+    _wtRecording = true;
+    _wtProcessor.onaudioprocess = e => { _wtChunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+    src.connect(_wtProcessor);
+    _wtProcessor.connect(_wtCtx.destination);
+    btn.textContent = '⏹ Stop'; btn.style.background = '#1a2a0a'; btn.style.borderColor = '#4d7e2e'; btn.style.color = '#81c784';
+    status.textContent = 'Recording…';
+  }
+
+  async function _wtStop() {
+    _wtRecording = false;
+    const btn = document.getElementById('wt-rec-btn');
+    const status = document.getElementById('wt-rec-status');
+    if (_wtProcessor) { _wtProcessor.disconnect(); _wtProcessor = null; }
+    if (_wtCtx) { await _wtCtx.close(); _wtCtx = null; }
+    if (_wtStream) { _wtStream.getTracks().forEach(t => t.stop()); _wtStream = null; }
+    btn.textContent = '⏺ Record'; btn.style.background = '#1a0a0a'; btn.style.borderColor = '#4d2e2e'; btn.style.color = '#ef9a9a';
+    if (!_wtChunks.length) { status.textContent = 'No audio'; return; }
+    status.textContent = 'Analyzing…';
+    const total = _wtChunks.reduce((s, c) => s + c.length, 0);
+    const merged = new Float32Array(total);
+    let off = 0; for (const c of _wtChunks) { merged.set(c, off); off += c.length; }
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/wake/test', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/octet-stream'},
+        body: merged.buffer,
+      });
+      if (!r.ok) { status.textContent = 'Error ' + r.status; return; }
+      const data = await r.json();
+      _wtRenderScores(data);
+      status.textContent = data.detected_by.length ? '🔔 Detected: ' + data.detected_by.join(', ') : 'No detection';
+    } catch(e) { status.textContent = 'Request failed'; }
+    btn.disabled = false;
+  }
+
+  function _wtRenderScores(data) {
+    const el = document.getElementById('wt-scores');
+    const scores = data.scores;
+    const threshold = data.threshold;
+    el.innerHTML = Object.entries(scores).map(([name, score]) => {
+      const pct = Math.round(score * 100);
+      const detected = score >= threshold;
+      const barColor = detected ? '#ffb74d' : '#4fc3f7';
+      const labelColor = detected ? '#ffb74d' : '#aaa';
+      return `<div style="display:flex;flex-direction:column;gap:2px;">
+        <div style="display:flex;justify-content:space-between;font-size:0.7rem;">
+          <span style="color:${labelColor};font-family:monospace;">${_esc(name)}</span>
+          <span style="color:${detected ? '#ffb74d' : '#555'};">${(score * 100).toFixed(1)}%${detected ? ' ⚡' : ''}</span>
+        </div>
+        <div style="background:#111;border:1px solid #1a1a1a;border-radius:2px;height:6px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${barColor};transition:width 0.4s;"></div>
+        </div>
+      </div>`;
+    }).join('');
+    if (!Object.keys(scores).length) el.innerHTML = '<div style="font-size:0.7rem;color:#555;">No scores returned.</div>';
   }
 
   // ── STT Voice Test ────────────────────────────────────────────────────────

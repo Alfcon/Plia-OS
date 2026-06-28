@@ -1086,6 +1086,66 @@ async def airllm_unload():
     return {"ok": True}
 
 
+_WAKE_MODEL = None
+
+
+def _get_wake_model():
+    global _WAKE_MODEL
+    if _WAKE_MODEL is None:
+        from openwakeword import get_pretrained_model_paths
+        from openwakeword.model import Model as _WModel
+        _WAKE_MODEL = _WModel(wakeword_model_paths=get_pretrained_model_paths())
+    return _WAKE_MODEL
+
+
+def _run_wake_prediction(audio_int16: "np.ndarray") -> dict:
+    model = _get_wake_model()
+    model.reset()
+    CHUNK = 1280
+    max_scores: dict[str, float] = {}
+    n = len(audio_int16)
+    for i in range(0, max(n, CHUNK), CHUNK):
+        chunk = audio_int16[i:i + CHUNK] if i < n else np.zeros(CHUNK, dtype=np.int16)
+        preds = model.predict(chunk)
+        for k, v in preds.items():
+            if not str(k).isdigit():
+                max_scores[k] = max(max_scores.get(k, 0.0), float(v))
+        if i >= n:
+            break
+    return max_scores
+
+
+@router.get("/api/wake/models")
+async def wake_models():
+    from openwakeword import get_pretrained_model_paths
+    import os
+    paths = get_pretrained_model_paths()
+    names = [os.path.splitext(os.path.basename(p))[0] for p in paths]
+    cfg = get_config()
+    return {"models": names, "configured": cfg.wake_word_model, "threshold": cfg.wake_word_threshold}
+
+
+@router.post("/api/wake/test")
+async def wake_test(request: Request):
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=422, detail="audio required")
+    audio = np.frombuffer(body, dtype=np.float32)
+    audio_int16 = (audio * 32767).clip(-32768, 32767).astype(np.int16)
+    try:
+        scores = await asyncio.to_thread(_run_wake_prediction, audio_int16)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    cfg = get_config()
+    threshold = cfg.wake_word_threshold
+    detected_by = [k for k, v in scores.items() if v >= threshold]
+    return {
+        "scores": {k: round(v, 4) for k, v in sorted(scores.items(), key=lambda x: -x[1])},
+        "threshold": threshold,
+        "detected_by": detected_by,
+    }
+
+
 _DL_STATE: dict = {"state": "idle", "model": "", "file": "", "bytes": 0, "total": 0, "error": ""}
 
 
