@@ -2109,6 +2109,112 @@ async def clear_events_endpoint():
     return {"ok": True, "deleted": deleted}
 
 
+@router.get("/api/health")
+async def system_health():
+    import time
+    import httpx
+    config = get_config()
+    results = []
+
+    async def check(name: str, coro):
+        try:
+            detail = await coro
+            results.append({"name": name, "status": "ok", "detail": detail or "OK"})
+        except Exception as exc:
+            results.append({"name": name, "status": "error", "detail": str(exc)})
+
+    async def probe_ollama():
+        if not config.ollama_url:
+            results.append({"name": "ollama", "status": "unconfigured", "detail": "No URL set"})
+            return
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            r = await client.get(f"{config.ollama_url}/api/tags")
+        r.raise_for_status()
+        data = r.json()
+        models = [m["name"] for m in data.get("models", [])]
+        results.append({"name": "ollama", "status": "ok", "detail": f"{len(models)} model(s)"})
+
+    async def probe_hass():
+        if not config.hass_url or not config.hass_token:
+            results.append({"name": "hass", "status": "unconfigured", "detail": "URL or token not set"})
+            return
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            r = await client.get(
+                f"{config.hass_url.rstrip('/')}/api/",
+                headers={"Authorization": f"Bearer {config.hass_token}"},
+            )
+        r.raise_for_status()
+        results.append({"name": "hass", "status": "ok", "detail": r.json().get("message", "Connected")})
+
+    async def probe_chromadb():
+        def _check():
+            import chromadb
+            chroma_path = str(pathlib.Path(config.memory_dir).expanduser() / "chroma")
+            chromadb.PersistentClient(path=chroma_path)
+            return "Connected"
+        detail = await asyncio.to_thread(_check)
+        results.append({"name": "chromadb", "status": "ok", "detail": detail})
+
+    async def probe_gcal():
+        cred = config.gcal_credentials_file
+        if not cred:
+            results.append({"name": "gcal", "status": "unconfigured", "detail": "No credentials file set"})
+            return
+        p = pathlib.Path(cred).expanduser()
+        if not p.exists():
+            results.append({"name": "gcal", "status": "error", "detail": f"File not found: {cred}"})
+        else:
+            results.append({"name": "gcal", "status": "ok", "detail": str(p)})
+
+    async def probe_email():
+        def _check():
+            from agents.email_store import list_accounts
+            accounts = list_accounts()
+            return accounts
+        accounts = await asyncio.to_thread(_check)
+        if not accounts:
+            results.append({"name": "email", "status": "unconfigured", "detail": "No accounts configured"})
+        else:
+            names = ", ".join(a.get("email", a.get("name", "?")) for a in accounts)
+            results.append({"name": "email", "status": "ok", "detail": names})
+
+    async def probe_memory():
+        def _check():
+            from agents.memory_store import get_memory_store
+            store = get_memory_store()
+            facts = store.list_all()
+            return len(facts)
+        count = await asyncio.to_thread(_check)
+        results.append({"name": "memory", "status": "ok", "detail": f"{count} facts stored"})
+
+    async def probe_fallback_llm():
+        provider = config.fallback_provider
+        if not provider:
+            results.append({"name": "fallback_llm", "status": "unconfigured", "detail": "No fallback provider set"})
+            return
+        key = config.fallback_api_key
+        results.append({
+            "name": "fallback_llm",
+            "status": "ok" if key else "error",
+            "detail": f"{provider} — {'API key set' if key else 'API key missing'}",
+        })
+
+    await asyncio.gather(
+        probe_ollama(),
+        probe_hass(),
+        probe_chromadb(),
+        probe_gcal(),
+        probe_email(),
+        probe_memory(),
+        probe_fallback_llm(),
+        return_exceptions=True,
+    )
+
+    order = ["ollama", "hass", "chromadb", "gcal", "email", "memory", "fallback_llm"]
+    results.sort(key=lambda x: order.index(x["name"]) if x["name"] in order else 99)
+    return {"services": results, "checked_at": time.time()}
+
+
 @router.get("/api/inspector")
 async def inspector(n: int = 50):
     from core.event_log import get_events

@@ -753,6 +753,7 @@
         <button class="m-nav-btn" data-section="evtlog" onclick="showMenuSection('evtlog');loadEventLog()">Events</button>
         <button class="m-nav-btn" data-section="search" onclick="showMenuSection('search');document.getElementById('search-input').focus()">Search</button>
         <button class="m-nav-btn" data-section="inspector" onclick="showMenuSection('inspector');loadInspector()">Inspector</button>
+        <button class="m-nav-btn" data-section="health" onclick="showMenuSection('health');loadHealth()">Health</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1697,6 +1698,16 @@
             <button onclick="loadInspector()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.7rem;padding:3px 10px;border-radius:3px;cursor:pointer;">↻ Refresh</button>
           </div>
           <div id="inspector-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+        </div>
+
+        <!-- System Health -->
+        <div id="m-section-health" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <span id="health-checked-at" style="font-size:0.68rem;color:#555;"></span>
+            <span style="flex:1;"></span>
+            <button onclick="loadHealth()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.7rem;padding:3px 10px;border-radius:3px;cursor:pointer;">↻ Recheck</button>
+          </div>
+          <div id="health-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
         </div>
 
         <div id="m-section-git" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
@@ -5785,6 +5796,47 @@
           ${toolBadge}
         </div>
         ${query}
+      </div>`;
+    }).join('');
+  }
+
+  // ── System Health panel ───────────────────────────────────────────────────
+
+  const _HEALTH_ICONS = {ok:'✓', error:'✗', unconfigured:'–'};
+  const _HEALTH_COLORS = {ok:'#81c784', error:'#ef5350', unconfigured:'#555'};
+  const _HEALTH_BG = {ok:'#0d2a1a', error:'#2a0d0d', unconfigured:'#111'};
+  const _HEALTH_BORDER = {ok:'#1b5e20', error:'#5e1b1b', unconfigured:'#333'};
+  const _HEALTH_LABELS = {
+    ollama:'Ollama LLM', hass:'Home Assistant', chromadb:'ChromaDB',
+    gcal:'Google Calendar', email:'Email', memory:'Memory Store',
+    fallback_llm:'Fallback LLM',
+  };
+
+  async function loadHealth() {
+    const list = document.getElementById('health-list');
+    list.innerHTML = '<div style="font-size:0.7rem;color:#444;">Checking services…</div>';
+    let data;
+    try {
+      const r = await fetch('/api/health');
+      if (!r.ok) { list.innerHTML = '<div style="color:#ef5350;font-size:0.7rem;">Error reaching health endpoint</div>'; return; }
+      data = await r.json();
+    } catch(e) { list.innerHTML = `<div style="color:#ef5350;font-size:0.7rem;">${_esc(e.message)}</div>`; return; }
+    const ts = document.getElementById('health-checked-at');
+    ts.textContent = 'Checked ' + new Date(data.checked_at * 1000).toLocaleTimeString();
+    list.innerHTML = data.services.map(s => {
+      const st = s.status;
+      const icon = _HEALTH_ICONS[st] || '?';
+      const color = _HEALTH_COLORS[st] || '#888';
+      const bg = _HEALTH_BG[st] || '#111';
+      const border = _HEALTH_BORDER[st] || '#333';
+      const label = _HEALTH_LABELS[s.name] || s.name;
+      return `<div style="background:${bg};border:1px solid ${border};border-radius:3px;padding:7px 12px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:0.9rem;color:${color};font-weight:700;width:14px;text-align:center;">${icon}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.75rem;font-weight:600;color:${st==='ok'?'#e0e0e0':color};">${_esc(label)}</div>
+          <div style="font-size:0.68rem;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(s.detail)}</div>
+        </div>
+        <span style="font-size:0.62rem;color:${color};border:1px solid ${border};border-radius:3px;padding:1px 6px;flex-shrink:0;">${st}</span>
       </div>`;
     }).join('');
   }
