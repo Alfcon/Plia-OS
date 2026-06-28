@@ -1609,6 +1609,43 @@ async def rename_clip(filename: str, body: dict):
     return {"ok": True, "filename": dst.name}
 
 
+# ── Config snapshots ──────────────────────────────────────────────────────────
+
+@router.get("/api/snapshots")
+async def list_snapshots_endpoint():
+    from core.snapshot_store import list_snapshots
+    return {"snapshots": await asyncio.to_thread(list_snapshots)}
+
+
+@router.post("/api/snapshots")
+async def create_snapshot_endpoint(body: dict):
+    from core.snapshot_store import create_snapshot
+    label = body.get("label", "")
+    name = await asyncio.to_thread(create_snapshot, label)
+    return {"ok": True, "name": name}
+
+
+@router.post("/api/snapshots/{name}/restore")
+async def restore_snapshot_endpoint(name: str):
+    from core.snapshot_store import restore_snapshot
+    try:
+        result = await asyncio.to_thread(restore_snapshot, name)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return {"ok": True, **result}
+
+
+@router.delete("/api/snapshots/{name}")
+async def delete_snapshot_endpoint(name: str):
+    from core.snapshot_store import delete_snapshot
+    deleted = await asyncio.to_thread(delete_snapshot, name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return {"ok": True}
+
+
 # ── Log buffer ────────────────────────────────────────────────────────────────
 
 _LEVEL_MAP = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}

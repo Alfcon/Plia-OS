@@ -746,6 +746,7 @@
         <button class="m-nav-btn" data-section="flows" onclick="showMenuSection('flows');loadWorkflows()">Flows</button>
         <button class="m-nav-btn" data-section="hooks" onclick="showMenuSection('hooks');loadWebhooks()">Hooks</button>
         <button class="m-nav-btn" data-section="clips" onclick="showMenuSection('clips');loadClips()">Clips</button>
+        <button class="m-nav-btn" data-section="snaps" onclick="showMenuSection('snaps');loadSnapshots()">Snaps</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1603,6 +1604,18 @@
               </button>
             </div>
           </div>
+        </div>
+
+        <div id="m-section-snaps" class="m-pane" style="display:none;flex-direction:column;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-shrink:0;">
+            <input id="snap-label" type="text" placeholder="Label (optional)"
+              style="flex:1;background:#111;border:1px solid #333;color:#ccc;border-radius:3px;padding:3px 7px;font-size:0.75rem;"
+              onkeydown="if(event.key==='Enter')saveSnapshot()">
+            <button onclick="saveSnapshot()"
+              style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.7rem;padding:3px 12px;border-radius:3px;cursor:pointer;">Save Now</button>
+            <button onclick="loadSnapshots()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
+          </div>
+          <div id="snap-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;"></div>
         </div>
 
         <div id="m-section-clips" class="m-pane" style="display:none;flex-direction:column;">
@@ -5131,6 +5144,71 @@
       return;
     }
   });
+
+  // ── Config snapshots ─────────────────────────────────────────────────────
+
+  async function loadSnapshots() {
+    let data;
+    try {
+      const r = await fetch('/api/snapshots');
+      if (!r.ok) return;
+      data = await r.json();
+    } catch(e) { return; }
+    const list = document.getElementById('snap-list');
+    if (!data.snapshots.length) {
+      list.innerHTML = '<div style="padding:10px 8px;color:#333;font-size:0.72rem;">No snapshots yet. Click Save Now to capture current config.</div>';
+      return;
+    }
+    list.innerHTML = data.snapshots.map(s => {
+      const date = new Date(s.created_at * 1000).toLocaleString();
+      const sz = (s.size / 1024).toFixed(1) + 'K';
+      const isPreRestore = s.label === 'pre-restore';
+      const labelHtml = s.label
+        ? `<span style="color:${isPreRestore ? '#ffb74d' : '#4fc3f7'};font-size:0.7rem;margin-left:4px;">${_esc(s.label)}</span>`
+        : '';
+      return `<div style="padding:5px 8px;border-bottom:1px solid #111;display:flex;align-items:center;gap:5px;">
+        <div style="flex:1;min-width:0;">
+          <div style="color:#e0e0e0;font-size:0.72rem;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            ${_esc(date)}${labelHtml}
+          </div>
+          <div style="color:#444;font-size:0.62rem;">${sz} · ${_esc(s.name)}</div>
+        </div>
+        <button onclick="restoreSnapshot(${JSON.stringify(s.name)})"
+          style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.65rem;padding:2px 7px;border-radius:3px;cursor:pointer;flex-shrink:0;">Restore</button>
+        <button onclick="deleteSnapshot(${JSON.stringify(s.name)})"
+          style="background:#2a0d0d;border:1px solid #5e1b1b;color:#ef5350;font-size:0.65rem;padding:2px 7px;border-radius:3px;cursor:pointer;flex-shrink:0;">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  async function saveSnapshot() {
+    const label = document.getElementById('snap-label').value.trim();
+    try {
+      const r = await fetch('/api/snapshots', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({label}),
+      });
+      if (!r.ok) { const e = await r.json(); alert(e.detail || 'Save failed'); return; }
+      document.getElementById('snap-label').value = '';
+      loadSnapshots();
+    } catch(e) { alert('Network error'); }
+  }
+
+  async function restoreSnapshot(name) {
+    if (!confirm(`Restore snapshot "${name}"?\n\nCurrent config will be auto-saved as "pre-restore" before restoring.`)) return;
+    try {
+      const r = await fetch(`/api/snapshots/${encodeURIComponent(name)}/restore`, {method:'POST'});
+      if (!r.ok) { const e = await r.json(); alert(e.detail || 'Restore failed'); return; }
+      loadSnapshots();
+      alert('Config restored. Reload the page to see updated values.');
+    } catch(e) { alert('Network error'); }
+  }
+
+  async function deleteSnapshot(name) {
+    if (!confirm(`Delete snapshot "${name}"?`)) return;
+    await fetch(`/api/snapshots/${encodeURIComponent(name)}`, {method:'DELETE'}).catch(()=>{});
+    loadSnapshots();
+  }
 
   // ── Voice clip manager ───────────────────────────────────────────────────
 
