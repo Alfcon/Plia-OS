@@ -1193,6 +1193,45 @@ async def airllm_download_status():
     return {**_DL_STATE, "pct": pct}
 
 
+@router.get("/api/audio/devices")
+async def list_audio_devices():
+    try:
+        import sounddevice as _sd
+    except ImportError:
+        raise HTTPException(status_code=503, detail="sounddevice not available")
+    devs = await asyncio.to_thread(_sd.query_devices)
+    cfg = get_config()
+    defaults = _sd.default.device
+    def_in = defaults[0] if isinstance(defaults, (list, tuple)) else defaults
+    def_out = defaults[1] if isinstance(defaults, (list, tuple)) else defaults
+    return {
+        "devices": [
+            {
+                "index": i,
+                "name": d["name"],
+                "input_channels": d["max_input_channels"],
+                "output_channels": d["max_output_channels"],
+            }
+            for i, d in enumerate(devs)
+        ],
+        "default_input": def_in,
+        "default_output": def_out,
+        "configured_input": cfg.audio_input_device,
+        "configured_output": cfg.audio_output_device,
+    }
+
+
+@router.post("/api/audio/devices")
+async def set_audio_devices(body: dict):
+    inp = body.get("input_device")
+    out = body.get("output_device")
+    update_config(
+        audio_input_device=int(inp) if inp is not None else None,
+        audio_output_device=int(out) if out is not None else None,
+    )
+    return {"ok": True}
+
+
 @router.get("/api/mcp/servers")
 async def get_mcp_servers():
     return get_mcp_status()

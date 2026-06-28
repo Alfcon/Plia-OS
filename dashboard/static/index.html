@@ -759,6 +759,7 @@
         <button class="m-nav-btn" data-section="voicetest" onclick="showMenuSection('voicetest')">STT Test</button>
         <button class="m-nav-btn" data-section="ttstest" onclick="showMenuSection('ttstest')">TTS Test</button>
         <button class="m-nav-btn" data-section="waketest" onclick="showMenuSection('waketest');loadWakeModels()">Wake Test</button>
+        <button class="m-nav-btn" data-section="audiodev" onclick="showMenuSection('audiodev');loadAudioDevices()">Audio Devices</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1779,6 +1780,33 @@
           </div>
           <div style="font-size:0.68rem;color:#444;flex-shrink:0;">Recent tests</div>
           <div id="tts-history" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;"></div>
+        </div>
+
+        <!-- Audio Device Picker -->
+        <div id="m-section-audiodev" class="m-pane" style="display:none;flex-direction:column;gap:10px;">
+          <div style="flex-shrink:0;display:flex;flex-direction:column;gap:8px;border:1px solid #1a1a1a;border-radius:3px;padding:8px;">
+            <div style="font-size:0.68rem;color:#555;">Select input (mic) and output (speaker) devices used by the voice pipeline. Takes effect on next pipeline start.</div>
+            <label style="font-size:0.72rem;color:#aaa;">Microphone (input)
+              <select id="audiodev-input"
+                style="width:100%;margin-top:3px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 6px;font-size:0.72rem;">
+                <option value="">— system default —</option>
+              </select>
+            </label>
+            <label style="font-size:0.72rem;color:#aaa;">Speaker (output)
+              <select id="audiodev-output"
+                style="width:100%;margin-top:3px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 6px;font-size:0.72rem;">
+                <option value="">— system default —</option>
+              </select>
+            </label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button onclick="saveAudioDevices()"
+                style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.73rem;padding:5px 14px;border-radius:3px;cursor:pointer;">Save</button>
+              <button onclick="loadAudioDevices()"
+                style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
+              <span id="audiodev-status" style="font-size:0.7rem;color:#555;"></span>
+            </div>
+          </div>
+          <div id="audiodev-device-list" style="flex:1;min-height:0;overflow-y:auto;font-size:0.68rem;color:#444;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -6101,6 +6129,64 @@
         <div style="font-size:0.72rem;color:#ccc;font-style:italic;">"${_esc(h.text)}${h.text.length >= 80 ? '…' : ''}"</div>
       </div>`;
     }).join('');
+  }
+
+  // ── Audio Device Picker ───────────────────────────────────────────────────
+
+  async function loadAudioDevices() {
+    const status = document.getElementById('audiodev-status');
+    status.textContent = 'Loading…';
+    const data = await fetch('/api/audio/devices').then(r => r.json()).catch(() => null);
+    if (!data) { status.textContent = 'Error'; return; }
+    status.textContent = '';
+
+    const inSel = document.getElementById('audiodev-input');
+    const outSel = document.getElementById('audiodev-output');
+    inSel.innerHTML = '<option value="">— system default —</option>';
+    outSel.innerHTML = '<option value="">— system default —</option>';
+
+    for (const d of data.devices) {
+      if (d.input_channels > 0) {
+        const o = document.createElement('option');
+        o.value = d.index;
+        o.textContent = `[${d.index}] ${d.name} (${d.input_channels}ch in)`;
+        if (data.configured_input === d.index) o.selected = true;
+        inSel.appendChild(o);
+      }
+      if (d.output_channels > 0) {
+        const o = document.createElement('option');
+        o.value = d.index;
+        o.textContent = `[${d.index}] ${d.name} (${d.output_channels}ch out)`;
+        if (data.configured_output === d.index) o.selected = true;
+        outSel.appendChild(o);
+      }
+    }
+
+    const listEl = document.getElementById('audiodev-device-list');
+    listEl.innerHTML = '<div style="color:#333;margin-bottom:4px;">All devices:</div>' +
+      data.devices.map(d => {
+        const tags = [];
+        if (d.input_channels > 0) tags.push(`in:${d.input_channels}`);
+        if (d.output_channels > 0) tags.push(`out:${d.output_channels}`);
+        const active = d.index === data.default_input || d.index === data.default_output;
+        return `<div style="padding:2px 0;color:${active ? '#666' : '#333'};">[${d.index}] ${_esc(d.name)} <span style="color:#2a2a2a;">${tags.join(' ')}</span></div>`;
+      }).join('');
+  }
+
+  async function saveAudioDevices() {
+    const inVal = document.getElementById('audiodev-input').value;
+    const outVal = document.getElementById('audiodev-output').value;
+    const status = document.getElementById('audiodev-status');
+    status.textContent = 'Saving…';
+    const r = await fetch('/api/audio/devices', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        input_device: inVal === '' ? null : parseInt(inVal),
+        output_device: outVal === '' ? null : parseInt(outVal),
+      }),
+    });
+    status.textContent = r.ok ? 'Saved — restart pipeline to apply' : 'Error ' + r.status;
   }
 
   // ── Wake Word Test ────────────────────────────────────────────────────────

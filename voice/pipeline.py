@@ -95,7 +95,8 @@ class VoicePipeline:
         try:
             audio_out = self._tts.synthesise(strip_markdown(message))
             self._set_wake_mute(audio_out)
-            sd.play(audio_out, samplerate=24000, blocking=True)
+            from core.config import get_config as _gc
+            sd.play(audio_out, samplerate=24000, blocking=True, device=_gc().audio_output_device)
         except Exception:
             logger.exception("Reminder announcement failed")
 
@@ -109,12 +110,14 @@ class VoicePipeline:
             loop.call_soon_threadsafe(audio_q.put_nowait, indata[:, 0].copy())
 
         await events.emit("status", {"state": "armed"})
+        from core.config import get_config as _gc
         with sd.InputStream(
             samplerate=_SAMPLE_RATE,
             channels=1,
             dtype="int16",
             blocksize=_BLOCK_SIZE,
             callback=_cb,
+            device=_gc().audio_input_device,
         ):
             while self._running:
                 try:
@@ -257,7 +260,7 @@ class VoicePipeline:
                 self._set_wake_mute(audio_out)
                 while not audio_q.empty():
                     audio_q.get_nowait()
-                sd.play(audio_out, samplerate=24000, blocking=True)
+                sd.play(audio_out, samplerate=24000, blocking=True, device=_gc().audio_output_device)
                 logger.info("Playback complete")
                 while not audio_q.empty():
                     audio_q.get_nowait()

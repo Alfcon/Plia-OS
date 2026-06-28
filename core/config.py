@@ -125,6 +125,10 @@ class PliaConfig:
     # Tool guard — tools in this list require user approval before execution
     tool_guard_list: list = field(default_factory=list)
 
+    # Audio devices (None = system default)
+    audio_input_device: int | None = None
+    audio_output_device: int | None = None
+
 
 _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
     "tts_engine": ("kokoro", "chatterbox", "dramabox"),
