@@ -8,7 +8,7 @@ import numpy as np
 from datetime import datetime
 from scipy.io import wavfile
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Request
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 import pathlib
 from pathlib import Path
 from core import events, registry, pipeline_registry
@@ -2756,6 +2756,57 @@ async def run_benchmark(body: dict):
 @router.get("/api/benchmark/history")
 async def benchmark_history(n: int = 20):
     return {"history": list(_BENCH_HISTORY)[:n]}
+
+
+# ── Voice audio level ─────────────────────────────────────────────────────────
+
+@router.get("/api/voice/level")
+async def voice_audio_level():
+    try:
+        import voice.pipeline as _vp
+        level = _vp._CURRENT_AUDIO_LEVEL
+    except Exception:
+        level = 0.0
+    return {"level": round(level, 4)}
+
+
+# ── LLM streaming (SSE) ───────────────────────────────────────────────────────
+
+@router.post("/api/chat/stream")
+async def chat_stream(body: dict):
+    import httpx
+
+    messages = body.get("messages") or []
+    prompt = (body.get("prompt") or "").strip()
+    if not messages and prompt:
+        messages = [{"role": "user", "content": prompt}]
+    if not messages:
+        raise HTTPException(status_code=400, detail="prompt or messages required")
+
+    async def _gen():
+        cfg = get_config()
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                async with client.stream(
+                    "POST",
+                    f"{cfg.ollama_url}/api/chat",
+                    json={"model": cfg.ollama_model, "messages": messages, "stream": True},
+                ) as resp:
+                    async for line in resp.aiter_lines():
+                        if not line:
+                            continue
+                        try:
+                            chunk = json.loads(line)
+                            token = chunk.get("message", {}).get("content", "")
+                            if token:
+                                yield f"data: {json.dumps({'token': token})}\n\n"
+                        except Exception:
+                            pass
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(_gen(), media_type="text/event-stream")
 
 
 @router.websocket("/ws")

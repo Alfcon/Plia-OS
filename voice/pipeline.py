@@ -25,6 +25,7 @@ _INT16_MAX = 32768.0  # used to normalise int16 → float for RMS and STT
 from agents.chat_history import _HISTORY_PRELOAD  # canonical source; also used by /api/chat
 _CONVERSATION_CAP = 40  # max non-system messages kept in-memory (20 pairs)
 _TTS_SAMPLE_RATE = 24000
+_CURRENT_AUDIO_LEVEL: float = 0.0  # updated by _cb; read by /api/voice/level
 
 
 class VoicePipeline:
@@ -106,7 +107,8 @@ class VoicePipeline:
         audio_q: asyncio.Queue[np.ndarray] = asyncio.Queue()
 
         def _cb(indata, frames, time, status):
-            # Capture as int16 to avoid PipeWire float32 normalisation issues
+            import voice.pipeline as _vp
+            _vp._CURRENT_AUDIO_LEVEL = float(np.sqrt(np.mean((indata[:, 0] / _INT16_MAX) ** 2)))
             loop.call_soon_threadsafe(audio_q.put_nowait, indata[:, 0].copy())
 
         await events.emit("status", {"state": "armed"})

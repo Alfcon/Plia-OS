@@ -764,6 +764,8 @@
         <button class="m-nav-btn" data-section="ttstest" onclick="showMenuSection('ttstest')">TTS Test</button>
         <button class="m-nav-btn" data-section="waketest" onclick="showMenuSection('waketest');loadWakeModels()">Wake Test</button>
         <button class="m-nav-btn" data-section="audiodev" onclick="showMenuSection('audiodev');loadAudioDevices()">Audio Devices</button>
+        <button class="m-nav-btn" data-section="audiolevel" onclick="showMenuSection('audiolevel');startAudioLevelMeter()">Audio Level</button>
+        <button class="m-nav-btn" data-section="llmstream" onclick="showMenuSection('llmstream')">LLM Stream</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1811,6 +1813,52 @@
             </div>
           </div>
           <div id="audiodev-device-list" style="flex:1;min-height:0;overflow-y:auto;font-size:0.68rem;color:#444;"></div>
+        </div>
+
+        <!-- Audio Level Meter -->
+        <div id="m-section-audiolevel" class="m-pane" style="display:none;flex-direction:column;gap:10px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Live microphone input level from the voice pipeline. Updates at 10 Hz while panel is open.</div>
+          <div style="flex-shrink:0;border:1px solid #1a1a1a;border-radius:3px;padding:10px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:0.68rem;color:#555;width:36px;">Level</span>
+              <div style="flex:1;height:16px;background:#111;border-radius:3px;overflow:hidden;border:1px solid #222;">
+                <div id="al-bar" style="height:100%;width:0%;background:#1b5e20;border-radius:3px;transition:width 0.06s linear;"></div>
+              </div>
+              <span id="al-value" style="font-size:0.68rem;color:#888;width:40px;text-align:right;font-family:monospace;">0.0000</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:0.68rem;color:#555;width:36px;">Peak</span>
+              <div style="flex:1;height:8px;background:#111;border-radius:3px;overflow:hidden;border:1px solid #222;">
+                <div id="al-peak-bar" style="height:100%;width:0%;background:#ef9a9a;border-radius:3px;transition:width 0.2s linear;"></div>
+              </div>
+              <span id="al-peak-value" style="font-size:0.68rem;color:#888;width:40px;text-align:right;font-family:monospace;">0.0000</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span id="al-status" style="font-size:0.68rem;color:#444;">idle</span>
+              <button onclick="stopAudioLevelMeter()" style="margin-left:auto;background:none;border:none;color:#666;font-size:0.7rem;cursor:pointer;">■ Stop</button>
+              <button onclick="startAudioLevelMeter()" style="background:none;border:none;color:#4fc3f7;font-size:0.7rem;cursor:pointer;">▶ Start</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- LLM Streaming -->
+        <div id="m-section-llmstream" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Stream LLM responses token-by-token via SSE. Uses current Ollama model.</div>
+          <div style="flex-shrink:0;display:flex;gap:6px;align-items:flex-start;">
+            <textarea id="llms-prompt" rows="3" placeholder="Enter prompt…"
+              style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:6px 8px;font-size:0.75rem;font-family:monospace;resize:vertical;"
+              onkeydown="if(event.ctrlKey&&event.key==='Enter')streamLLM()"></textarea>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <button onclick="streamLLM()" id="llms-run-btn"
+                style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.73rem;padding:5px 12px;border-radius:3px;cursor:pointer;">▶ Stream</button>
+              <button onclick="llmsStop()"
+                style="background:none;border:1px solid #333;color:#888;font-size:0.73rem;padding:5px 12px;border-radius:3px;cursor:pointer;">■ Stop</button>
+              <button onclick="llmsClear()"
+                style="background:none;border:none;color:#444;font-size:0.7rem;cursor:pointer;">Clear</button>
+            </div>
+          </div>
+          <div id="llms-meta" style="font-size:0.68rem;color:#444;flex-shrink:0;min-height:14px;"></div>
+          <div id="llms-output" style="flex:1;min-height:120px;overflow-y:auto;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;padding:8px;font-size:0.75rem;font-family:monospace;color:#e0e0e0;white-space:pre-wrap;word-break:break-word;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -6709,6 +6757,106 @@
         <span style="color:#e0e0e0;">${_esc(cur.length > 40 ? cur.slice(0,40)+'…' : cur)}</span>
       </div>`;
     }).join('') + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:3px 0;border-top:1px solid #222;margin-top:2px;"><span style="color:#333;">key</span><span style="color:#333;">default</span><span style="color:#333;">current</span></div>';
+  }
+
+  // ── Audio Level Meter ─────────────────────────────────────────────────────
+
+  let _alTimer = null;
+  let _alPeak = 0;
+  let _alPeakDecay = 0;
+
+  function startAudioLevelMeter() {
+    if (_alTimer) return;
+    _alPeak = 0;
+    _alPeakDecay = 0;
+    document.getElementById('al-status').textContent = 'polling…';
+    _alTimer = setInterval(_pollAudioLevel, 100);
+  }
+
+  function stopAudioLevelMeter() {
+    clearInterval(_alTimer);
+    _alTimer = null;
+    document.getElementById('al-status').textContent = 'stopped';
+    document.getElementById('al-bar').style.width = '0%';
+  }
+
+  async function _pollAudioLevel() {
+    const r = await fetch('/api/voice/level').then(x => x.json()).catch(() => null);
+    if (!r) return;
+    const level = r.level;
+    const pct = Math.min(100, Math.round(level * 400));  // scale 0-0.25 → 0-100%
+    document.getElementById('al-bar').style.width = pct + '%';
+    document.getElementById('al-bar').style.background = level > 0.03 ? '#2e7d32' : '#1b5e20';
+    document.getElementById('al-value').textContent = level.toFixed(4);
+    if (level > _alPeak) { _alPeak = level; _alPeakDecay = 50; }
+    else if (_alPeakDecay > 0) { _alPeakDecay--; }
+    else { _alPeak = Math.max(0, _alPeak - 0.002); }
+    const peakPct = Math.min(100, Math.round(_alPeak * 400));
+    document.getElementById('al-peak-bar').style.width = peakPct + '%';
+    document.getElementById('al-peak-value').textContent = _alPeak.toFixed(4);
+    document.getElementById('al-status').textContent = level > 0.03 ? '🔊 active' : '🔇 silent';
+  }
+
+  // ── LLM Streaming ─────────────────────────────────────────────────────────
+
+  let _llmsReader = null;
+
+  async function streamLLM() {
+    const prompt = document.getElementById('llms-prompt').value.trim();
+    if (!prompt) return;
+    llmsClear();
+    document.getElementById('llms-run-btn').disabled = true;
+    document.getElementById('llms-meta').textContent = 'Connecting…';
+    const out = document.getElementById('llms-output');
+    const t0 = Date.now();
+    let tokens = 0;
+    try {
+      const resp = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({prompt}),
+      });
+      if (!resp.ok) { out.textContent = 'Error: ' + resp.status; return; }
+      const reader = resp.body.getReader();
+      _llmsReader = reader;
+      const dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, {stream: true});
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6);
+          if (payload === '[DONE]') { break; }
+          try {
+            const d = JSON.parse(payload);
+            if (d.error) { out.textContent += '\n[Error: ' + d.error + ']'; break; }
+            if (d.token) { out.textContent += d.token; tokens++; out.scrollTop = out.scrollHeight; }
+          } catch(_) {}
+        }
+      }
+    } catch(e) {
+      if (e.name !== 'AbortError') out.textContent += '\n[Stream interrupted: ' + e.message + ']';
+    } finally {
+      _llmsReader = null;
+      document.getElementById('llms-run-btn').disabled = false;
+      const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+      document.getElementById('llms-meta').textContent = tokens + ' tokens · ' + elapsed + 's';
+    }
+  }
+
+  function llmsStop() {
+    if (_llmsReader) { _llmsReader.cancel(); _llmsReader = null; }
+    document.getElementById('llms-run-btn').disabled = false;
+    document.getElementById('llms-meta').textContent = 'stopped';
+  }
+
+  function llmsClear() {
+    document.getElementById('llms-output').textContent = '';
+    document.getElementById('llms-meta').textContent = '';
   }
 
   // ── Benchmark panel ───────────────────────────────────────────────────────
