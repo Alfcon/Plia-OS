@@ -3960,6 +3960,187 @@ async def restart_watchdog_task(name: str):
     return {"ok": True, "name": name}
 
 
+# ── Screenshot ────────────────────────────────────────────────────────────────
+
+@router.post("/api/screenshot")
+async def take_screenshot():
+    import base64 as _b64
+    import tempfile as _tmp
+    import os as _os
+    with _tmp.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        fname = f.name
+    try:
+        cmds = [
+            ["scrot", fname],
+            ["gnome-screenshot", "-f", fname],
+            ["import", "-window", "root", fname],
+        ]
+        for cmd in cmds:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await proc.wait()
+            if proc.returncode == 0 and _os.path.exists(fname) and _os.path.getsize(fname) > 0:
+                break
+        else:
+            raise HTTPException(status_code=503, detail="No screenshot tool available (install scrot or gnome-screenshot)")
+        data = Path(fname).read_bytes()
+        return {"image": _b64.b64encode(data).decode(), "size": len(data)}
+    finally:
+        try:
+            _os.unlink(fname)
+        except Exception:
+            pass
+
+
+# ── Shell runner ──────────────────────────────────────────────────────────────
+
+import collections as _shell_cols
+
+_SHELL_HISTORY: _shell_cols.deque = _shell_cols.deque(maxlen=50)
+
+
+@router.post("/api/shell")
+async def run_shell_command(body: dict):
+    import time as _t
+    cmd = (body.get("command") or "").strip()
+    timeout = min(int(body.get("timeout", 10)), 30)
+    if not cmd:
+        raise HTTPException(status_code=422, detail="command required")
+    t0 = _t.time()
+    try:
+        proc = await asyncio.create_subprocess_shell(
+            cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            entry = {
+                "command": cmd, "stdout": "", "stderr": "Timed out",
+                "returncode": -1, "elapsed_ms": int((_t.time() - t0) * 1000),
+            }
+            _SHELL_HISTORY.appendleft(entry)
+            return entry
+        entry = {
+            "command": cmd,
+            "stdout": stdout.decode(errors="replace"),
+            "stderr": stderr.decode(errors="replace"),
+            "returncode": proc.returncode,
+            "elapsed_ms": int((_t.time() - t0) * 1000),
+        }
+        _SHELL_HISTORY.appendleft(entry)
+        return entry
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/api/shell/history")
+async def shell_history():
+    return {"history": list(_SHELL_HISTORY)}
+
+
+# ── HTTP probe ────────────────────────────────────────────────────────────────
+
+import collections as _probe_cols
+
+_PROBE_HISTORY: _probe_cols.deque = _probe_cols.deque(maxlen=100)
+
+
+@router.post("/api/probe")
+async def http_probe(body: dict):
+    import httpx as _httpx
+    import time as _t
+    url = (body.get("url") or "").strip()
+    timeout = min(float(body.get("timeout", 5.0)), 30.0)
+    method = (body.get("method") or "GET").upper()
+    if not url:
+        raise HTTPException(status_code=422, detail="url required")
+    t0 = _t.time()
+    try:
+        async with _httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
+            resp = await client.request(method, url)
+        elapsed_ms = int((_t.time() - t0) * 1000)
+        entry = {
+            "url": url, "method": method, "status": resp.status_code,
+            "elapsed_ms": elapsed_ms, "ok": resp.is_success, "error": None,
+        }
+    except Exception as exc:
+        elapsed_ms = int((_t.time() - t0) * 1000)
+        entry = {
+            "url": url, "method": method, "status": None,
+            "elapsed_ms": elapsed_ms, "ok": False, "error": str(exc),
+        }
+    _PROBE_HISTORY.appendleft(entry)
+    return entry
+
+
+@router.get("/api/probe/history")
+async def probe_history():
+    return {"history": list(_PROBE_HISTORY)}
+
+
+# ── Docker status ─────────────────────────────────────────────────────────────
+
+async def _docker_action(container_id: str, action: str) -> dict:
+    safe_id = re.sub(r"[^a-zA-Z0-9_.\-]", "", container_id)
+    if not safe_id:
+        raise HTTPException(status_code=400, detail="Invalid container id")
+    proc = await asyncio.create_subprocess_exec(
+        "docker", action, safe_id,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise HTTPException(status_code=500, detail=stderr.decode(errors="replace").strip())
+    return {"ok": True, "action": action, "container": safe_id}
+
+
+@router.get("/api/docker")
+async def docker_status():
+    proc = await asyncio.create_subprocess_exec(
+        "docker", "ps", "-a", "--format", "{{json .}}",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Docker unavailable: {stderr.decode(errors='replace').strip()}",
+        )
+    containers = []
+    for line in stdout.decode(errors="replace").splitlines():
+        line = line.strip()
+        if line:
+            try:
+                containers.append(json.loads(line))
+            except Exception:
+                pass
+    return {"containers": containers, "total": len(containers)}
+
+
+@router.post("/api/docker/{container_id}/restart")
+async def docker_restart(container_id: str):
+    return await _docker_action(container_id, "restart")
+
+
+@router.post("/api/docker/{container_id}/stop")
+async def docker_stop(container_id: str):
+    return await _docker_action(container_id, "stop")
+
+
+@router.post("/api/docker/{container_id}/start")
+async def docker_start(container_id: str):
+    return await _docker_action(container_id, "start")
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()

@@ -801,6 +801,10 @@
         <button class="m-nav-btn" data-section="audioupload" onclick="showMenuSection('audioupload')">Audio Upload</button>
         <button class="m-nav-btn" data-section="watchdog" onclick="showMenuSection('watchdog');loadWatchdog()">Watchdog</button>
         <button class="m-nav-btn" data-section="chatexport" onclick="showMenuSection('chatexport');loadChatExportCount()">Chat Export</button>
+        <button class="m-nav-btn" data-section="screenshot" onclick="showMenuSection('screenshot')">Screenshot</button>
+        <button class="m-nav-btn" data-section="shellrun" onclick="showMenuSection('shellrun');loadShellHistory()">Shell</button>
+        <button class="m-nav-btn" data-section="httpprobe" onclick="showMenuSection('httpprobe');loadProbeHistory()">HTTP Probe</button>
+        <button class="m-nav-btn" data-section="docker" onclick="showMenuSection('docker');loadDocker()">Docker</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2434,6 +2438,59 @@
             <a href="/api/history/export?fmt=markdown" download style="background:#0a1a0a;border:1px solid #2e4d2e;color:#a5d6a7;font-size:0.72rem;padding:6px 16px;border-radius:3px;cursor:pointer;text-decoration:none;">⬇ Markdown</a>
             <a href="/api/history/export/pdf" download style="background:#1a0a1a;border:1px solid #4d2e4d;color:#ce93d8;font-size:0.72rem;padding:6px 16px;border-radius:3px;cursor:pointer;text-decoration:none;">⬇ PDF</a>
           </div>
+        </div>
+
+        <!-- Screenshot -->
+        <div id="m-section-screenshot" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Capture desktop screenshot via scrot or gnome-screenshot.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <button onclick="captureScreenshot()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">⊕ Capture</button>
+            <button id="screenshot-save-btn" onclick="saveScreenshot()" style="display:none;background:none;border:1px solid #333;color:#aaa;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">⬇ Save PNG</button>
+            <span id="screenshot-status" style="font-size:0.68rem;color:#555;"></span>
+          </div>
+          <img id="screenshot-img" style="display:none;max-width:100%;border:1px solid #1a1a1a;border-radius:3px;" alt="screenshot">
+        </div>
+
+        <!-- Shell Runner -->
+        <div id="m-section-shellrun" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Run shell commands on the server. Timeout capped at 30 s.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <input id="shell-cmd" type="text" placeholder="command…" style="flex:1;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 8px;font-size:0.72rem;font-family:monospace;"
+              onkeydown="if(event.key==='Enter')runShellCmd()">
+            <input id="shell-timeout" type="number" value="10" min="1" max="30" style="width:45px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 5px;font-size:0.72rem;text-align:center;" title="timeout seconds">
+            <span style="font-size:0.68rem;color:#555;">s</span>
+            <button onclick="runShellCmd()" style="background:#0a1a0a;border:1px solid #2e4d2e;color:#a5d6a7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">▶ Run</button>
+          </div>
+          <pre id="shell-output" style="flex:0 0 auto;min-height:60px;max-height:180px;overflow-y:auto;background:#080808;border:1px solid #1a1a1a;border-radius:3px;padding:8px;font-size:0.68rem;font-family:monospace;color:#a5d6a7;white-space:pre-wrap;"></pre>
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">History</div>
+          <div id="shell-history" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;font-size:0.68rem;font-family:monospace;"></div>
+        </div>
+
+        <!-- HTTP Probe -->
+        <div id="m-section-httpprobe" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">Ping any URL and see status + latency.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;flex-wrap:wrap;">
+            <select id="probe-method" style="background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 6px;font-size:0.72rem;">
+              <option>GET</option><option>POST</option><option>HEAD</option><option>OPTIONS</option>
+            </select>
+            <input id="probe-url" type="text" placeholder="https://…" style="flex:1;min-width:0;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 8px;font-size:0.72rem;"
+              onkeydown="if(event.key==='Enter')runProbe()">
+            <button onclick="runProbe()" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Probe</button>
+          </div>
+          <div id="probe-result" style="font-size:0.72rem;font-family:monospace;color:#aaa;min-height:1.2rem;flex-shrink:0;"></div>
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">History</div>
+          <div id="probe-history" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;font-size:0.68rem;font-family:monospace;"></div>
+        </div>
+
+        <!-- Docker -->
+        <div id="m-section-docker" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.72rem;color:#666;flex-shrink:0;">List and control Docker containers.</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <button onclick="loadDocker()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻ Refresh</button>
+            <span id="docker-total" style="font-size:0.68rem;color:#555;margin-left:auto;"></span>
+          </div>
+          <div id="docker-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+          <div id="docker-status" style="font-size:0.7rem;color:#888;flex-shrink:0;min-height:1rem;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -7289,6 +7346,176 @@
         if (r2.ok) { const d2 = await r2.json(); el.textContent = d2.messages ? d2.messages.length : '?'; }
       }
     } catch(e) { el.textContent = '?'; }
+  }
+
+  // ── Screenshot ───────────────────────────────────────────────────────────
+
+  let _screenshotData = null;
+
+  async function captureScreenshot() {
+    const status = document.getElementById('screenshot-status');
+    const img = document.getElementById('screenshot-img');
+    const saveBtn = document.getElementById('screenshot-save-btn');
+    status.textContent = 'Capturing…';
+    img.style.display = 'none';
+    saveBtn.style.display = 'none';
+    _screenshotData = null;
+    try {
+      const r = await fetch('/api/screenshot', {method: 'POST'});
+      if (r.ok) {
+        const d = await r.json();
+        _screenshotData = d.image;
+        img.src = 'data:image/png;base64,' + d.image;
+        img.style.display = 'block';
+        saveBtn.style.display = 'inline-block';
+        status.textContent = `${(d.size / 1024).toFixed(1)} KB`;
+      } else {
+        const e = await r.json();
+        status.textContent = `Error: ${e.detail}`;
+      }
+    } catch(e) { status.textContent = 'Failed'; }
+  }
+
+  function saveScreenshot() {
+    if (!_screenshotData) return;
+    const a = document.createElement('a');
+    a.href = 'data:image/png;base64,' + _screenshotData;
+    a.download = `screenshot_${Date.now()}.png`;
+    a.click();
+  }
+
+  // ── Shell Runner ──────────────────────────────────────────────────────────
+
+  async function runShellCmd() {
+    const cmd = document.getElementById('shell-cmd').value.trim();
+    const timeout = parseInt(document.getElementById('shell-timeout').value || '10', 10);
+    const out = document.getElementById('shell-output');
+    if (!cmd) return;
+    out.textContent = '…';
+    try {
+      const r = await fetch('/api/shell', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({command: cmd, timeout}),
+      });
+      const d = await r.json();
+      const text = [
+        d.stdout && `STDOUT:\n${d.stdout}`,
+        d.stderr && `STDERR:\n${d.stderr}`,
+        `exit ${d.returncode} (${d.elapsed_ms} ms)`,
+      ].filter(Boolean).join('\n\n');
+      out.textContent = text || '(no output)';
+      out.style.color = d.returncode === 0 ? '#a5d6a7' : '#ef9a9a';
+      await loadShellHistory();
+    } catch(e) { out.textContent = 'Network error'; }
+  }
+
+  async function loadShellHistory() {
+    try {
+      const r = await fetch('/api/shell/history');
+      if (!r.ok) return;
+      const d = await r.json();
+      const el = document.getElementById('shell-history');
+      el.innerHTML = d.history.map(h =>
+        `<div style="padding:3px 6px;background:#0a0a0a;border-radius:2px;cursor:pointer;color:${h.returncode===0?'#4fc3f7':'#ef9a9a'}"
+          onclick="document.getElementById('shell-cmd').value=${JSON.stringify(h.command).replace(/</g,'&lt;')}">
+          <span style="color:#555;">${h.returncode===0?'✓':'✗'}</span>
+          <span style="color:#888;">${_esc(h.command)}</span>
+          <span style="color:#444;float:right;">${h.elapsed_ms}ms</span>
+        </div>`
+      ).join('');
+    } catch(e) {}
+  }
+
+  // ── HTTP Probe ────────────────────────────────────────────────────────────
+
+  async function runProbe() {
+    const url = document.getElementById('probe-url').value.trim();
+    const method = document.getElementById('probe-method').value;
+    const result = document.getElementById('probe-result');
+    if (!url) return;
+    result.textContent = 'Probing…';
+    try {
+      const r = await fetch('/api/probe', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({url, method}),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        result.style.color = '#a5d6a7';
+        result.textContent = `${d.status} OK — ${d.elapsed_ms} ms`;
+      } else if (d.status) {
+        result.style.color = '#ef9a9a';
+        result.textContent = `${d.status} — ${d.elapsed_ms} ms`;
+      } else {
+        result.style.color = '#ef9a9a';
+        result.textContent = `Error: ${d.error}`;
+      }
+      await loadProbeHistory();
+    } catch(e) { result.textContent = 'Network error'; }
+  }
+
+  async function loadProbeHistory() {
+    try {
+      const r = await fetch('/api/probe/history');
+      if (!r.ok) return;
+      const d = await r.json();
+      const el = document.getElementById('probe-history');
+      el.innerHTML = d.history.map(h =>
+        `<div style="display:flex;align-items:center;gap:6px;padding:2px 4px;">
+          <span style="color:${h.ok?'#a5d6a7':'#ef9a9a'};font-size:0.7rem;">${h.ok?'✓':'✗'} ${h.status||'—'}</span>
+          <span style="color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${_esc(h.url)}</span>
+          <span style="color:#444;flex-shrink:0;">${h.elapsed_ms}ms</span>
+        </div>`
+      ).join('');
+    } catch(e) {}
+  }
+
+  // ── Docker ────────────────────────────────────────────────────────────────
+
+  async function loadDocker() {
+    const list = document.getElementById('docker-list');
+    const total = document.getElementById('docker-total');
+    const status = document.getElementById('docker-status');
+    status.textContent = '';
+    try {
+      const r = await fetch('/api/docker');
+      if (!r.ok) {
+        const e = await r.json();
+        list.innerHTML = `<div style="font-size:0.72rem;color:#ef9a9a;">${_esc(e.detail)}</div>`;
+        return;
+      }
+      const d = await r.json();
+      total.textContent = `${d.total} containers`;
+      list.innerHTML = d.containers.map(c => {
+        const running = (c.State || c.Status || '').toLowerCase().startsWith('run');
+        const id = c.ID || c.Id || '';
+        const name = c.Names || c.Name || id;
+        return `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;background:#0a0a0a;border-radius:3px;flex-wrap:wrap;">
+          <span style="width:6px;height:6px;border-radius:50%;background:${running?'#a5d6a7':'#555'};flex-shrink:0;"></span>
+          <span style="font-size:0.72rem;font-family:monospace;color:#e0e0e0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(name)}</span>
+          <span style="font-size:0.65rem;color:#555;flex-shrink:0;">${_esc(c.Status||c.State||'')}</span>
+          <div style="display:flex;gap:4px;flex-shrink:0;">
+            <button onclick="dockerAction(${JSON.stringify(id).replace(/</g,'&lt;')},'start')"
+              style="background:none;border:1px solid #2e4d2e;color:#a5d6a7;font-size:0.65rem;padding:2px 6px;border-radius:2px;cursor:pointer;">▶</button>
+            <button onclick="dockerAction(${JSON.stringify(id).replace(/</g,'&lt;')},'restart')"
+              style="background:none;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.65rem;padding:2px 6px;border-radius:2px;cursor:pointer;">⟳</button>
+            <button onclick="dockerAction(${JSON.stringify(id).replace(/</g,'&lt;')},'stop')"
+              style="background:none;border:1px solid #4d2e2e;color:#ef9a9a;font-size:0.65rem;padding:2px 6px;border-radius:2px;cursor:pointer;">■</button>
+          </div>
+        </div>`;
+      }).join('') || '<div style="font-size:0.72rem;color:#444;">No containers</div>';
+    } catch(e) { list.innerHTML = '<div style="color:#ef9a9a;font-size:0.72rem;">Error</div>'; }
+  }
+
+  async function dockerAction(id, action) {
+    const status = document.getElementById('docker-status');
+    status.textContent = `${action} ${id}…`;
+    try {
+      const r = await fetch(`/api/docker/${encodeURIComponent(id)}/${action}`, {method:'POST'});
+      if (r.ok) { status.textContent = `${action} OK`; }
+      else { const e = await r.json(); status.textContent = `Error: ${e.detail}`; }
+      await loadDocker();
+    } catch(e) { status.textContent = 'Network error'; }
   }
 
   // ── Tool playground ──────────────────────────────────────────────────────
