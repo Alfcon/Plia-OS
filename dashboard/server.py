@@ -1258,6 +1258,115 @@ async def set_audio_devices(body: dict):
     return {"ok": True}
 
 
+# ── Network diagnostics ───────────────────────────────────────────────────────
+
+@router.post("/api/netdiag/ping")
+async def netdiag_ping(body: dict):
+    import time, re, asyncio as _aio
+    host = (body.get("host") or "").strip()
+    if not host:
+        raise HTTPException(status_code=422, detail="host required")
+    t0 = time.monotonic()
+    try:
+        proc = await _aio.create_subprocess_exec(
+            "ping", "-c", "1", "-W", "2", host,
+            stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        ok = proc.returncode == 0
+        detail = stdout.decode(errors="replace")
+        m = re.search(r"time=(\d+\.?\d*)\s*ms", detail)
+        rtt = float(m.group(1)) if m else None
+        return {"ok": ok, "host": host, "rtt_ms": rtt, "latency_ms": latency_ms, "detail": detail.strip().splitlines()[-1] if detail.strip() else ""}
+    except Exception as exc:
+        return {"ok": False, "host": host, "rtt_ms": None, "latency_ms": int((time.monotonic() - t0) * 1000), "detail": str(exc)}
+
+
+@router.post("/api/netdiag/dns")
+async def netdiag_dns(body: dict):
+    import time
+    host = (body.get("host") or "").strip()
+    if not host:
+        raise HTTPException(status_code=422, detail="host required")
+    t0 = time.monotonic()
+    try:
+        loop = asyncio.get_event_loop()
+        infos = await asyncio.wait_for(loop.getaddrinfo(host, None), timeout=5)
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        ips = list(dict.fromkeys(i[4][0] for i in infos))
+        return {"ok": True, "host": host, "ips": ips, "latency_ms": latency_ms}
+    except Exception as exc:
+        return {"ok": False, "host": host, "ips": [], "latency_ms": int((time.monotonic() - t0) * 1000), "detail": str(exc)}
+
+
+@router.post("/api/netdiag/port")
+async def netdiag_port(body: dict):
+    import time
+    host = (body.get("host") or "").strip()
+    port = body.get("port")
+    if not host or port is None:
+        raise HTTPException(status_code=422, detail="host and port required")
+    t0 = time.monotonic()
+    try:
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, int(port)), timeout=5)
+        writer.close()
+        await writer.wait_closed()
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        return {"ok": True, "host": host, "port": int(port), "latency_ms": latency_ms, "detail": "open"}
+    except Exception as exc:
+        return {"ok": False, "host": host, "port": int(port) if port else None, "latency_ms": int((time.monotonic() - t0) * 1000), "detail": str(exc)}
+
+
+# ── Notification log ──────────────────────────────────────────────────────────
+
+_NOTIF_LOG: _collections.deque = _collections.deque(maxlen=200)
+
+
+def _on_notif_event(payload: dict) -> None:
+    if payload.get("type") not in ("reminder_fired",):
+        return
+    import time as _t
+    _NOTIF_LOG.appendleft({
+        "ts": _t.time(),
+        "source": "reminder",
+        "message": payload.get("message", ""),
+        "id": payload.get("id"),
+    })
+
+
+events.subscribe(_on_notif_event)
+
+
+@router.get("/api/notifications/log")
+async def get_notification_log(n: int = 50):
+    return {"notifications": list(_NOTIF_LOG)[:min(n, 200)]}
+
+
+@router.delete("/api/notifications/log")
+async def clear_notification_log():
+    _NOTIF_LOG.clear()
+    return {"ok": True}
+
+
+# ── Config diff ───────────────────────────────────────────────────────────────
+
+@router.get("/api/config/diff")
+async def config_diff():
+    import dataclasses
+    defaults = dataclasses.asdict(type(get_config())())
+    current = dataclasses.asdict(get_config())
+    _BLOCKED = {"system_prompt_backup", "fallback_api_key", "hass_token", "gcal_credentials_file"}
+    diffs = []
+    for key, default_val in defaults.items():
+        if key in _BLOCKED:
+            continue
+        cur_val = current.get(key)
+        if cur_val != default_val:
+            diffs.append({"key": key, "default": default_val, "current": cur_val})
+    return {"diffs": diffs, "total": len(diffs)}
+
+
 @router.get("/api/mcp/servers")
 async def get_mcp_servers():
     return get_mcp_status()

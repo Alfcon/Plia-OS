@@ -756,6 +756,9 @@
         <button class="m-nav-btn" data-section="health" onclick="showMenuSection('health');loadHealth()">Health</button>
         <button class="m-nav-btn" data-section="bench" onclick="showMenuSection('bench');loadBenchHistory()">Bench</button>
         <button class="m-nav-btn" data-section="vramtl" onclick="showMenuSection('vramtl');startVramTimeline()">VRAM</button>
+        <button class="m-nav-btn" data-section="netdiag" onclick="showMenuSection('netdiag')">Network</button>
+        <button class="m-nav-btn" data-section="notiflog" onclick="showMenuSection('notiflog');loadNotifLog()">Notif Log</button>
+        <button class="m-nav-btn" data-section="cfgdiff" onclick="showMenuSection('cfgdiff');loadConfigDiff()">Config Diff</button>
         <button class="m-nav-btn" data-section="prompts" onclick="showMenuSection('prompts');loadPrompts()">Prompts</button>
         <button class="m-nav-btn" data-section="voicetest" onclick="showMenuSection('voicetest')">STT Test</button>
         <button class="m-nav-btn" data-section="ttstest" onclick="showMenuSection('ttstest')">TTS Test</button>
@@ -1873,6 +1876,46 @@
           <canvas id="vramtl-canvas" width="600" height="160"
             style="width:100%;height:160px;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;display:block;flex-shrink:0;"></canvas>
           <div id="vramtl-models" style="font-size:0.68rem;color:#555;flex-shrink:0;"></div>
+        </div>
+
+        <!-- Network Diagnostics -->
+        <div id="m-section-netdiag" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="display:flex;flex-direction:column;gap:6px;border:1px solid #1a1a1a;border-radius:3px;padding:8px;flex-shrink:0;">
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+              <input id="nd-host" type="text" placeholder="hostname or IP"
+                style="flex:1;min-width:120px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 7px;font-size:0.73rem;font-family:monospace;"
+                onkeydown="if(event.key==='Enter')ndRun()">
+              <input id="nd-port" type="number" placeholder="port"
+                style="width:72px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 7px;font-size:0.73rem;">
+            </div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+              <button onclick="ndCheck('ping')" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 12px;border-radius:3px;cursor:pointer;">Ping</button>
+              <button onclick="ndCheck('dns')"  style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 12px;border-radius:3px;cursor:pointer;">DNS</button>
+              <button onclick="ndCheck('port')" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.72rem;padding:4px 12px;border-radius:3px;cursor:pointer;">Port</button>
+              <span id="nd-status" style="font-size:0.7rem;color:#555;align-self:center;"></span>
+            </div>
+          </div>
+          <div id="nd-results" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;font-size:0.73rem;font-family:monospace;"></div>
+        </div>
+
+        <!-- Notification Log -->
+        <div id="m-section-notiflog" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <span style="font-size:0.68rem;color:#555;">Fired reminders and cron announcements</span>
+            <button onclick="loadNotifLog()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;margin-left:auto;">↻</button>
+            <button onclick="clearNotifLog()" style="background:#1a0a0a;border:1px solid #4d2e2e;color:#ef9a9a;font-size:0.68rem;padding:2px 8px;border-radius:3px;cursor:pointer;">Clear</button>
+          </div>
+          <div id="notif-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;"></div>
+        </div>
+
+        <!-- Config Diff -->
+        <div id="m-section-cfgdiff" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <span style="font-size:0.68rem;color:#555;">Fields changed from factory defaults</span>
+            <button onclick="loadConfigDiff()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;margin-left:auto;">↻</button>
+            <span id="cfgdiff-count" style="font-size:0.68rem;color:#555;"></span>
+          </div>
+          <div id="cfgdiff-list" style="flex:1;min-height:0;overflow-y:auto;font-size:0.72rem;font-family:monospace;"></div>
         </div>
 
         <div id="m-section-bench" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
@@ -6582,6 +6625,90 @@
     if (modEl) modEl.innerHTML = modelNames.map((n, i) =>
       `<span style="color:${_MODEL_COLORS[i % _MODEL_COLORS.length]};margin-right:10px;">■ ${_esc(n)}</span>`
     ).join('') || '<span style="color:#333;">No models loaded</span>';
+  }
+
+  // ── Network Diagnostics ───────────────────────────────────────────────────
+
+  const _ndHistory = [];
+  async function ndCheck(type) {
+    const host = (document.getElementById('nd-host')?.value || '').trim();
+    const port = document.getElementById('nd-port')?.value;
+    if (!host) { document.getElementById('nd-status').textContent = 'Enter host'; return; }
+    if (type === 'port' && !port) { document.getElementById('nd-status').textContent = 'Enter port'; return; }
+    document.getElementById('nd-status').textContent = 'Running…';
+    const body = {host};
+    if (port) body.port = parseInt(port);
+    const r = await fetch(`/api/netdiag/${type}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
+    }).then(x => x.json()).catch(e => ({ok: false, detail: String(e)}));
+    document.getElementById('nd-status').textContent = '';
+    _ndHistory.unshift({type, ...r, ts: Date.now()});
+    _ndRender();
+  }
+  function ndRun() { ndCheck(document.querySelector('.nd-type-active')?.dataset?.type || 'ping'); }
+  function _ndRender() {
+    const el = document.getElementById('nd-results');
+    if (!_ndHistory.length) { el.innerHTML = '<div style="color:#333;font-size:0.68rem;">No checks yet.</div>'; return; }
+    el.innerHTML = _ndHistory.map(r => {
+      const t = new Date(r.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      const ok = r.ok;
+      const color = ok ? '#81c784' : '#ef9a9a';
+      let detail = '';
+      if (r.type === 'ping') detail = r.rtt_ms != null ? `RTT ${r.rtt_ms}ms` : (r.detail || '');
+      else if (r.type === 'dns') detail = ok ? r.ips?.join(', ') : (r.detail || '');
+      else if (r.type === 'port') detail = r.detail || '';
+      const host = r.port ? `${r.host}:${r.port}` : r.host;
+      return `<div style="background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;padding:5px 8px;display:flex;gap:8px;align-items:baseline;">
+        <span style="color:#333;font-size:0.62rem;flex-shrink:0;">${t}</span>
+        <span style="color:#555;flex-shrink:0;">${r.type}</span>
+        <span style="color:#888;flex-shrink:0;">${_esc(host)}</span>
+        <span style="color:${color};flex-shrink:0;">${ok ? '✓' : '✗'}</span>
+        <span style="color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(String(detail || ''))}</span>
+        <span style="color:#444;font-size:0.62rem;flex-shrink:0;margin-left:auto;">${r.latency_ms}ms</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Notification Log ──────────────────────────────────────────────────────
+
+  async function loadNotifLog() {
+    const r = await fetch('/api/notifications/log?n=100').then(x => x.json()).catch(() => null);
+    const el = document.getElementById('notif-list');
+    if (!r || !r.notifications) { el.innerHTML = '<div style="color:#333;font-size:0.68rem;">Error</div>'; return; }
+    if (!r.notifications.length) { el.innerHTML = '<div style="color:#333;font-size:0.68rem;">No notifications yet.</div>'; return; }
+    el.innerHTML = r.notifications.map(n => {
+      const t = new Date(n.ts * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      const srcColor = n.source === 'cron' ? '#ffb74d' : '#4fc3f7';
+      return `<div style="background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;padding:5px 8px;display:flex;gap:8px;align-items:baseline;">
+        <span style="color:#333;font-size:0.62rem;flex-shrink:0;">${t}</span>
+        <span style="color:${srcColor};font-size:0.65rem;flex-shrink:0;">${_esc(n.source)}</span>
+        <span style="color:#ccc;">${_esc(n.message)}</span>
+      </div>`;
+    }).join('');
+  }
+  async function clearNotifLog() {
+    await fetch('/api/notifications/log', {method:'DELETE'});
+    await loadNotifLog();
+  }
+
+  // ── Config Diff ───────────────────────────────────────────────────────────
+
+  async function loadConfigDiff() {
+    const r = await fetch('/api/config/diff').then(x => x.json()).catch(() => null);
+    const el = document.getElementById('cfgdiff-list');
+    const cnt = document.getElementById('cfgdiff-count');
+    if (!r) { el.innerHTML = '<div style="color:#555;">Error</div>'; return; }
+    cnt.textContent = r.total + ' changed';
+    if (!r.diffs.length) { el.innerHTML = '<div style="color:#333;">All fields match factory defaults.</div>'; return; }
+    el.innerHTML = r.diffs.map(d => {
+      const def = JSON.stringify(d.default);
+      const cur = JSON.stringify(d.current);
+      return `<div style="border-bottom:1px solid #111;padding:4px 0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+        <span style="color:#4fc3f7;">${_esc(d.key)}</span>
+        <span style="color:#555;">${_esc(def.length > 40 ? def.slice(0,40)+'…' : def)}</span>
+        <span style="color:#e0e0e0;">${_esc(cur.length > 40 ? cur.slice(0,40)+'…' : cur)}</span>
+      </div>`;
+    }).join('') + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:3px 0;border-top:1px solid #222;margin-top:2px;"><span style="color:#333;">key</span><span style="color:#333;">default</span><span style="color:#333;">current</span></div>';
   }
 
   // ── Benchmark panel ───────────────────────────────────────────────────────
