@@ -743,6 +743,7 @@
         <button class="m-nav-btn" data-section="proactive" onclick="showMenuSection('proactive');loadProactiveStatus()">Proactive</button>
         <button class="m-nav-btn" data-section="files" onclick="showMenuSection('files');loadFileBrowser()">Files</button>
         <button class="m-nav-btn" data-section="logs" onclick="showMenuSection('logs');loadLogs()">Logs</button>
+        <button class="m-nav-btn" data-section="flows" onclick="showMenuSection('flows');loadWorkflows()">Flows</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1598,6 +1599,34 @@
                 style="display:none;background:#1a1a1a;border:1px solid #333;color:#888;font-size:11px;padding:4px 14px;border-radius:3px;cursor:pointer">
                 Load more
               </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="m-section-flows" class="m-pane" style="display:none;flex-direction:column;">
+          <div style="display:flex;gap:8px;flex:1;min-height:0;overflow:hidden;">
+            <!-- Left: workflow list -->
+            <div style="width:38%;min-width:0;display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                <span style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.06em;color:#555;">Workflows</span>
+                <button onclick="wfNew()" style="margin-left:auto;background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.7rem;padding:2px 8px;border-radius:3px;cursor:pointer;">+ New</button>
+                <button onclick="loadWorkflows()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
+              </div>
+              <div id="wf-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #222;border-radius:3px;font-size:0.75rem;"></div>
+            </div>
+            <!-- Right: editor + runner -->
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;flex-wrap:wrap;">
+                <input id="wf-name" placeholder="Workflow name" style="flex:1;min-width:80px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 7px;font-size:0.75rem;font-family:monospace;">
+                <input id="wf-desc" placeholder="Description (optional)" style="flex:2;min-width:100px;background:#111;border:1px solid #333;color:#888;border-radius:3px;padding:3px 7px;font-size:0.72rem;">
+                <button onclick="wfSave()" style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.7rem;padding:3px 9px;border-radius:3px;cursor:pointer;">Save</button>
+                <button onclick="wfRun()" id="wf-run-btn" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.7rem;padding:3px 9px;border-radius:3px;cursor:pointer;">▶ Run</button>
+              </div>
+              <!-- Steps -->
+              <div id="wf-steps" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;padding:4px;display:flex;flex-direction:column;gap:4px;"></div>
+              <button onclick="wfAddStep()" style="background:#111;border:1px dashed #333;color:#555;font-size:0.7rem;padding:4px;border-radius:3px;cursor:pointer;flex-shrink:0;">+ Add Step</button>
+              <!-- Results -->
+              <div id="wf-results" style="display:none;flex-direction:column;gap:3px;flex-shrink:0;max-height:200px;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;padding:4px;"></div>
             </div>
           </div>
         </div>
@@ -5057,6 +5086,175 @@
       return;
     }
   });
+
+  // ── Workflow chains ───────────────────────────────────────────────────────
+
+  let _wfToolNames = [];
+
+  async function loadWorkflows() {
+    if (!_wfToolNames.length) {
+      try {
+        const r = await fetch('/api/tools');
+        if (r.ok) _wfToolNames = Object.keys(await r.json());
+      } catch(e) {}
+    }
+    let data;
+    try {
+      const r = await fetch('/api/workflows');
+      if (!r.ok) return;
+      data = await r.json();
+    } catch(e) { return; }
+    const list = document.getElementById('wf-list');
+    if (!data.workflows.length) {
+      list.innerHTML = '<div style="padding:10px 8px;color:#333;font-size:0.72rem;">No workflows yet.</div>';
+      return;
+    }
+    list.innerHTML = data.workflows.map(wf => `
+      <div style="padding:5px 8px;border-bottom:1px solid #111;display:flex;align-items:center;gap:5px;">
+        <div style="flex:1;min-width:0;cursor:pointer;" onclick="wfLoad(${JSON.stringify(wf.name)})">
+          <div style="color:#e0e0e0;font-size:0.75rem;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(wf.name)}</div>
+          ${wf.description ? `<div style="color:#555;font-size:0.65rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(wf.description)}</div>` : ''}
+          <div style="color:#444;font-size:0.65rem;">${wf.steps ? wf.steps.length : 0} step${wf.steps && wf.steps.length !== 1 ? 's' : ''}</div>
+        </div>
+        <button onclick="wfRunNamed(${JSON.stringify(wf.name)})" title="Run"
+          style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.65rem;padding:2px 6px;border-radius:3px;cursor:pointer;flex-shrink:0;">▶</button>
+        <button onclick="wfDelete(${JSON.stringify(wf.name)})" title="Delete"
+          style="background:#2a0d0d;border:1px solid #5e1b1b;color:#ef5350;font-size:0.65rem;padding:2px 6px;border-radius:3px;cursor:pointer;flex-shrink:0;">✕</button>
+      </div>`).join('');
+  }
+
+  function wfNew() {
+    document.getElementById('wf-name').value = '';
+    document.getElementById('wf-desc').value = '';
+    document.getElementById('wf-steps').innerHTML = '';
+    document.getElementById('wf-results').style.display = 'none';
+    document.getElementById('wf-results').innerHTML = '';
+  }
+
+  function wfLoad(name) {
+    fetch('/api/workflows').then(r => r.json()).then(data => {
+      const wf = data.workflows.find(w => w.name === name);
+      if (!wf) return;
+      document.getElementById('wf-name').value = wf.name;
+      document.getElementById('wf-desc').value = wf.description || '';
+      document.getElementById('wf-steps').innerHTML = '';
+      document.getElementById('wf-results').style.display = 'none';
+      (wf.steps || []).forEach(step => wfAddStep(step));
+    }).catch(() => {});
+  }
+
+  function _wfToolSelect(selected) {
+    const opts = _wfToolNames.map(t =>
+      `<option value="${_esc(t)}" ${t === selected ? 'selected' : ''}>${_esc(t)}</option>`
+    ).join('');
+    return `<select style="background:#111;border:1px solid #333;color:#ccc;font-size:0.7rem;padding:2px 4px;border-radius:3px;font-family:monospace;max-width:180px;">${opts}</select>`;
+  }
+
+  let _wfStepIdx = 0;
+  function wfAddStep(step) {
+    const idx = _wfStepIdx++;
+    const tool = step && step.tool || '';
+    const params = step && step.params ? JSON.stringify(step.params, null, 2) : '{}';
+    const note = step && step.note || '';
+    const container = document.getElementById('wf-steps');
+    const div = document.createElement('div');
+    div.dataset.stepIdx = idx;
+    div.style.cssText = 'border:1px solid #1a1a1a;border-radius:3px;padding:5px 7px;background:#0a0a0a;display:flex;flex-direction:column;gap:4px;';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:5px;">
+        <span style="color:#333;font-size:0.65rem;flex-shrink:0;">Tool</span>
+        <select class="wf-tool-sel" style="background:#111;border:1px solid #333;color:#ccc;font-size:0.7rem;padding:2px 4px;border-radius:3px;font-family:monospace;flex:1;min-width:0;">
+          ${_wfToolNames.map(t => `<option value="${_esc(t)}" ${t === tool ? 'selected' : ''}>${_esc(t)}</option>`).join('')}
+        </select>
+        <button onclick="this.closest('[data-step-idx]').remove()" style="background:none;border:none;color:#555;font-size:0.8rem;cursor:pointer;padding:0 3px;">✕</button>
+        <button onclick="_wfMoveStep(this,-1)" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;padding:0 2px;">↑</button>
+        <button onclick="_wfMoveStep(this,1)" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;padding:0 2px;">↓</button>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:5px;">
+        <span style="color:#333;font-size:0.65rem;flex-shrink:0;padding-top:3px;">Params</span>
+        <textarea class="wf-params" rows="3"
+          style="flex:1;background:#060606;border:1px solid #222;color:#aaa;font-size:0.68rem;font-family:monospace;padding:3px 5px;border-radius:2px;resize:vertical;min-height:44px;"
+          placeholder='{"key": "{{prev}}"}'>${_esc(params)}</textarea>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;">
+        <span style="color:#333;font-size:0.65rem;flex-shrink:0;">Note</span>
+        <input type="text" class="wf-note" value="${_esc(note)}" placeholder="optional step label"
+          style="flex:1;background:#111;border:1px solid #1a1a1a;color:#555;font-size:0.68rem;padding:2px 5px;border-radius:2px;">
+      </div>`;
+    container.appendChild(div);
+  }
+
+  function _wfMoveStep(btn, dir) {
+    const el = btn.closest('[data-step-idx]');
+    const parent = el.parentNode;
+    const children = Array.from(parent.children);
+    const idx = children.indexOf(el);
+    const target = children[idx + dir];
+    if (!target) return;
+    if (dir === -1) parent.insertBefore(el, target);
+    else parent.insertBefore(target, el);
+  }
+
+  function _wfCollectSteps() {
+    return Array.from(document.querySelectorAll('#wf-steps > [data-step-idx]')).map(div => {
+      const tool = div.querySelector('.wf-tool-sel').value;
+      let params = {};
+      try { params = JSON.parse(div.querySelector('.wf-params').value || '{}'); } catch(e) {}
+      const note = div.querySelector('.wf-note').value;
+      return {tool, params, note};
+    });
+  }
+
+  async function wfSave() {
+    const name = document.getElementById('wf-name').value.trim();
+    const description = document.getElementById('wf-desc').value.trim();
+    if (!name) { alert('Workflow name required'); return; }
+    const steps = _wfCollectSteps();
+    try {
+      const r = await fetch('/api/workflows', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({name, description, steps}),
+      });
+      if (!r.ok) { const e = await r.json(); alert(e.detail || 'Save failed'); return; }
+      loadWorkflows();
+    } catch(e) { alert('Network error'); }
+  }
+
+  async function wfRun() {
+    const name = document.getElementById('wf-name').value.trim();
+    if (!name) { await wfSave(); return; }
+    await wfSave();
+    await wfRunNamed(name);
+  }
+
+  async function wfRunNamed(name) {
+    const res = document.getElementById('wf-results');
+    res.style.display = 'flex';
+    res.innerHTML = '<div style="color:#555;font-size:0.72rem;padding:4px;">Running…</div>';
+    try {
+      const r = await fetch(`/api/workflows/${encodeURIComponent(name)}/run`, {method:'POST'});
+      if (!r.ok) { const e = await r.json(); res.innerHTML = `<div style="color:#ef5350;font-size:0.72rem;padding:4px;">${_esc(e.detail || 'Error')}</div>`; return; }
+      const data = await r.json();
+      res.innerHTML = data.steps.map((s, i) => {
+        const ok = !s.error;
+        const hdr = `<span style="color:${ok?'#81c784':'#ef5350'};font-size:0.65rem;font-weight:600;">[${i}] ${_esc(s.tool)}</span>
+          ${s.note ? `<span style="color:#444;font-size:0.65rem;"> — ${_esc(s.note)}</span>` : ''}
+          <span style="color:#333;font-size:0.62rem;float:right;">${s.duration_ms}ms</span>`;
+        const body = s.error
+          ? `<div style="color:#ef5350;font-size:0.68rem;white-space:pre-wrap;word-break:break-all;">${_esc(s.error)}</div>`
+          : `<div style="color:#ccc;font-size:0.68rem;white-space:pre-wrap;word-break:break-all;max-height:80px;overflow-y:auto;">${_esc(s.result)}</div>`;
+        return `<div style="border:1px solid #1a1a1a;border-radius:3px;padding:4px 6px;background:#050505;">
+          <div style="margin-bottom:3px;">${hdr}</div>${body}</div>`;
+      }).join('');
+    } catch(e) { res.innerHTML = '<div style="color:#ef5350;font-size:0.72rem;padding:4px;">Network error</div>'; }
+  }
+
+  async function wfDelete(name) {
+    if (!confirm(`Delete workflow "${name}"?`)) return;
+    await fetch(`/api/workflows/${encodeURIComponent(name)}`, {method:'DELETE'}).catch(()=>{});
+    loadWorkflows();
+    if (document.getElementById('wf-name').value === name) wfNew();
+  }
 
   // ── System log viewer ────────────────────────────────────────────────────
 

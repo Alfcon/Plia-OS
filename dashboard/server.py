@@ -1515,6 +1515,47 @@ async def clear_logs():
     return {"ok": True}
 
 
+# ── Workflows ─────────────────────────────────────────────────────────────────
+
+@router.get("/api/workflows")
+async def list_workflows_endpoint():
+    from agents.workflow_store import list_workflows
+    return {"workflows": await asyncio.to_thread(list_workflows)}
+
+
+@router.post("/api/workflows")
+async def save_workflow_endpoint(body: dict):
+    from agents.workflow_store import save_workflow
+    name = body.get("name", "").strip()
+    steps = body.get("steps", [])
+    description = body.get("description", "")
+    if not name:
+        raise HTTPException(status_code=400, detail="name required")
+    if not isinstance(steps, list):
+        raise HTTPException(status_code=400, detail="steps must be a list")
+    await asyncio.to_thread(save_workflow, name, steps, description)
+    return {"ok": True, "name": name}
+
+
+@router.delete("/api/workflows/{name}")
+async def delete_workflow_endpoint(name: str):
+    from agents.workflow_store import delete_workflow
+    deleted = await asyncio.to_thread(delete_workflow, name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    return {"ok": True}
+
+
+@router.post("/api/workflows/{name}/run")
+async def run_workflow_endpoint(name: str):
+    from agents.workflow_store import run_workflow
+    try:
+        results = await run_workflow(name)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return {"name": name, "steps": results}
+
+
 @router.get("/api/token-usage")
 async def get_token_usage():
     from core.token_usage import get_stats
