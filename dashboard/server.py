@@ -74,6 +74,9 @@ def setup_event_forwarding() -> None:
     """Call once at startup to wire the event bus to WebSocket clients."""
     if not events.is_subscribed(_broadcast):
         events.subscribe(_broadcast)
+    from core.event_log import log_event
+    if not events.is_subscribed(log_event):
+        events.subscribe(log_event)
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -1994,6 +1997,23 @@ async def trigger_webhook(slug: str, request: Request):
         payload = {}
     result = await fire_webhook(slug, payload)
     return result
+
+
+# ── Event history ─────────────────────────────────────────────────────────────
+
+@router.get("/api/events")
+async def list_events(n: int = 200, type: str | None = None):
+    from core.event_log import get_events, get_event_types
+    events_list = await asyncio.to_thread(get_events, n, type)
+    types = await asyncio.to_thread(get_event_types)
+    return {"events": events_list, "types": types, "count": len(events_list)}
+
+
+@router.delete("/api/events")
+async def clear_events_endpoint():
+    from core.event_log import clear_events
+    deleted = await asyncio.to_thread(clear_events)
+    return {"ok": True, "deleted": deleted}
 
 
 # ── Tool playground ───────────────────────────────────────────────────────────

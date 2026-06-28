@@ -750,6 +750,7 @@
         <button class="m-nav-btn" data-section="git" onclick="showMenuSection('git');loadGit()">Git</button>
         <button class="m-nav-btn" data-section="vars" onclick="showMenuSection('vars');loadVars()">Vars</button>
         <button class="m-nav-btn" data-section="tools" onclick="showMenuSection('tools');loadTools()">Tools</button>
+        <button class="m-nav-btn" data-section="evtlog" onclick="showMenuSection('evtlog');loadEventLog()">Events</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -1652,6 +1653,24 @@
             <button onclick="document.getElementById('tool-output').textContent=''" style="background:none;border:none;color:#444;font-size:0.7rem;cursor:pointer;">Clear</button>
           </div>
           <pre id="tool-output" style="flex:1;min-height:0;overflow-y:auto;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;padding:8px;font-size:0.72rem;color:#e0e0e0;white-space:pre-wrap;word-break:break-all;margin:0;"></pre>
+        </div>
+
+        <!-- Event history -->
+        <div id="m-section-evtlog" class="m-pane" style="display:none;flex-direction:column;gap:6px;">
+          <div style="display:flex;gap:5px;align-items:center;flex-shrink:0;flex-wrap:wrap;">
+            <select id="evtlog-type" onchange="loadEventLog()" style="background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:2px 6px;font-size:0.72rem;font-family:monospace;">
+              <option value="">all types</option>
+            </select>
+            <input id="evtlog-n" type="number" value="100" min="10" max="2000" style="width:55px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:2px 5px;font-size:0.72rem;text-align:center;" onchange="loadEventLog()">
+            <label style="font-size:0.68rem;color:#555;display:flex;align-items:center;gap:3px;">
+              <input type="checkbox" id="evtlog-auto" onchange="_toggleEvtAutoRefresh()"> live
+            </label>
+            <span style="flex:1;"></span>
+            <button onclick="loadEventLog()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
+            <button onclick="_clearEventLog()" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;">Clear</button>
+          </div>
+          <div id="evtlog-count" style="font-size:0.65rem;color:#444;flex-shrink:0;"></div>
+          <div id="evtlog-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.7rem;font-family:monospace;"></div>
         </div>
 
         <div id="m-section-git" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
@@ -5440,6 +5459,88 @@
       if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
       if (e.key === 'Escape') { loadVars(); }
     });
+  }
+
+  // ── Event history ────────────────────────────────────────────────────────
+
+  const _EVT_COLORS = {
+    agent_routing: '#81c784',
+    reminder_fired: '#ffb74d',
+    status: '#4fc3f7',
+    transcript: '#ce93d8',
+    clear_history: '#ef9a9a',
+  };
+
+  let _evtAutoTimer = null;
+
+  async function loadEventLog() {
+    const typeFilter = document.getElementById('evtlog-type')?.value || '';
+    const n = parseInt(document.getElementById('evtlog-n')?.value || '100', 10);
+    let data;
+    try {
+      const url = `/api/events?n=${n}${typeFilter ? '&type='+encodeURIComponent(typeFilter) : ''}`;
+      const r = await fetch(url);
+      if (!r.ok) return;
+      data = await r.json();
+    } catch(e) { return; }
+
+    // populate type filter
+    const sel = document.getElementById('evtlog-type');
+    if (sel) {
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">all types</option>' +
+        data.types.map(t => `<option value="${_esc(t)}"${t===prev?' selected':''}>${_esc(t)}</option>`).join('');
+    }
+
+    document.getElementById('evtlog-count').textContent =
+      `${data.count} event${data.count!==1?'s':''} shown`;
+
+    const list = document.getElementById('evtlog-list');
+    if (!data.events.length) {
+      list.innerHTML = '<div style="padding:8px;color:#333;">No events recorded.</div>';
+      return;
+    }
+    list.innerHTML = data.events.map(e => {
+      const color = _EVT_COLORS[e.event_type] || '#888';
+      const ts = new Date(e.ts * 1000);
+      const tsStr = ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      const dateStr = ts.toLocaleDateString([], {month:'short',day:'numeric'});
+      const summary = _evtSummary(e);
+      return `<div style="display:flex;gap:6px;padding:4px 8px;border-bottom:1px solid #111;align-items:baseline;cursor:pointer;" onclick="_evtToggle(this)">
+        <span style="color:#333;font-size:0.62rem;flex-shrink:0;white-space:nowrap;" title="${_esc(dateStr)}">${_esc(tsStr)}</span>
+        <span style="color:${color};flex-shrink:0;font-size:0.68rem;min-width:110px;">${_esc(e.event_type)}</span>
+        <span style="color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${_esc(summary)}</span>
+        <pre class="evtlog-detail" style="display:none;white-space:pre-wrap;word-break:break-all;color:#666;margin:4px 0 0;font-size:0.65rem;">${_esc(JSON.stringify(e.data, null, 2))}</pre>
+      </div>`;
+    }).join('');
+  }
+
+  function _evtSummary(e) {
+    const d = e.data || {};
+    switch(e.event_type) {
+      case 'agent_routing': return `→ ${d.agent || '?'} ${d.keyword ? '(kw)' : ''} ${d.query ? '"'+d.query.slice(0,40)+'"' : ''}`.trim();
+      case 'reminder_fired': return d.message || '';
+      case 'status': return d.status || d.state || '';
+      case 'transcript': return (d.role ? `[${d.role}] ` : '') + (d.text || '').slice(0, 60);
+      default: return JSON.stringify(d).slice(0, 80);
+    }
+  }
+
+  function _evtToggle(row) {
+    const pre = row.querySelector('.evtlog-detail');
+    if (pre) pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function _toggleEvtAutoRefresh() {
+    const checked = document.getElementById('evtlog-auto')?.checked;
+    clearInterval(_evtAutoTimer);
+    if (checked) _evtAutoTimer = setInterval(loadEventLog, 3000);
+  }
+
+  async function _clearEventLog() {
+    if (!confirm('Clear all event history?')) return;
+    await fetch('/api/events', {method:'DELETE'}).catch(()=>{});
+    loadEventLog();
   }
 
   // ── Tool playground ──────────────────────────────────────────────────────
