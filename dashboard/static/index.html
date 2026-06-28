@@ -774,6 +774,10 @@
         <button class="m-nav-btn" data-section="schedmsg" onclick="showMenuSection('schedmsg');loadScheduledMsgs()">Sched Msgs</button>
         <button class="m-nav-btn" data-section="sandbox" onclick="showMenuSection('sandbox')">Sandbox</button>
         <button class="m-nav-btn" data-section="sysalerts" onclick="showMenuSection('sysalerts');loadAlertConfig();loadAlertLog()">Sys Alerts</button>
+        <button class="m-nav-btn" data-section="cfghistory" onclick="showMenuSection('cfghistory');loadCfgHistory()">Cfg History</button>
+        <button class="m-nav-btn" data-section="toolstats" onclick="showMenuSection('toolstats');loadToolStats()">Tool Stats</button>
+        <button class="m-nav-btn" data-section="voiceshortcuts" onclick="showMenuSection('voiceshortcuts');loadVoiceShortcuts()">Shortcuts</button>
+        <button class="m-nav-btn" data-section="agenttrace" onclick="showMenuSection('agenttrace');loadAgentTrace()">Agent Trace</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2023,6 +2027,53 @@
             <button onclick="clearAlertLog()" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;">Clear</button>
           </div>
           <div id="alert-log" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;"></div>
+        </div>
+
+        <!-- Config History -->
+        <div id="m-section-cfghistory" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Timeline of config field changes (old → new, timestamped).</div>
+          <div style="flex-shrink:0;display:flex;align-items:center;gap:6px;">
+            <button onclick="loadCfgHistory()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻ Refresh</button>
+            <button onclick="clearCfgHistory()" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;">Clear</button>
+          </div>
+          <div id="cfg-history-log" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;font-family:monospace;"></div>
+        </div>
+
+        <!-- Tool Stats -->
+        <div id="m-section-toolstats" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Agent/tool call counts, avg latency, errors — updated live from routing events.</div>
+          <div style="flex-shrink:0;display:flex;align-items:center;gap:6px;">
+            <button onclick="loadToolStats()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻ Refresh</button>
+            <button onclick="resetToolStats()" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;">Reset</button>
+          </div>
+          <div id="tool-stats-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:5px;"></div>
+        </div>
+
+        <!-- Voice Shortcuts -->
+        <div id="m-section-voiceshortcuts" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Keyword → pipeline message mappings. Matched before LLM routing.</div>
+          <div style="flex-shrink:0;border:1px solid #1a1a1a;border-radius:3px;padding:8px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:end;">
+              <label style="font-size:0.72rem;color:#aaa;">Keyword
+                <input type="text" id="sc-keyword" placeholder="e.g. weather" style="width:100%;margin-top:3px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 6px;font-size:0.73rem;box-sizing:border-box;">
+              </label>
+              <label style="font-size:0.72rem;color:#aaa;">Pipeline message
+                <input type="text" id="sc-message" placeholder="e.g. What is the weather today?" style="width:100%;margin-top:3px;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:3px 6px;font-size:0.73rem;box-sizing:border-box;">
+              </label>
+              <button onclick="addVoiceShortcut()" style="background:#0a1a0a;border:1px solid #2e4d2e;color:#a5d6a7;font-size:0.73rem;padding:5px 10px;border-radius:3px;cursor:pointer;white-space:nowrap;">+ Add</button>
+            </div>
+          </div>
+          <div id="shortcuts-voice-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+        </div>
+
+        <!-- Agent Trace -->
+        <div id="m-section-agenttrace" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Recent supervisor routing decisions: agent, method, latency, query snippet.</div>
+          <div style="flex-shrink:0;display:flex;align-items:center;gap:6px;">
+            <button onclick="loadAgentTrace()" style="background:none;border:none;color:#4fc3f7;font-size:0.72rem;cursor:pointer;">↻ Refresh</button>
+            <button onclick="clearAgentTrace()" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;">Clear</button>
+          </div>
+          <div id="agent-trace-log" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;font-size:0.75rem;font-family:monospace;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -7336,6 +7387,111 @@
   async function clearAlertLog() {
     await fetch('/api/alerts/log', {method:'DELETE'}).catch(()=>{});
     await loadAlertLog();
+  }
+
+  // ── Config history ────────────────────────────────────────────────────────
+
+  async function loadCfgHistory() {
+    const el = document.getElementById('cfg-history-log');
+    if (!el) return;
+    const data = await fetch('/api/config/history').then(r=>r.json()).catch(()=>({history:[]}));
+    if (!data.history.length) { el.innerHTML='<div style="padding:8px;color:#444;">No changes recorded.</div>'; return; }
+    el.innerHTML = data.history.map(h => {
+      const ts = new Date(h.ts*1000).toLocaleTimeString();
+      const changes = Object.entries(h.changes).map(([k,v]) =>
+        `<span style="color:#aaa;">${k}</span>: <span style="color:#ef9a9a;">${JSON.stringify(v.old)}</span> → <span style="color:#a5d6a7;">${JSON.stringify(v.new)}</span>`
+      ).join('<br>');
+      return `<div style="padding:6px 8px;border-bottom:1px solid #1a1a1a;"><span style="color:#555;font-size:0.68rem;">${ts}</span><br>${changes}</div>`;
+    }).join('');
+  }
+
+  async function clearCfgHistory() {
+    await fetch('/api/config/history', {method:'DELETE'}).catch(()=>{});
+    await loadCfgHistory();
+  }
+
+  // ── Tool stats ────────────────────────────────────────────────────────────
+
+  async function loadToolStats() {
+    const el = document.getElementById('tool-stats-list');
+    if (!el) return;
+    const data = await fetch('/api/tools/stats').then(r=>r.json()).catch(()=>({stats:[]}));
+    if (!data.stats.length) { el.innerHTML='<div style="color:#444;font-size:0.75rem;">No routing events yet.</div>'; return; }
+    const maxCalls = Math.max(...data.stats.map(s=>s.calls), 1);
+    el.innerHTML = data.stats.map(s => {
+      const pct = Math.round(s.calls/maxCalls*100);
+      return `<div style="border:1px solid #1a1a1a;border-radius:3px;padding:6px 8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:0.75rem;color:#e0e0e0;">${s.agent}</span>
+          <span style="font-size:0.68rem;color:#555;">${s.calls} calls · ${s.avg_latency_ms}ms avg</span>
+        </div>
+        <div style="background:#1a1a1a;border-radius:2px;height:4px;"><div style="background:#4fc3f7;height:4px;border-radius:2px;width:${pct}%;"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  async function resetToolStats() {
+    await fetch('/api/tools/stats/reset', {method:'POST'}).catch(()=>{});
+    await loadToolStats();
+  }
+
+  // ── Voice shortcuts ───────────────────────────────────────────────────────
+
+  async function loadVoiceShortcuts() {
+    const el = document.getElementById('shortcuts-voice-list');
+    if (!el) return;
+    const data = await fetch('/api/shortcuts').then(r=>r.json()).catch(()=>({shortcuts:[]}));
+    if (!data.shortcuts.length) { el.innerHTML='<div style="color:#444;font-size:0.75rem;">No shortcuts defined.</div>'; return; }
+    el.innerHTML = data.shortcuts.map(s =>
+      `<div style="border:1px solid #1a1a1a;border-radius:3px;padding:6px 8px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div>
+          <span style="font-size:0.72rem;color:#4fc3f7;">"${s.keyword}"</span>
+          <span style="font-size:0.68rem;color:#555;margin:0 6px;">→</span>
+          <span style="font-size:0.72rem;color:#e0e0e0;">${s.message}</span>
+        </div>
+        <button onclick="deleteVoiceShortcut(${s.id})" style="background:none;border:none;color:#555;cursor:pointer;font-size:0.8rem;flex-shrink:0;">✕</button>
+      </div>`
+    ).join('');
+  }
+
+  async function addVoiceShortcut() {
+    const kw = document.getElementById('sc-keyword').value.trim();
+    const msg = document.getElementById('sc-message').value.trim();
+    if (!kw || !msg) return;
+    await fetch('/api/shortcuts', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({keyword:kw, message:msg})});
+    document.getElementById('sc-keyword').value='';
+    document.getElementById('sc-message').value='';
+    await loadVoiceShortcuts();
+  }
+
+  async function deleteVoiceShortcut(id) {
+    await fetch(`/api/shortcuts/${id}`, {method:'DELETE'}).catch(()=>{});
+    await loadVoiceShortcuts();
+  }
+
+  // ── Agent trace ───────────────────────────────────────────────────────────
+
+  async function loadAgentTrace() {
+    const el = document.getElementById('agent-trace-log');
+    if (!el) return;
+    const data = await fetch('/api/trace/recent').then(r=>r.json()).catch(()=>({traces:[]}));
+    if (!data.traces.length) { el.innerHTML='<div style="padding:8px;color:#444;">No traces yet.</div>'; return; }
+    el.innerHTML = data.traces.map(t => {
+      const ts = new Date(t.ts*1000).toLocaleTimeString();
+      const methodColor = t.routing_method==='keyword' ? '#a5d6a7' : '#4fc3f7';
+      return `<div style="padding:5px 8px;border-bottom:1px solid #1a1a1a;">
+        <span style="color:#555;font-size:0.65rem;">${ts}</span>
+        <span style="color:#e0e0e0;font-size:0.73rem;margin:0 6px;">${t.agent}</span>
+        <span style="color:${methodColor};font-size:0.65rem;">[${t.routing_method}]</span>
+        <span style="color:#555;font-size:0.65rem;margin-left:6px;">${t.latency_ms}ms</span>
+        ${t.query ? `<div style="color:#666;font-size:0.65rem;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.query}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  async function clearAgentTrace() {
+    await fetch('/api/trace/recent', {method:'DELETE'}).catch(()=>{});
+    await loadAgentTrace();
   }
 
   // ── Benchmark panel ───────────────────────────────────────────────────────

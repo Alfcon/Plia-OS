@@ -72,6 +72,35 @@ async def _broadcast(payload: dict) -> None:
         _ws_clients.remove(ws)
 
 
+import collections as _collections_top
+import time as _time_top
+
+_CONFIG_HISTORY: _collections_top.deque = _collections_top.deque(maxlen=200)
+
+_TOOL_STATS: dict[str, dict] = {}
+
+_TURN_TRACES: _collections_top.deque = _collections_top.deque(maxlen=100)
+
+
+def _on_agent_routing(payload: dict) -> None:
+    if payload.get("type") != "agent_routing":
+        return
+    agent = payload.get("agent", "unknown")
+    latency = payload.get("latency_ms", 0)
+    # tool analytics
+    entry = _TOOL_STATS.setdefault(agent, {"calls": 0, "total_latency_ms": 0, "errors": 0})
+    entry["calls"] += 1
+    entry["total_latency_ms"] += latency
+    # turn trace
+    _TURN_TRACES.appendleft({
+        "ts": _time_top.time(),
+        "agent": agent,
+        "routing_method": payload.get("routing_method", "unknown"),
+        "latency_ms": latency,
+        "query": payload.get("query", ""),
+    })
+
+
 def setup_event_forwarding() -> None:
     """Call once at startup to wire the event bus to WebSocket clients."""
     if not events.is_subscribed(_broadcast):
@@ -79,6 +108,8 @@ def setup_event_forwarding() -> None:
     from core.event_log import log_event
     if not events.is_subscribed(log_event):
         events.subscribe(log_event)
+    if not events.is_subscribed(_on_agent_routing):
+        events.subscribe(_on_agent_routing)
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -242,6 +273,7 @@ async def get_config_route():
 @router.post("/api/config")
 async def post_config(updates: dict):
     updates.pop("system_prompt_backup", None)  # internal field — not settable via public API
+    _old_cfg = dataclasses.asdict(get_config())
     old_engine = get_config().tts_engine
     old_briefing_enabled = get_config().briefing_cron_enabled
     old_briefing_time = get_config().briefing_cron_time
@@ -249,6 +281,9 @@ async def post_config(updates: dict):
         config = update_config(**updates)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    _changes = {k: {"old": _old_cfg.get(k), "new": v} for k, v in updates.items() if _old_cfg.get(k) != v}
+    if _changes:
+        _CONFIG_HISTORY.appendleft({"ts": _time_top.time(), "changes": _changes})
     # Sync briefing cron job when enabled/time changes
     if config.briefing_cron_enabled != old_briefing_enabled or config.briefing_cron_time != old_briefing_time:
         from agents.cron_store import get_cron_store
@@ -857,9 +892,13 @@ async def chat(body: dict):
     from core.supervisor import run_turn
     from core.context_compactor import maybe_compact
     from agents.chat_history import get_recent, _HISTORY_PRELOAD
+    from core.shortcut_store import match_shortcut
     text = (body.get("text") or "").strip()
     if not text:
         raise HTTPException(status_code=422, detail="text required")
+    mapped = match_shortcut(text)
+    if mapped:
+        text = mapped
     rows = await asyncio.to_thread(get_recent, _HISTORY_PRELOAD)
     history = [{"role": m["role"], "content": m["content"]} for m in rows]
     history.append({"role": "user", "content": text})
@@ -3184,6 +3223,71 @@ async def set_alert_config(body: dict):
             kwargs[key] = val
     if kwargs:
         await asyncio.to_thread(update_config, **kwargs)
+    return {"ok": True}
+
+
+@router.get("/api/config/history")
+async def config_history(n: int = 50):
+    return {"history": list(_CONFIG_HISTORY)[:n]}
+
+
+@router.delete("/api/config/history")
+async def clear_config_history():
+    _CONFIG_HISTORY.clear()
+    return {"ok": True}
+
+
+@router.get("/api/tools/stats")
+async def tool_stats():
+    result = []
+    for agent, s in _TOOL_STATS.items():
+        calls = s["calls"]
+        avg_latency = round(s["total_latency_ms"] / calls) if calls else 0
+        result.append({"agent": agent, "calls": calls, "avg_latency_ms": avg_latency, "errors": s["errors"]})
+    result.sort(key=lambda x: x["calls"], reverse=True)
+    return {"stats": result}
+
+
+@router.post("/api/tools/stats/reset")
+async def reset_tool_stats():
+    _TOOL_STATS.clear()
+    return {"ok": True}
+
+
+@router.get("/api/shortcuts")
+async def list_shortcuts():
+    from core.shortcut_store import list_shortcuts as _list
+    return {"shortcuts": await asyncio.to_thread(_list)}
+
+
+@router.post("/api/shortcuts")
+async def add_shortcut(body: dict):
+    keyword = (body.get("keyword") or "").strip()
+    message = (body.get("message") or "").strip()
+    if not keyword or not message:
+        raise HTTPException(status_code=400, detail="keyword and message required")
+    from core.shortcut_store import add_shortcut as _add
+    shortcut_id = await asyncio.to_thread(_add, keyword, message)
+    return {"ok": True, "id": shortcut_id}
+
+
+@router.delete("/api/shortcuts/{shortcut_id}")
+async def delete_shortcut(shortcut_id: int):
+    from core.shortcut_store import delete_shortcut as _del
+    found = await asyncio.to_thread(_del, shortcut_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="shortcut not found")
+    return {"ok": True}
+
+
+@router.get("/api/trace/recent")
+async def recent_traces(n: int = 50):
+    return {"traces": list(_TURN_TRACES)[:n]}
+
+
+@router.delete("/api/trace/recent")
+async def clear_traces():
+    _TURN_TRACES.clear()
     return {"ok": True}
 
 
