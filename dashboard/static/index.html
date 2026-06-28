@@ -817,6 +817,10 @@
         <button class="m-nav-btn" data-section="hasher" onclick="showMenuSection('hasher')">Hash</button>
         <button class="m-nav-btn" data-section="regextester" onclick="showMenuSection('regextester')">Regex</button>
         <button class="m-nav-btn" data-section="diskusage" onclick="showMenuSection('diskusage');loadDiskUsage()">Disk</button>
+        <button class="m-nav-btn" data-section="colorconv" onclick="showMenuSection('colorconv')">Color</button>
+        <button class="m-nav-btn" data-section="uuidgen" onclick="showMenuSection('uuidgen')">UUID</button>
+        <button class="m-nav-btn" data-section="mdrender" onclick="showMenuSection('mdrender')">Markdown</button>
+        <button class="m-nav-btn" data-section="csvview" onclick="showMenuSection('csvview')">CSV</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2665,6 +2669,67 @@
             <span id="disk-total" style="font-size:0.68rem;color:#555;margin-left:auto;"></span>
           </div>
           <div id="disk-list" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:5px;"></div>
+        </div>
+
+        <!-- Color Converter -->
+        <div id="m-section-colorconv" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-weight:600;font-size:13px;">Color Converter</div>
+          <div style="display:flex;gap:6px;">
+            <input id="color-input" placeholder="#ff6600 or rgb(255,102,0) or hsl(24,100%,50%)" style="flex:1;padding:5px 8px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:12px;" oninput="convertColor()">
+          </div>
+          <div id="color-swatch" style="display:none;width:100%;height:60px;border-radius:4px;border:1px solid #333;"></div>
+          <div id="color-results" style="display:flex;flex-direction:column;gap:4px;"></div>
+        </div>
+
+        <!-- UUID Generator -->
+        <div id="m-section-uuidgen" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-weight:600;font-size:13px;">UUID Generator</div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <label style="font-size:12px;color:#aaa;">Version</label>
+            <select id="uuid-version" style="padding:4px 6px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:12px;">
+              <option value="4">v4 (random)</option>
+              <option value="1">v1 (time-based)</option>
+            </select>
+            <label style="font-size:12px;color:#aaa;">Count</label>
+            <input id="uuid-count" type="number" value="5" min="1" max="50" style="width:56px;padding:4px 6px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:12px;">
+            <label style="display:flex;gap:4px;align-items:center;font-size:12px;color:#aaa;"><input id="uuid-upper" type="checkbox"> Upper</label>
+            <button onclick="generateUUIDs()" style="padding:4px 10px;background:#2a5298;border:none;border-radius:4px;color:#fff;font-size:12px;cursor:pointer;">Generate</button>
+          </div>
+          <div style="display:flex;justify-content:flex-end;">
+            <button onclick="copyAllUUIDs()" style="padding:3px 10px;background:#333;border:none;border-radius:4px;color:#ccc;font-size:11px;cursor:pointer;">Copy All</button>
+          </div>
+          <div id="uuid-results" style="display:flex;flex-direction:column;gap:3px;max-height:260px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- Markdown Renderer -->
+        <div id="m-section-mdrender" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-weight:600;font-size:13px;">Markdown Renderer</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="font-size:11px;color:#888;">Input</div>
+              <textarea id="md-input" placeholder="# Heading&#10;**bold** _italic_&#10;- list item" style="flex:1;min-height:220px;padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:12px;resize:vertical;font-family:monospace;" oninput="renderMarkdown()"></textarea>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="font-size:11px;color:#888;">Preview</div>
+              <div id="md-preview" style="flex:1;min-height:220px;padding:8px;background:#111;border:1px solid #333;border-radius:4px;color:#ddd;font-size:13px;overflow-y:auto;line-height:1.5;"></div>
+            </div>
+          </div>
+          <div id="md-status" style="font-size:11px;color:#666;"></div>
+        </div>
+
+        <!-- CSV Viewer -->
+        <div id="m-section-csvview" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-weight:600;font-size:13px;">CSV Viewer</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <label style="font-size:12px;color:#aaa;">Delimiter <input id="csv-delim" value="," style="width:36px;padding:3px 5px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:12px;"></label>
+            <label style="display:flex;gap:4px;align-items:center;font-size:12px;color:#aaa;"><input id="csv-header" type="checkbox" checked> Has header</label>
+            <label style="font-size:12px;color:#aaa;">Max rows <input id="csv-maxrows" type="number" value="1000" style="width:60px;padding:3px 5px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:12px;"></label>
+          </div>
+          <textarea id="csv-input" placeholder="Paste CSV here..." style="min-height:100px;padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:12px;resize:vertical;font-family:monospace;" oninput="parseCSV()"></textarea>
+          <div id="csv-status" style="font-size:11px;color:#888;"></div>
+          <div style="overflow:auto;max-height:280px;">
+            <table id="csv-table" style="width:100%;border-collapse:collapse;font-size:12px;display:none;"></table>
+          </div>
         </div>
 
         <!-- Wake Word Test -->
@@ -8139,6 +8204,113 @@
         </div>`;
       }).join('') || '<div style="color:#444;font-size:0.72rem;">No partitions</div>';
     } catch(e) { list.textContent = 'Error'; }
+  }
+
+  // ── Color converter ──────────────────────────────────────────────────────────
+  let _colorTimer = null;
+  function convertColor() {
+    clearTimeout(_colorTimer);
+    _colorTimer = setTimeout(async () => {
+      const val = document.getElementById('color-input').value.trim();
+      if (!val) { document.getElementById('color-results').innerHTML=''; document.getElementById('color-swatch').style.display='none'; return; }
+      try {
+        const r = await fetch('/api/color', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:val})});
+        if (!r.ok) { document.getElementById('color-results').innerHTML=`<div style="color:#f66;font-size:12px;">${_esc((await r.json()).detail||'Error')}</div>`; document.getElementById('color-swatch').style.display='none'; return; }
+        const d = await r.json();
+        const sw = document.getElementById('color-swatch');
+        sw.style.display='block'; sw.style.background=d.hex;
+        sw.style.color=d.luminance>0.5?'#000':'#fff';
+        sw.style.display='flex'; sw.style.alignItems='center'; sw.style.justifyContent='center';
+        sw.style.fontSize='13px'; sw.style.fontWeight='600';
+        sw.textContent=d.hex.toUpperCase()+' — luminance '+d.luminance;
+        const formats = [{k:'hex',label:'HEX'},{k:'hex_upper',label:'HEX (upper)'},{k:'rgb',label:'RGB'},{k:'hsl',label:'HSL'}];
+        document.getElementById('color-results').innerHTML=formats.map(f=>`
+          <div style="display:flex;align-items:center;gap:6px;background:#1a1a1a;padding:5px 8px;border-radius:4px;">
+            <span style="font-size:11px;color:#666;width:80px;">${f.label}</span>
+            <code style="flex:1;font-size:12px;color:#7ec8e3;">${_esc(d[f.k])}</code>
+            <button onclick="navigator.clipboard.writeText('${_esc(d[f.k])}')" style="padding:2px 8px;background:#333;border:none;border-radius:3px;color:#aaa;font-size:11px;cursor:pointer;">Copy</button>
+          </div>`).join('');
+      } catch(e) { document.getElementById('color-results').innerHTML=`<div style="color:#f66;font-size:12px;">${_esc(e.message)}</div>`; }
+    }, 300);
+  }
+
+  // ── UUID generator ────────────────────────────────────────────────────────────
+  async function generateUUIDs() {
+    const version=parseInt(document.getElementById('uuid-version').value);
+    const count=parseInt(document.getElementById('uuid-count').value)||5;
+    const upper=document.getElementById('uuid-upper').checked;
+    try {
+      const r=await fetch('/api/uuid',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version,count,upper})});
+      const d=await r.json();
+      if(!r.ok){document.getElementById('uuid-results').innerHTML=`<div style="color:#f66;font-size:12px;">${_esc(d.detail||'Error')}</div>`;return;}
+      document.getElementById('uuid-results').innerHTML=d.uuids.map(u=>`
+        <div style="display:flex;align-items:center;gap:6px;background:#1a1a1a;padding:4px 8px;border-radius:4px;">
+          <code style="flex:1;font-size:12px;color:#b5e48c;">${_esc(u)}</code>
+          <button onclick="navigator.clipboard.writeText('${_esc(u)}')" style="padding:2px 6px;background:#333;border:none;border-radius:3px;color:#aaa;font-size:10px;cursor:pointer;">Copy</button>
+        </div>`).join('');
+    } catch(e){document.getElementById('uuid-results').innerHTML=`<div style="color:#f66;font-size:12px;">${_esc(e.message)}</div>`;}
+  }
+  function copyAllUUIDs() {
+    const codes=[...document.querySelectorAll('#uuid-results code')].map(c=>c.textContent);
+    if(codes.length) navigator.clipboard.writeText(codes.join('\n'));
+  }
+
+  // ── Markdown renderer ─────────────────────────────────────────────────────────
+  let _mdTimer=null;
+  function renderMarkdown() {
+    clearTimeout(_mdTimer);
+    _mdTimer=setTimeout(async()=>{
+      const text=document.getElementById('md-input').value;
+      const status=document.getElementById('md-status');
+      const preview=document.getElementById('md-preview');
+      if(!text){preview.innerHTML='';status.textContent='';return;}
+      try {
+        const r=await fetch('/api/markdown',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+        const d=await r.json();
+        preview.innerHTML=d.html;
+        status.textContent=`${d.length} chars — rendered via ${d.engine}`;
+      } catch(e){status.textContent='Error: '+e.message;status.style.color='#f66';}
+    },250);
+  }
+
+  // ── CSV viewer ────────────────────────────────────────────────────────────────
+  let _csvTimer=null, _csvSortCol=-1, _csvSortAsc=true, _csvData=null;
+  function parseCSV() {
+    clearTimeout(_csvTimer);
+    _csvTimer=setTimeout(async()=>{
+      const text=document.getElementById('csv-input').value;
+      const status=document.getElementById('csv-status');
+      const tbl=document.getElementById('csv-table');
+      if(!text){tbl.style.display='none';status.textContent='';_csvData=null;return;}
+      const delim=(document.getElementById('csv-delim').value||',')[0];
+      const header=document.getElementById('csv-header').checked;
+      const maxRows=parseInt(document.getElementById('csv-maxrows').value)||1000;
+      try {
+        const r=await fetch('/api/csv/parse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,delimiter:delim,header,max_rows:maxRows})});
+        const d=await r.json();
+        _csvData=d; _csvSortCol=-1;
+        status.textContent=`${d.total} rows × ${d.columns} columns`;
+        renderCSVTable(d);
+      } catch(e){status.textContent='Error: '+e.message;status.style.color='#f66';}
+    },300);
+  }
+  function renderCSVTable(d){
+    const tbl=document.getElementById('csv-table');
+    tbl.style.display='table';
+    const head=`<thead><tr>${d.headers.map((h,i)=>`<th onclick="csvSort(${i})" style="padding:5px 8px;background:#1a1a1a;border:1px solid #333;text-align:left;cursor:pointer;white-space:nowrap;font-size:12px;color:#7ec8e3;">${_esc(h)}</th>`).join('')}</tr></thead>`;
+    const body=`<tbody>${d.rows.map(row=>`<tr>${row.map(cell=>`<td style="padding:4px 8px;border:1px solid #222;font-size:12px;color:#ddd;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;">${_esc(String(cell??''))}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    tbl.innerHTML=head+body;
+  }
+  function csvSort(col){
+    if(!_csvData)return;
+    if(_csvSortCol===col){_csvSortAsc=!_csvSortAsc;}else{_csvSortCol=col;_csvSortAsc=true;}
+    const rows=[..._csvData.rows].sort((a,b)=>{
+      const av=a[col]??'',bv=b[col]??'';
+      const an=parseFloat(av),bn=parseFloat(bv);
+      const cmp=!isNaN(an)&&!isNaN(bn)?an-bn:String(av).localeCompare(String(bv));
+      return _csvSortAsc?cmp:-cmp;
+    });
+    renderCSVTable({..._csvData,rows});
   }
 
   // ── Tool playground ──────────────────────────────────────────────────────

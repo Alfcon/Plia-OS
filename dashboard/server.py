@@ -4567,6 +4567,147 @@ async def disk_usage():
     return {"partitions": partitions, "total": len(partitions)}
 
 
+# ── Color converter ───────────────────────────────────────────────────────────
+
+def _hex_to_rgb(h: str) -> tuple:
+    h = h.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+def _rgb_to_hsl(r: int, g: int, b: int) -> tuple:
+    rf, gf, bf = r / 255, g / 255, b / 255
+    mx, mn = max(rf, gf, bf), min(rf, gf, bf)
+    lf = (mx + mn) / 2
+    if mx == mn:
+        hf = sf = 0.0
+    else:
+        d = mx - mn
+        sf = d / (2 - mx - mn) if lf > 0.5 else d / (mx + mn)
+        if mx == rf:
+            hf = ((gf - bf) / d + (6 if gf < bf else 0)) / 6
+        elif mx == gf:
+            hf = ((bf - rf) / d + 2) / 6
+        else:
+            hf = ((rf - gf) / d + 4) / 6
+    return round(hf * 360), round(sf * 100), round(lf * 100)
+
+
+def _hsl_to_rgb(h: float, s: float, lv: float) -> tuple:
+    h, s, lv = h / 360, s / 100, lv / 100
+    if s == 0:
+        v = round(lv * 255)
+        return v, v, v
+
+    def _h2rgb(p: float, q: float, t: float) -> float:
+        t = t % 1
+        if t < 1 / 6:
+            return p + (q - p) * 6 * t
+        if t < 0.5:
+            return q
+        if t < 2 / 3:
+            return p + (q - p) * (2 / 3 - t) * 6
+        return p
+
+    q = lv * (1 + s) if lv < 0.5 else lv + s - lv * s
+    p = 2 * lv - q
+    return round(_h2rgb(p, q, h + 1/3) * 255), round(_h2rgb(p, q, h) * 255), round(_h2rgb(p, q, h - 1/3) * 255)
+
+
+@router.post("/api/color")
+async def color_convert(body: dict):
+    import re as _re
+    value = str(body.get("value", "")).strip()
+    if not value:
+        raise HTTPException(status_code=422, detail="value required")
+    if _re.match(r"^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$", value):
+        r, g, b = _hex_to_rgb(value)
+    elif value.lower().startswith("rgb"):
+        nums = _re.findall(r"\d+", value)
+        if len(nums) < 3:
+            raise HTTPException(status_code=422, detail="Invalid rgb value")
+        r, g, b = int(nums[0]), int(nums[1]), int(nums[2])
+    elif value.lower().startswith("hsl"):
+        nums = _re.findall(r"[\d.]+", value)
+        if len(nums) < 3:
+            raise HTTPException(status_code=422, detail="Invalid hsl value")
+        r, g, b = _hsl_to_rgb(float(nums[0]), float(nums[1]), float(nums[2]))
+    else:
+        raise HTTPException(status_code=422, detail=f"Cannot parse color: {value!r}")
+    r, g, b = max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b))
+    hx = f"#{r:02x}{g:02x}{b:02x}"
+    hs, ss, ls = _rgb_to_hsl(r, g, b)
+    return {
+        "hex": hx,
+        "hex_upper": hx.upper(),
+        "rgb": f"rgb({r}, {g}, {b})",
+        "rgb_values": [r, g, b],
+        "hsl": f"hsl({hs}, {ss}%, {ls}%)",
+        "hsl_values": [hs, ss, ls],
+        "luminance": round(0.2126 * r / 255 + 0.7152 * g / 255 + 0.0722 * b / 255, 3),
+    }
+
+
+# ── UUID generator ────────────────────────────────────────────────────────────
+
+@router.post("/api/uuid")
+async def generate_uuid(body: dict):
+    import uuid as _uuid
+    version = int(body.get("version", 4))
+    count = min(max(int(body.get("count", 5)), 1), 50)
+    upper = bool(body.get("upper", False))
+    if version not in (1, 4):
+        raise HTTPException(status_code=422, detail="version must be 1 or 4")
+    fn = _uuid.uuid1 if version == 1 else _uuid.uuid4
+    uuids = [(str(fn()).upper() if upper else str(fn())) for _ in range(count)]
+    return {"uuids": uuids, "version": version, "count": count}
+
+
+# ── Markdown renderer ─────────────────────────────────────────────────────────
+
+@router.post("/api/markdown")
+async def render_markdown(body: dict):
+    import html as _html
+    text = body.get("text", "")
+    try:
+        import markdown as _md
+        html_out = _md.markdown(text, extensions=["fenced_code", "tables"])
+        return {"html": html_out, "length": len(text), "engine": "markdown"}
+    except ImportError:
+        pass
+    try:
+        import markdown2 as _md2
+        html_out = _md2.markdown(text, extras=["fenced-code-blocks", "tables"])
+        return {"html": html_out, "length": len(text), "engine": "markdown2"}
+    except ImportError:
+        pass
+    lines = [f"<p>{_html.escape(line)}</p>" for line in text.splitlines()]
+    return {"html": "\n".join(lines), "length": len(text), "engine": "fallback"}
+
+
+# ── CSV viewer ────────────────────────────────────────────────────────────────
+
+@router.post("/api/csv/parse")
+async def csv_parse(body: dict):
+    import csv
+    import io
+    text = body.get("text", "")
+    delimiter = (body.get("delimiter") or ",")[:1] or ","
+    has_header = bool(body.get("header", True))
+    max_rows = min(int(body.get("max_rows", 1000)), 5000)
+    if not text:
+        return {"headers": [], "rows": [], "total": 0, "columns": 0}
+    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
+    all_rows = list(reader)[: max_rows + (1 if has_header else 0)]
+    if has_header and all_rows:
+        headers, rows = all_rows[0], all_rows[1:]
+    else:
+        headers = [f"col{i}" for i in range(len(all_rows[0]) if all_rows else 0)]
+        rows = all_rows
+    return {"headers": headers, "rows": rows, "total": len(rows), "columns": len(headers)}
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
