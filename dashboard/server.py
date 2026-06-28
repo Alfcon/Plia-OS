@@ -13,6 +13,7 @@ import pathlib
 from pathlib import Path
 from core import events, registry, pipeline_registry
 from core.registry import call_tool_async
+from core.loader import load_modules
 from core.config import get_config, update_config, restore_system_prompt, reset_system_prompt_to_default
 from voice.tts import get_tts_service
 from voice.vram_broker import get_vram_broker
@@ -134,15 +135,41 @@ async def get_tools():
     return {"tools": tools}
 
 
+_MODULES_DIR = Path(__file__).resolve().parent.parent / "modules"
+
+
 @router.get("/api/modules")
 async def list_modules():
     from core.config import get_config
     disabled = set(get_config().disabled_modules)
-    modules = registry.list_modules()
-    return [
-        {"name": name, "tools": tools, "enabled": name not in disabled}
-        for name, tools in sorted(modules.items())
-    ]
+    registered = registry.list_modules()
+    # all .py files on disk
+    disk_names = {p.stem for p in _MODULES_DIR.glob("*.py") if not p.name.startswith("_")}
+    all_names = disk_names | set(registered.keys())
+    result = []
+    for name in sorted(all_names):
+        tools = registered.get(name, [])
+        result.append({
+            "name": name,
+            "tools": tools,
+            "tool_count": len(tools),
+            "enabled": name not in disabled,
+            "on_disk": name in disk_names,
+            "loaded": name in registered,
+        })
+    return result
+
+
+@router.post("/api/modules/reload")
+async def reload_modules():
+    from core.registry import _tools
+    # remove all non-MCP user module tools then re-import
+    to_remove = [k for k, v in list(_tools.items()) if not v.get("module", "").startswith("mcp:")]
+    for k in to_remove:
+        del _tools[k]
+    await asyncio.to_thread(load_modules)
+    registered = registry.list_modules()
+    return {"ok": True, "modules": len(registered), "tools": sum(len(t) for t in registered.values())}
 
 
 @router.post("/api/modules/{name}/enable")

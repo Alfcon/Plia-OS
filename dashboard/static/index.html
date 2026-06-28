@@ -1124,13 +1124,18 @@
           <p style="font-size:0.72rem;color:#555;margin:0 0 8px;">Facts Plia learned from conversation. Say "remember that…" to add.</p>
           <ul id="memory-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
         </div>
-        <div id="m-section-modules" class="m-pane" style="display:none">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-            <span style="font-size:0.78rem;color:#aaa;">Loaded tools</span>
-            <button onclick="loadModules()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
+        <div id="m-section-modules" class="m-pane" style="display:none;flex-direction:column;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-shrink:0;flex-wrap:wrap;">
+            <span style="font-size:0.78rem;color:#aaa;flex:1;">Modules</span>
+            <button onclick="reloadModules()" id="mod-reload-btn"
+              style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.7rem;padding:2px 10px;border-radius:3px;cursor:pointer;">
+              ↻ Reload all
+            </button>
+            <button onclick="loadModules()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻</button>
           </div>
-          <p style="font-size:0.72rem;color:#555;margin:0 0 8px;">Tools available to the LLM. Drop a .py file in modules/ and restart to add.</p>
-          <ul id="modules-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;"></ul>
+          <p style="font-size:0.68rem;color:#555;margin:0 0 8px;flex-shrink:0;">Drop a .py file in modules/ and click Reload. Disable hides tools from LLM without unloading.</p>
+          <ul id="modules-list" style="font-size:0.78rem;list-style:none;padding:0;margin:0;flex:1;min-height:0;overflow-y:auto;"></ul>
+          <div id="mod-status" style="font-size:0.68rem;color:#81c784;margin-top:4px;flex-shrink:0;min-height:1rem;"></div>
         </div>
         <div id="m-section-mcp" class="m-pane" style="display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
@@ -2749,23 +2754,28 @@
       if (!r.ok) throw new Error(r.status);
       const modules = await r.json();
       if (modules.length === 0) {
-        list.innerHTML = '<li style="color:#555;font-size:0.75rem;">No modules loaded</li>';
+        list.innerHTML = '<li style="color:#555;font-size:0.75rem;">No modules found</li>';
         return;
       }
       list.innerHTML = modules.map(m => {
-        const color = m.enabled ? '#81c784' : '#555';
-        const label = m.enabled ? 'Enabled' : 'Disabled';
         const action = m.enabled ? 'disable' : 'enable';
         const actionLabel = m.enabled ? 'Disable' : 'Enable';
-        return `<li style="padding:6px 0;border-bottom:1px solid #1a1a1a;display:flex;align-items:flex-start;gap:14px;">
+        const statusColor = !m.loaded ? '#ef9a9a' : m.enabled ? '#81c784' : '#555';
+        const statusLabel = !m.loaded ? 'not loaded' : m.enabled ? 'enabled' : 'disabled';
+        const toolStr = m.tools.length
+          ? `${m.tool_count} tool${m.tool_count !== 1 ? 's' : ''}: ${m.tools.map(_esc).join(', ')}`
+          : 'no tools registered';
+        return `<li style="padding:6px 0;border-bottom:1px solid #1a1a1a;display:flex;align-items:flex-start;gap:10px;">
           <button onclick="toggleModule('${_esc(m.name)}','${action}')"
-            style="background:#1e1e1e;border:1px solid #333;border-radius:3px;color:#aaa;font-size:0.7rem;padding:2px 6px;cursor:pointer;flex-shrink:0;width:60px;">
+            ${!m.loaded ? 'disabled title="not loaded"' : ''}
+            style="background:#1e1e1e;border:1px solid #333;border-radius:3px;color:${m.loaded?'#aaa':'#333'};font-size:0.7rem;padding:2px 6px;cursor:${m.loaded?'pointer':'default'};flex-shrink:0;width:56px;">
             ${actionLabel}
           </button>
-          <div>
-            <strong style="color:#e0e0e0;font-size:0.78rem;">${_esc(m.name)}</strong>
-            <span style="color:${color};font-size:0.7rem;margin-left:6px;">${label}</span><br>
-            <span style="color:#666;font-size:0.7rem;">${m.tools.length} tool${m.tools.length !== 1 ? 's' : ''}: ${m.tools.map(_esc).join(', ')}</span>
+          <div style="min-width:0;">
+            <span style="color:#e0e0e0;font-size:0.75rem;font-family:monospace;">${_esc(m.name)}.py</span>
+            <span style="color:${statusColor};font-size:0.68rem;margin-left:5px;">${statusLabel}</span>
+            ${!m.on_disk ? '<span style="color:#f9a825;font-size:0.65rem;margin-left:4px;">(removed from disk)</span>' : ''}
+            <div style="color:#555;font-size:0.68rem;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${toolStr}</div>
           </div>
         </li>`;
       }).join('');
@@ -2781,6 +2791,27 @@
       await loadModules();
     } catch(e) {
       alert(`Failed to ${action} module: ${name}`);
+    }
+  }
+
+  async function reloadModules() {
+    const btn = document.getElementById('mod-reload-btn');
+    const status = document.getElementById('mod-status');
+    btn.disabled = true;
+    btn.textContent = '⏳ Reloading…';
+    status.textContent = '';
+    try {
+      const r = await fetch('/api/modules/reload', {method: 'POST'});
+      const data = await r.json();
+      if (!r.ok) { status.style.color = '#ef9a9a'; status.textContent = data.detail || 'Failed'; return; }
+      status.style.color = '#81c784';
+      status.textContent = `Reloaded — ${data.modules} modules, ${data.tools} tools`;
+      await loadModules();
+    } catch(e) {
+      status.style.color = '#ef9a9a'; status.textContent = 'Error';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '↻ Reload all';
     }
   }
 
