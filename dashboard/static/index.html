@@ -2319,17 +2319,96 @@
         ul.innerHTML = '<li style="color:#555;font-style:italic;">No pending reminders</li>';
         return;
       }
-      ul.innerHTML = _reminderData.map(r =>
-        `<li style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #1e1e1e;">
-          <span style="flex:1;margin-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.message)}">${_esc(r.message)}</span>
-          <span id="r-cd-${r.id}" style="color:#888;font-size:0.72rem;white-space:nowrap;margin-right:6px;font-variant-numeric:tabular-nums;">${_fmtCountdown(r.fire_at)}</span>
-          <button onclick="cancelReminder(${r.id})" style="background:none;border:1px solid #555;border-radius:3px;color:#ef9a9a;font-size:0.72rem;padding:1px 5px;cursor:pointer;">✕</button>
-        </li>`
-      ).join('');
+      const now = Date.now();
+      ul.innerHTML = _reminderData.map(r => {
+        const overdue = new Date(r.fire_at).getTime() < now;
+        const cdColor = overdue ? '#ef9a9a' : '#888';
+        return `<li style="padding:5px 0;border-bottom:1px solid #1a1a1a;">
+          <div style="display:flex;align-items:center;gap:5px;">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${overdue?'#ef9a9a':'#e0e0e0'};font-size:0.75rem;cursor:pointer;"
+              title="Double-click to edit" ondblclick="remindEditMsg(${r.id},this)">${_esc(r.message)}</span>
+            <span id="r-cd-${r.id}" style="color:${cdColor};font-size:0.68rem;white-space:nowrap;font-variant-numeric:tabular-nums;flex-shrink:0;">${_fmtCountdown(r.fire_at)}</span>
+            <button onclick="cancelReminder(${r.id})" style="background:none;border:1px solid #444;border-radius:3px;color:#ef9a9a;font-size:0.68rem;padding:1px 4px;cursor:pointer;flex-shrink:0;">✕</button>
+          </div>
+          <div style="display:flex;gap:3px;margin-top:3px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:0.62rem;color:#444;flex-shrink:0;">snooze:</span>
+            ${[['5m',300],['30m',1800],['1h',3600],['1d',86400]].map(([l,s]) =>
+              `<button onclick="snoozeReminder(${r.id},${s})"
+                style="background:#111;border:1px solid #2a2a2a;color:#888;font-size:0.62rem;padding:1px 5px;border-radius:3px;cursor:pointer;">+${l}</button>`
+            ).join('')}
+            <button onclick="remindReschedule(${r.id},'${_esc(r.fire_at)}')"
+              style="background:#111;border:1px solid #2a2a2a;color:#4fc3f7;font-size:0.62rem;padding:1px 5px;border-radius:3px;cursor:pointer;margin-left:4px;">reschedule</button>
+          </div>
+        </li>`;
+      }).join('');
       _reminderCountdownInterval = setInterval(_renderReminderCountdowns, 1000);
     } catch(e) {
       ul.innerHTML = '<li style="color:#ef9a9a;">Failed to load</li>';
     }
+  }
+
+  async function snoozeReminder(id, seconds) {
+    const item = _reminderData.find(r => r.id === id);
+    if (!item) return;
+    const base = new Date(Math.max(Date.now(), new Date(item.fire_at).getTime()));
+    const newTime = new Date(base.getTime() + seconds * 1000).toISOString();
+    await fetch(`/api/reminders/${id}`, {
+      method: 'PATCH', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({fire_at: newTime}),
+    });
+    loadReminders();
+  }
+
+  function remindReschedule(id, currentIso) {
+    const input = document.createElement('input');
+    input.type = 'datetime-local';
+    const local = new Date(currentIso);
+    local.setMinutes(local.getMinutes() - local.getTimezoneOffset());
+    input.value = local.toISOString().slice(0, 16);
+    input.style.cssText = 'background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:2px 5px;font-size:0.7rem;';
+    const li = document.querySelector(`#r-cd-${id}`)?.closest('li');
+    if (!li) return;
+    const div = document.createElement('div');
+    div.style.marginTop = '4px';
+    div.appendChild(input);
+    const btn = document.createElement('button');
+    btn.textContent = 'Save';
+    btn.style.cssText = 'margin-left:4px;background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.68rem;padding:2px 8px;border-radius:3px;cursor:pointer;';
+    btn.onclick = async () => {
+      if (!input.value) return;
+      const iso = new Date(input.value).toISOString();
+      await fetch(`/api/reminders/${id}`, {
+        method: 'PATCH', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({fire_at: iso}),
+      });
+      loadReminders();
+    };
+    div.appendChild(btn);
+    li.appendChild(div);
+    input.focus();
+  }
+
+  function remindEditMsg(id, el) {
+    const input = document.createElement('input');
+    input.value = el.textContent;
+    input.style.cssText = 'background:#111;border:1px solid #333;color:#e0e0e0;font-size:0.75rem;font-family:inherit;width:100%;border-radius:3px;padding:1px 5px;';
+    el.replaceWith(input);
+    input.focus(); input.select();
+    const save = async () => {
+      const msg = input.value.trim();
+      if (msg) {
+        await fetch(`/api/reminders/${id}`, {
+          method: 'PATCH', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({message: msg}),
+        }).catch(() => {});
+      }
+      loadReminders();
+    };
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      if (e.key === 'Escape') loadReminders();
+    });
   }
 
   let _timerData = [];

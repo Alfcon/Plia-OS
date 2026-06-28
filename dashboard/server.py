@@ -503,6 +503,43 @@ async def cancel_reminder(reminder_id: int):
     return {"status": "cancelled", "id": reminder_id}
 
 
+@router.patch("/api/reminders/{reminder_id}")
+async def edit_reminder(reminder_id: int, body: dict):
+    message = (body.get("message") or "").strip() or None
+    fire_at = (body.get("fire_at") or "").strip() or None
+    if not message and not fire_at:
+        raise HTTPException(status_code=422, detail="message or fire_at required")
+    if fire_at:
+        try:
+            parsed = datetime.fromisoformat(fire_at)
+            if parsed.tzinfo is None:
+                raise ValueError
+        except ValueError:
+            raise HTTPException(status_code=422, detail="fire_at must be ISO-8601 with timezone")
+    from agents.memory_store import get_memory_store
+    store = get_memory_store()
+
+    def _update():
+        with store._conn() as conn:
+            row = conn.execute(
+                "SELECT message, fire_at FROM reminders WHERE id=? AND done=0", (reminder_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            new_msg = message if message is not None else row[0]
+            new_fire = fire_at if fire_at is not None else row[1]
+            conn.execute(
+                "UPDATE reminders SET message=?, fire_at=? WHERE id=?",
+                (new_msg, new_fire, reminder_id),
+            )
+            return {"id": reminder_id, "message": new_msg, "fire_at": new_fire}
+
+    result = await asyncio.to_thread(_update)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Reminder not found or already done")
+    return result
+
+
 @router.get("/api/timers")
 async def list_timers():
     from agents.memory_store import get_memory_store
