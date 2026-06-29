@@ -41,9 +41,14 @@ def get_workflow(name: str) -> dict | None:
     return {"name": name, **data[name]}
 
 
-def save_workflow(name: str, steps: list[dict], description: str = "") -> None:
+def save_workflow(
+    name: str,
+    steps: list[dict],
+    description: str = "",
+    event_trigger: str | None = None,
+) -> None:
     data = _load()
-    data[name] = {"description": description, "steps": steps}
+    data[name] = {"description": description, "steps": steps, "event_trigger": event_trigger}
     _save(data)
 
 

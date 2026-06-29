@@ -55,6 +55,22 @@ def test_delete_nonexistent(tmp_path):
         assert delete_workflow("ghost") is False
 
 
+def test_save_workflow_with_event_trigger(tmp_path):
+    with patch("agents.workflow_store._workflows_path", return_value=tmp_path / "wf.json"):
+        from agents.workflow_store import save_workflow, get_workflow
+        save_workflow("trig", [], "desc", event_trigger="reminder_fired")
+        wf = get_workflow("trig")
+    assert wf["event_trigger"] == "reminder_fired"
+
+
+def test_event_trigger_defaults_none(tmp_path):
+    with patch("agents.workflow_store._workflows_path", return_value=tmp_path / "wf.json"):
+        from agents.workflow_store import save_workflow, get_workflow
+        save_workflow("plain", [], "")
+        wf = get_workflow("plain")
+    assert wf["event_trigger"] is None
+
+
 def test_interpolate_prev(tmp_path):
     from agents.workflow_store import _interpolate
     assert _interpolate("{{prev}}", ["hello"]) == "hello"
