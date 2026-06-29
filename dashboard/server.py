@@ -4904,6 +4904,116 @@ async def url_parse(body: dict):
     }
 
 
+# ── Custom agent builder ───────────────────────────────────────────────────────
+
+import dataclasses as _agent_dc
+
+@router.get("/api/agents")
+async def list_custom_agents():
+    from core.agent_store import list_agents
+    agents = await asyncio.to_thread(list_agents)
+    return {
+        "agents": [
+            {
+                "name": a.name,
+                "display_name": a.display_name,
+                "enabled": a.enabled,
+                "keyword_count": len(a.keywords),
+                "tool_count": len(a.tool_names),
+            }
+            for a in agents
+        ]
+    }
+
+
+@router.post("/api/agents", status_code=201)
+async def create_custom_agent(body: dict):
+    from core.agent_store import AgentDef, get_agent, save_agent
+    from core.supervisor import _reload_custom_agents
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="name required")
+    existing = await asyncio.to_thread(get_agent, name)
+    if existing is not None:
+        raise HTTPException(status_code=409, detail=f"Agent '{name}' already exists")
+    try:
+        defn = AgentDef(
+            name=name,
+            display_name=(body.get("display_name") or "").strip(),
+            system_prompt=(body.get("system_prompt") or "").strip(),
+            tool_names=list(body.get("tool_names") or []),
+            keywords=list(body.get("keywords") or []),
+            llm_description=(body.get("llm_description") or "").strip(),
+            enabled=bool(body.get("enabled", True)),
+        )
+        await asyncio.to_thread(save_agent, defn)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    _reload_custom_agents()
+    await events.emit("agents_updated", {"action": "create", "name": name})
+    return _agent_dc.asdict(await asyncio.to_thread(get_agent, name))
+
+
+@router.get("/api/agents/{name}")
+async def get_custom_agent(name: str):
+    from core.agent_store import get_agent
+    defn = await asyncio.to_thread(get_agent, name)
+    if defn is None:
+        raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+    import dataclasses as _dc
+    return _dc.asdict(defn)
+
+
+@router.put("/api/agents/{name}")
+async def update_custom_agent(name: str, body: dict):
+    from core.agent_store import AgentDef, get_agent, save_agent
+    from core.supervisor import _reload_custom_agents
+    existing = await asyncio.to_thread(get_agent, name)
+    if existing is None:
+        raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+    updated = AgentDef(
+        name=name,
+        display_name=(body.get("display_name") or "").strip(),
+        system_prompt=(body.get("system_prompt") or "").strip(),
+        tool_names=list(body.get("tool_names") or []),
+        keywords=list(body.get("keywords") or []),
+        llm_description=(body.get("llm_description") or "").strip(),
+        enabled=bool(body.get("enabled", True)),
+        created_at=existing.created_at,
+    )
+    await asyncio.to_thread(save_agent, updated)
+    _reload_custom_agents()
+    await events.emit("agents_updated", {"action": "update", "name": name})
+    import dataclasses as _dc
+    return _dc.asdict(await asyncio.to_thread(get_agent, name))
+
+
+@router.delete("/api/agents/{name}")
+async def delete_custom_agent(name: str):
+    from core.agent_store import delete_agent
+    from core.supervisor import _reload_custom_agents
+    ok = await asyncio.to_thread(delete_agent, name)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+    _reload_custom_agents()
+    await events.emit("agents_updated", {"action": "delete", "name": name})
+    return {"ok": True}
+
+
+@router.post("/api/agents/{name}/toggle")
+async def toggle_custom_agent(name: str):
+    from core.agent_store import get_agent, save_agent
+    from core.supervisor import _reload_custom_agents
+    defn = await asyncio.to_thread(get_agent, name)
+    if defn is None:
+        raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+    defn.enabled = not defn.enabled
+    await asyncio.to_thread(save_agent, defn)
+    _reload_custom_agents()
+    await events.emit("agents_updated", {"action": "toggle", "name": name})
+    return {"name": name, "enabled": defn.enabled}
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
