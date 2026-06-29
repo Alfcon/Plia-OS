@@ -6344,10 +6344,6 @@
     document.getElementById('new-email-gmail-fields').style.display = p === 'gmail' ? '' : 'none';
   }
 
-  function _esc(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
   async function loadEmailAccounts() {
     try {
       const r = await fetch('/api/email/accounts');

@@ -4006,13 +4006,13 @@ _SHELL_HISTORY: _shell_cols.deque = _shell_cols.deque(maxlen=50)
 async def run_shell_command(body: dict):
     import time as _t
     cmd = (body.get("command") or "").strip()
-    timeout = min(int(body.get("timeout", 10)), 30)
+    timeout = min(max(int(body.get("timeout", 10)), 1), 30)
     if not cmd:
         raise HTTPException(status_code=422, detail="command required")
     t0 = _t.time()
     try:
-        proc = await asyncio.create_subprocess_shell(
-            cmd,
+        proc = await asyncio.create_subprocess_exec(
+            "sh", "-c", cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -4249,14 +4249,23 @@ async def generate_qr(body: dict):
 
 # ── File watcher (SSE) ────────────────────────────────────────────────────────
 
+_WATCH_ALLOWED_ROOTS = ("/tmp", "/home", "/var/log", "/var/tmp")
+
+
 @router.get("/api/watch")
 async def file_watch_sse(path: str = "/tmp", request: Request = None):
+    import os as _os
+    real = _os.path.realpath(path)
+    if not any(real == r or real.startswith(r + "/") for r in _WATCH_ALLOWED_ROOTS):
+        async def _deny():
+            yield f"data: {json.dumps({'error': 'Path not in allowed roots: ' + ', '.join(_WATCH_ALLOWED_ROOTS)})}\n\n"
+        return StreamingResponse(_deny(), media_type="text/event-stream")
     async def event_gen():
         try:
             proc = await asyncio.create_subprocess_exec(
                 "inotifywait", "-m", "-r", "--format", "%e\t%w%f",
                 "-e", "create,delete,modify,moved_to,moved_from",
-                path,
+                real,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
@@ -4764,19 +4773,25 @@ async def ip_calc(body: dict):
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    hosts = list(net.hosts())
+    if net.prefixlen < 8:
+        raise HTTPException(status_code=422, detail="Prefix too large (minimum /8); use a more specific range")
     total_hosts = net.num_addresses
-    usable = len(hosts)
+    # IPv4 /31 and /32 have no "usable" hosts in the traditional sense
+    usable = max(total_hosts - 2, 0) if net.version == 4 and total_hosts > 2 else total_hosts
+    na = net.network_address
+    ba = net.broadcast_address if net.version == 4 else None
+    first_host = str(na + 1) if total_hosts > 2 else (str(na) if total_hosts else None)
+    last_host = str(ba - 1) if (ba and total_hosts > 2) else (str(na) if total_hosts == 1 else None)
     return {
-        "network": str(net.network_address),
-        "broadcast": str(net.broadcast_address) if net.version == 4 else None,
+        "network": str(na),
+        "broadcast": str(ba) if ba else None,
         "mask": str(net.netmask) if net.version == 4 else None,
         "prefix": net.prefixlen,
         "version": net.version,
         "total_addresses": total_hosts,
         "usable_hosts": usable,
-        "first_host": str(hosts[0]) if hosts else None,
-        "last_host": str(hosts[-1]) if hosts else None,
+        "first_host": first_host,
+        "last_host": last_host,
         "cidr": str(net),
         "is_private": net.is_private,
         "is_loopback": net.is_loopback,
@@ -4828,6 +4843,8 @@ async def list_processes(sort: str = "cpu", limit: int = 25):
 @router.post("/api/processes/{pid}/kill")
 async def kill_process(pid: int, body: dict):
     import re as _re
+    if pid < 2:
+        raise HTTPException(status_code=422, detail="PID must be >= 2")
     signal = str(body.get("signal", "TERM"))
     if not _re.match(r"^[A-Z0-9]+$", signal):
         raise HTTPException(status_code=422, detail="invalid signal")

@@ -85,3 +85,17 @@ async def test_kill_invalid_signal_422():
     async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
         r = await c.post("/api/processes/1234/kill", json={"signal": "rm -rf /"})
     assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_kill_pid_1_rejected():
+    async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
+        r = await c.post("/api/processes/1/kill", json={"signal": "TERM"})
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_kill_pid_0_rejected():
+    async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
+        r = await c.post("/api/processes/0/kill", json={"signal": "TERM"})
+    assert r.status_code == 422

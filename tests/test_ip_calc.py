@@ -66,6 +66,13 @@ async def test_invalid_value_422():
 
 
 @pytest.mark.asyncio
+async def test_prefix_too_large_422():
+    async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
+        r = await c.post("/api/ip/calc", json={"value": "0.0.0.0/0"})
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_missing_value_422():
     async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
         r = await c.post("/api/ip/calc", json={})
