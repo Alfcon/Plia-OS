@@ -26,11 +26,32 @@ logger = logging.getLogger(__name__)
 _RESPONSE_CACHE: dict[str, tuple[str, list]] = {}
 _CACHE_STATS: dict[str, int] = {"hits": 0, "misses": 0}
 
+_custom_intents: set[str] = set()
+_custom_keyword_routes: dict[str, list[str]] = {}
+_custom_llm_descriptions: dict[str, str] = {}
+
+
+def _reload_custom_agents() -> None:
+    from core.agent_store import list_agents
+    _custom_intents.clear()
+    _custom_keyword_routes.clear()
+    _custom_llm_descriptions.clear()
+    for a in list_agents():
+        if not a.enabled:
+            continue
+        intent = f"custom:{a.name}"
+        _custom_intents.add(intent)
+        if a.keywords:
+            _custom_keyword_routes[intent] = [kw.lower() for kw in a.keywords]
+        if a.llm_description:
+            _custom_llm_descriptions[intent] = a.llm_description
+
+
 _KNOWN_INTENTS = {"memory", "web", "code", "calendar", "home", "reminder", "network", "wifi", "file", "weather", "cron"}
 _HOP_LIMIT = 5
 _TOOL_CALL_LIMIT = 10
 
-_CLASSIFY_SYSTEM = (
+_CLASSIFY_SYSTEM_BASE = (
     "You are a router. Given the conversation, output exactly one word — "
     "the specialist to handle the request: memory, web, code, calendar, home, reminder, network, wifi, file, weather, cron. "
     "Use 'reminder' for one-shot announcements at a specific future time ('remind me at 3pm', 'notify me in 2 hours'). "
@@ -42,6 +63,17 @@ _CLASSIFY_SYSTEM = (
     "Use 'weather' for weather conditions, forecasts, temperature, rain, UV index, or climate queries. "
     "Use 'respond' for countdown timers, volume, system info, calculations, or anything answerable with tools directly."
 )
+
+
+def _build_classify_system() -> str:
+    if not _custom_llm_descriptions:
+        return _CLASSIFY_SYSTEM_BASE
+    extras = "\n".join(
+        f"Use '{intent}' for: {desc}"
+        for intent, desc in _custom_llm_descriptions.items()
+    )
+    return _CLASSIFY_SYSTEM_BASE + f"\nCustom specialists:\n{extras}"
+
 
 _KEYWORD_ROUTES: dict[str, list[str]] = {
     "memory": ["remember that", "remember this", "recall what",
@@ -160,6 +192,9 @@ def _keyword_route(text: str) -> str | None:
     for intent, keywords in _KEYWORD_ROUTES.items():
         if any(kw in lower for kw in keywords):
             return intent
+    for intent, keywords in _custom_keyword_routes.items():
+        if any(kw in lower for kw in keywords):
+            return intent
     return None
 
 
@@ -237,14 +272,14 @@ async def _supervisor_node(state: AgentState) -> dict:
         else:
             t0 = time.monotonic()
             classify_messages = [
-                {"role": "system", "content": _CLASSIFY_SYSTEM},
+                {"role": "system", "content": _build_classify_system()},
                 *state["messages"],
             ]
             msg = await call_llm(classify_messages)
             latency_ms = int((time.monotonic() - t0) * 1000)
             content = msg.get("content", "") or ""
             intent = content.strip().lower().split()[0] if content.strip() else "respond"
-            if intent not in _KNOWN_INTENTS:
+            if intent not in _KNOWN_INTENTS and intent not in _custom_intents:
                 intent = "respond"
             routing_method = "llm"
     else:
@@ -316,10 +351,14 @@ async def _respond_node(state: AgentState) -> dict:
 
 
 def _route(state: AgentState) -> str:
-    return state.get("active_agent") or "respond"
+    intent = state.get("active_agent") or "respond"
+    if intent.startswith("custom:"):
+        return "custom_agent"
+    return intent
 
 
 def _build_graph():
+    from agents.custom_agent import custom_agent_node
     g = StateGraph(AgentState)
     g.add_node("supervisor", _supervisor_node)
     g.add_node("memory", memory_node)
@@ -333,6 +372,7 @@ def _build_graph():
     g.add_node("file", file_node)
     g.add_node("weather", weather_node)
     g.add_node("respond", _respond_node)
+    g.add_node("custom_agent", custom_agent_node)
 
     g.set_entry_point("supervisor")
     g.add_conditional_edges("supervisor", _route, {
@@ -348,14 +388,17 @@ def _build_graph():
         "weather": "weather",
         "cron": "respond",
         "respond": "respond",
+        "custom_agent": "custom_agent",
     })
     for agent in ("memory", "web", "code", "calendar", "home", "reminder", "network", "wifi", "file", "weather"):
         g.add_edge(agent, "supervisor")
+    g.add_edge("custom_agent", "supervisor")
     g.add_edge("respond", END)
     return g.compile()
 
 
 _graph = _build_graph()
+_reload_custom_agents()
 
 
 async def run_turn(messages: list[dict]) -> tuple[str, list[dict]]:
