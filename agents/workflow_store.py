@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import contextvars
 import json
 import os
 import re
 import time
 from pathlib import Path
 from typing import Any
+
+_wf_depth: contextvars.ContextVar[int] = contextvars.ContextVar("_wf_depth", default=0)
 
 
 def _workflows_path() -> Path:
@@ -142,38 +145,45 @@ async def _run_step(
 
 
 async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
-    wf = get_workflow(name)
-    if wf is None:
-        raise KeyError(f"Workflow {name!r} not found")
+    depth = _wf_depth.get()
+    if depth >= 10:
+        raise RuntimeError(f"Workflow recursion depth limit reached (name={name!r})")
+    token = _wf_depth.set(depth + 1)
+    try:
+        wf = get_workflow(name)
+        if wf is None:
+            raise KeyError(f"Workflow {name!r} not found")
 
-    step_results: list[str] = []
-    output: list[dict] = []
+        step_results: list[str] = []
+        output: list[dict] = []
 
-    for i, step in enumerate(wf["steps"]):
-        note = step.get("note", "")
-        step_type = step.get("step_type", "tool")
-        t0 = time.monotonic()
-        try:
-            result_str, error = await _run_step(step, step_results, payload)
-        except Exception as exc:
-            result_str = ""
-            error = str(exc)
-        duration_ms = int((time.monotonic() - t0) * 1000)
-        step_results.append(result_str)
-        output.append({
-            "step": i,
-            "step_type": step_type,
-            "tool": step.get("tool", ""),
-            "params": step.get("params", {}),
-            "note": note,
-            "result": result_str,
-            "error": error,
-            "duration_ms": duration_ms,
-        })
-        if error:
-            break
+        for i, step in enumerate(wf["steps"]):
+            note = step.get("note", "")
+            step_type = step.get("step_type", "tool")
+            t0 = time.monotonic()
+            try:
+                result_str, error = await _run_step(step, step_results, payload)
+            except Exception as exc:
+                result_str = ""
+                error = str(exc)
+            duration_ms = int((time.monotonic() - t0) * 1000)
+            step_results.append(result_str)
+            output.append({
+                "step": i,
+                "step_type": step_type,
+                "tool": step.get("tool", ""),
+                "params": step.get("params", {}),
+                "note": note,
+                "result": result_str,
+                "error": error,
+                "duration_ms": duration_ms,
+            })
+            if error:
+                break
 
-    return output
+        return output
+    finally:
+        _wf_depth.reset(token)
 
 
 async def dry_run_workflow(name: str, payload: dict | None = None) -> list[dict]:

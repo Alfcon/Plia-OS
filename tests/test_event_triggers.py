@@ -16,6 +16,13 @@ def test_setup_subscribes():
     assert events.is_subscribed(_on_event)
 
 
+def test_setup_does_not_double_subscribe():
+    from core.event_triggers import setup_event_triggers, _on_event
+    setup_event_triggers()
+    setup_event_triggers()
+    assert events._subscribers.count(_on_event) == 1
+
+
 @pytest.mark.asyncio
 async def test_matching_event_fires_workflow(wf_path):
     from agents.workflow_store import save_workflow
