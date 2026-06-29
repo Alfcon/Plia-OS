@@ -64,8 +64,8 @@ def delete_workflow(name: str) -> bool:
     return True
 
 
-def _interpolate(value: Any, results: list[str], payload: dict | None = None) -> Any:
-    """Substitute {{prev}}, {{step_N}}, {{payload}}, {{payload.key}}, {{vars.name}}."""
+def _interpolate(value: Any, results: list[str], payload: dict | None = None, run_vars: dict[str, dict] | None = None) -> Any:
+    """Substitute {{prev}}, {{step_N}}, {{payload}}, {{payload.key}}, {{vars.name}}, {{steps.name.result/error}}."""
     if not isinstance(value, str):
         return value
     prev = results[-1] if results else ""
@@ -90,11 +90,16 @@ def _interpolate(value: Any, results: list[str], payload: dict | None = None) ->
     from agents.variable_store import resolve_vars
     value = resolve_vars(value)
 
+    if run_vars:
+        def _sub_steps(m: re.Match) -> str:
+            return run_vars.get(m.group(1), {}).get(m.group(2), "")
+        value = re.sub(r"\{\{steps\.(\w+)\.(result|error)\}\}", _sub_steps, value)
+
     return value
 
 
-def _interpolate_params(params: dict, results: list[str], payload: dict | None = None) -> dict:
-    return {k: _interpolate(v, results, payload) for k, v in params.items()}
+def _interpolate_params(params: dict, results: list[str], payload: dict | None = None, run_vars: dict[str, dict] | None = None) -> dict:
+    return {k: _interpolate(v, results, payload, run_vars) for k, v in params.items()}
 
 
 from core.registry import call_tool_async
@@ -104,18 +109,19 @@ async def _run_step(
     step: dict,
     step_results: list[str],
     payload: dict | None,
+    run_vars: dict[str, dict] | None = None,
 ) -> tuple[str, str | None]:
     """Dispatch one workflow step. Returns (result_str, error_str | None)."""
     step_type = step.get("step_type", "tool")
 
     if step_type == "tool":
         tool = step.get("tool", "")
-        params = _interpolate_params(step.get("params", {}), step_results, payload)
+        params = _interpolate_params(step.get("params", {}), step_results, payload, run_vars)
         result = await call_tool_async(tool, params)
         return str(result), None
 
     elif step_type == "llm":
-        prompt = _interpolate(step.get("prompt", ""), step_results, payload)
+        prompt = _interpolate(step.get("prompt", ""), step_results, payload, run_vars)
         system = step.get("system", "")
         msgs = ([{"role": "system", "content": system}] if system else [])
         msgs.append({"role": "user", "content": prompt})
@@ -126,7 +132,7 @@ async def _run_step(
     elif step_type == "agent":
         from agents.custom_agent import custom_agent_node
         name = step.get("name", "")
-        message = _interpolate(step.get("message", "{{prev}}"), step_results, payload)
+        message = _interpolate(step.get("message", "{{prev}}"), step_results, payload, run_vars)
         state = {
             "active_agent": f"custom:{name}",
             "messages": [{"role": "user", "content": message}],
@@ -155,6 +161,7 @@ async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
             raise KeyError(f"Workflow {name!r} not found")
 
         step_results: list[str] = []
+        run_vars: dict[str, dict] = {}
         output: list[dict] = []
 
         for i, step in enumerate(wf["steps"]):
@@ -162,12 +169,17 @@ async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
             step_type = step.get("step_type", "tool")
             t0 = time.monotonic()
             try:
-                result_str, error = await _run_step(step, step_results, payload)
+                result_str, error = await _run_step(step, step_results, payload, run_vars)
             except Exception as exc:
                 result_str = ""
                 error = str(exc)
             duration_ms = int((time.monotonic() - t0) * 1000)
             step_results.append(result_str)
+            if step_name := step.get("name"):
+                run_vars[step_name] = {
+                    "result": result_str,
+                    "error": error or "",
+                }
             output.append({
                 "step": i,
                 "step_type": step_type,
@@ -193,6 +205,7 @@ async def dry_run_workflow(name: str, payload: dict | None = None) -> list[dict]
         raise KeyError(f"Workflow {name!r} not found")
 
     step_results: list[str] = []
+    run_vars: dict[str, dict] = {}
     output: list[dict] = []
 
     for i, step in enumerate(wf["steps"]):
@@ -200,19 +213,21 @@ async def dry_run_workflow(name: str, payload: dict | None = None) -> list[dict]
         tool = step.get("tool", "")
         raw_params = step.get("params", {})
         note = step.get("note", "")
-        params = _interpolate_params(raw_params, step_results, payload)
+        params = _interpolate_params(raw_params, step_results, payload, run_vars)
 
         if step_type == "llm":
-            prompt = _interpolate(step.get("prompt", ""), step_results, payload)
+            prompt = _interpolate(step.get("prompt", ""), step_results, payload, run_vars)
             dry_result = f"[DRY RUN] would call LLM with prompt: {prompt!r}"
         elif step_type == "agent":
             agent_name = step.get("name", "")
-            message = _interpolate(step.get("message", "{{prev}}"), step_results, payload)
+            message = _interpolate(step.get("message", "{{prev}}"), step_results, payload, run_vars)
             dry_result = f"[DRY RUN] would call agent {agent_name!r} with: {message!r}"
         else:
             dry_result = f"[DRY RUN] would call {tool!r} with {params}"
 
         step_results.append(dry_result)
+        if step_name := step.get("name"):
+            run_vars[step_name] = {"result": dry_result, "error": ""}
         output.append({
             "step": i,
             "step_type": step_type,
