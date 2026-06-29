@@ -2770,11 +2770,12 @@ async def save_workflow_endpoint(body: dict):
     name = body.get("name", "").strip()
     steps = body.get("steps", [])
     description = body.get("description", "")
+    event_trigger = (body.get("event_trigger") or "").strip() or None
     if not name:
         raise HTTPException(status_code=400, detail="name required")
     if not isinstance(steps, list):
         raise HTTPException(status_code=400, detail="steps must be a list")
-    await asyncio.to_thread(save_workflow, name, steps, description)
+    await asyncio.to_thread(save_workflow, name, steps, description, event_trigger=event_trigger)
     return {"ok": True, "name": name}
 
 
@@ -4945,6 +4946,7 @@ async def create_custom_agent(body: dict):
             keywords=list(body.get("keywords") or []),
             llm_description=(body.get("llm_description") or "").strip(),
             enabled=bool(body.get("enabled", True)),
+            workflow_name=(body.get("workflow_name") or "").strip() or None,
         )
         await asyncio.to_thread(save_agent, defn)
     except ValueError as e:
@@ -4979,6 +4981,7 @@ async def update_custom_agent(name: str, body: dict):
         llm_description=(body.get("llm_description") or "").strip(),
         enabled=bool(body.get("enabled", True)),
         created_at=existing.created_at,
+        workflow_name=(body.get("workflow_name") or "").strip() or None,
     )
     await asyncio.to_thread(save_agent, updated)
     _reload_custom_agents()
