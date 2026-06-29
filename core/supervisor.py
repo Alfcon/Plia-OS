@@ -229,18 +229,24 @@ async def _supervisor_node(state: AgentState) -> dict:
     intent = _keyword_route(last_user)
     latency_ms = 0
     if intent is None:
-        t0 = time.monotonic()
-        classify_messages = [
-            {"role": "system", "content": _CLASSIFY_SYSTEM},
-            *state["messages"],
-        ]
-        msg = await call_llm(classify_messages)
-        latency_ms = int((time.monotonic() - t0) * 1000)
-        content = msg.get("content", "") or ""
-        intent = content.strip().lower().split()[0] if content.strip() else "respond"
-        if intent not in _KNOWN_INTENTS:
-            intent = "respond"
-        routing_method = "llm"
+        from core.intent_classifier import classify_intent, THRESHOLD as _IC_THRESH
+        _ic_intent, _ic_conf = classify_intent(last_user)
+        if _ic_conf >= _IC_THRESH and _ic_intent in _KNOWN_INTENTS:
+            intent = _ic_intent
+            routing_method = "classifier"
+        else:
+            t0 = time.monotonic()
+            classify_messages = [
+                {"role": "system", "content": _CLASSIFY_SYSTEM},
+                *state["messages"],
+            ]
+            msg = await call_llm(classify_messages)
+            latency_ms = int((time.monotonic() - t0) * 1000)
+            content = msg.get("content", "") or ""
+            intent = content.strip().lower().split()[0] if content.strip() else "respond"
+            if intent not in _KNOWN_INTENTS:
+                intent = "respond"
+            routing_method = "llm"
     else:
         routing_method = "keyword"
 

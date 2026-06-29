@@ -4005,10 +4005,15 @@ _SHELL_HISTORY: _shell_cols.deque = _shell_cols.deque(maxlen=50)
 @router.post("/api/shell")
 async def run_shell_command(body: dict):
     import time as _t
+    from core.shell_guard import check_command, ShellBlockedError
     cmd = (body.get("command") or "").strip()
     timeout = min(max(int(body.get("timeout", 10)), 1), 30)
     if not cmd:
         raise HTTPException(status_code=422, detail="command required")
+    try:
+        check_command(cmd)
+    except ShellBlockedError as _e:
+        raise HTTPException(status_code=422, detail=str(_e))
     t0 = _t.time()
     try:
         proc = await asyncio.create_subprocess_exec(

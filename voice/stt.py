@@ -23,7 +23,9 @@ class STTService:
         if self._model is None:
             raise RuntimeError("Call load() before transcribe()")
         config = get_config()
-        segments, _ = self._model.transcribe(audio, language=config.stt_language)
+        lang = config.stt_language
+        language: str | None = lang if lang and lang.lower() != "auto" else None
+        segments, _ = self._model.transcribe(audio, language=language)
         return " ".join(seg.text.strip() for seg in segments).strip()
 
 

@@ -256,7 +256,10 @@ class VoicePipeline:
             await events.emit("status", {"state": "speaking"})
             logger.info("Synthesising speech...")
             try:
-                audio_out = self._tts.synthesise(strip_markdown(response))
+                from voice.text_utils import truncate_for_tts
+                tts_text = strip_markdown(response)
+                tts_text = truncate_for_tts(tts_text, _gc().tts_max_words)
+                audio_out = self._tts.synthesise(tts_text)
                 logger.info("Playing audio (%d samples)...", len(audio_out))
                 # Mute before playback: audio duration + 4s tail covers hardware buffer echo
                 self._set_wake_mute(audio_out)

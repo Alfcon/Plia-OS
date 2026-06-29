@@ -27,10 +27,11 @@ class PliaConfig:
 
     # STT
     stt_model_size: str = "base"  # tiny | base | small | medium | large
-    stt_language: str = "en"
+    stt_language: str = "en"  # set to "" or "auto" to enable per-chunk language detection
 
     # TTS
     tts_engine: Literal["kokoro", "chatterbox", "dramabox"] = "kokoro"
+    tts_max_words: int = 0  # 0 = no truncation; >0 = truncate voice output at sentence boundary
     kokoro_voice: str = "af_heart"
     kokoro_speed: float = 1.0
     chatterbox_reference_audio: str | None = None

@@ -1,6 +1,21 @@
 import re
 
 
+def truncate_for_tts(text: str, max_words: int) -> str:
+    """Truncate text at last sentence boundary before max_words. Returns original if no limit."""
+    if not max_words or max_words <= 0:
+        return text
+    words = text.split()
+    if len(words) <= max_words:
+        return text
+    truncated = " ".join(words[:max_words])
+    for end in (".", "!", "?"):
+        idx = truncated.rfind(end)
+        if idx > len(truncated) // 4:  # avoid truncating at start punctuation
+            return truncated[: idx + 1] + " (see dashboard for full response)"
+    return truncated + " … (see dashboard for full response)"
+
+
 def strip_markdown(text: str) -> str:
     """Remove markdown formatting so TTS reads clean prose."""
     if not text:
