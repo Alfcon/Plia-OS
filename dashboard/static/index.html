@@ -825,6 +825,7 @@
         <button class="m-nav-btn" data-section="ipcalc" onclick="showMenuSection('ipcalc')">IP/CIDR</button>
         <button class="m-nav-btn" data-section="proclist" onclick="showMenuSection('proclist');loadProcesses()">Processes</button>
         <button class="m-nav-btn" data-section="urlparse" onclick="showMenuSection('urlparse')">URL</button>
+        <button class="m-nav-btn" data-section="customagents" onclick="showMenuSection('customagents');caLoad()">Custom Agents</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2784,6 +2785,39 @@
             <input id="url-input" placeholder="https://example.com/path?foo=bar#section" style="flex:1;padding:5px 8px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:12px;" oninput="parseURL()">
           </div>
           <div id="url-results" style="display:flex;flex-direction:column;gap:4px;"></div>
+        </div>
+
+        <!-- Custom Agents -->
+        <div id="m-section-customagents" class="m-pane" style="display:none">
+          <h2>Custom Agents</h2>
+          <p style="color:#888;margin-bottom:1rem">Define specialist agents with custom system prompts, tool access, and trigger keywords. No restart needed.</p>
+
+          <button onclick="caShowForm(null)" style="margin-bottom:1rem">+ New Agent</button>
+
+          <div id="ca-list">Loading…</div>
+
+          <div id="ca-form-wrap" style="display:none;margin-top:1.5rem;background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1.5rem">
+            <h3 id="ca-form-title">New Agent</h3>
+            <label>Name (slug, immutable after creation)</label>
+            <input id="ca-name" placeholder="finance" style="width:100%;margin-bottom:.75rem" />
+            <label>Display Name</label>
+            <input id="ca-display-name" placeholder="Finance Assistant" style="width:100%;margin-bottom:.75rem" />
+            <label>System Prompt</label>
+            <textarea id="ca-system-prompt" rows="6" placeholder="You are a finance specialist..." style="width:100%;margin-bottom:.75rem"></textarea>
+            <label>Keywords (comma-separated, fast trigger phrases)</label>
+            <input id="ca-keywords" placeholder="stock, portfolio, finance" style="width:100%;margin-bottom:.75rem" />
+            <label>LLM Description (one sentence — used by router when no keyword matches)</label>
+            <input id="ca-llm-desc" placeholder="Use for stock prices and portfolio questions" style="width:100%;margin-bottom:.75rem" />
+            <label>Tools</label>
+            <div id="ca-tools-list" style="max-height:200px;overflow-y:auto;background:#111;border:1px solid #333;border-radius:4px;padding:.5rem;margin-bottom:.75rem">Loading tools…</div>
+            <label style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem">
+              <input type="checkbox" id="ca-enabled" checked /> Enabled
+            </label>
+            <div style="display:flex;gap:.75rem">
+              <button onclick="caSave()">Save</button>
+              <button onclick="caHideForm()" style="background:#333">Cancel</button>
+            </div>
+          </div>
         </div>
 
         <!-- Wake Word Test -->
@@ -8495,6 +8529,116 @@
       } catch(e) { out.innerHTML=`<div style="color:#f66;font-size:12px;">${_esc(e.message)}</div>`; }
     }, 250);
   }
+
+  // ── Custom Agents ──────────────────────────────────────────────────────────
+  let _caEditName = null;
+  let _caAllTools = [];
+
+  async function caLoad() {
+    const r = await fetch('/api/agents');
+    const d = await r.json();
+    const agents = d.agents;
+    const el = document.getElementById('ca-list');
+    if (!agents.length) { el.innerHTML = '<p style="color:#888">No custom agents yet.</p>'; return; }
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse">
+      <thead><tr style="border-bottom:1px solid #333">
+        <th style="text-align:left;padding:.4rem .6rem">Name</th>
+        <th style="text-align:left;padding:.4rem .6rem">Keywords</th>
+        <th style="text-align:left;padding:.4rem .6rem">Tools</th>
+        <th style="padding:.4rem .6rem">Enabled</th>
+        <th style="padding:.4rem .6rem">Actions</th>
+      </tr></thead>
+      <tbody>${agents.map(a => `
+        <tr style="border-bottom:1px solid #222">
+          <td style="padding:.4rem .6rem"><strong>${_esc(a.display_name)}</strong><br><small style="color:#888">${_esc(a.name)}</small></td>
+          <td style="padding:.4rem .6rem">${a.keyword_count}</td>
+          <td style="padding:.4rem .6rem">${a.tool_count}</td>
+          <td style="text-align:center;padding:.4rem .6rem">
+            <input type="checkbox" ${a.enabled ? 'checked' : ''} onchange="caToggle('${_esc(a.name)}')" />
+          </td>
+          <td style="text-align:center;padding:.4rem .6rem">
+            <button onclick="caShowForm('${_esc(a.name)}')" style="padding:.2rem .6rem;font-size:.8rem">Edit</button>
+            <button onclick="caDelete('${_esc(a.name)}')" style="padding:.2rem .6rem;font-size:.8rem;background:#7f1d1d;margin-left:.25rem">Delete</button>
+          </td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  async function caLoadTools() {
+    if (_caAllTools.length) return;
+    const r = await fetch('/api/tools');
+    const d = await r.json();
+    _caAllTools = d.tools || [];
+  }
+
+  async function caShowForm(name) {
+    await caLoadTools();
+    _caEditName = name;
+    document.getElementById('ca-form-title').textContent = name ? 'Edit Agent' : 'New Agent';
+    document.getElementById('ca-name').disabled = !!name;
+    let defn = {name:'',display_name:'',system_prompt:'',keywords:[],llm_description:'',tool_names:[],enabled:true};
+    if (name) {
+      const r = await fetch(`/api/agents/${encodeURIComponent(name)}`);
+      defn = await r.json();
+    }
+    document.getElementById('ca-name').value = defn.name || '';
+    document.getElementById('ca-display-name').value = defn.display_name || '';
+    document.getElementById('ca-system-prompt').value = defn.system_prompt || '';
+    document.getElementById('ca-keywords').value = (defn.keywords || []).join(', ');
+    document.getElementById('ca-llm-desc').value = defn.llm_description || '';
+    document.getElementById('ca-enabled').checked = defn.enabled !== false;
+    const toolsEl = document.getElementById('ca-tools-list');
+    toolsEl.innerHTML = _caAllTools.map(t =>
+      `<label style="display:flex;align-items:center;gap:.4rem;margin-bottom:.25rem">
+        <input type="checkbox" value="${_esc(t.name)}" ${(defn.tool_names||[]).includes(t.name)?'checked':''} />
+        <span>${_esc(t.name)}</span> <small style="color:#888">${_esc(t.description||'')}</small>
+      </label>`
+    ).join('');
+    document.getElementById('ca-form-wrap').style.display = 'block';
+  }
+
+  function caHideForm() {
+    document.getElementById('ca-form-wrap').style.display = 'none';
+    _caEditName = null;
+  }
+
+  async function caSave() {
+    const name = document.getElementById('ca-name').value.trim();
+    const body = {
+      name,
+      display_name: document.getElementById('ca-display-name').value.trim(),
+      system_prompt: document.getElementById('ca-system-prompt').value.trim(),
+      keywords: document.getElementById('ca-keywords').value.split(',').map(s=>s.trim()).filter(Boolean),
+      llm_description: document.getElementById('ca-llm-desc').value.trim(),
+      tool_names: [...document.querySelectorAll('#ca-tools-list input:checked')].map(el=>el.value),
+      enabled: document.getElementById('ca-enabled').checked,
+    };
+    const url = _caEditName ? `/api/agents/${encodeURIComponent(_caEditName)}` : '/api/agents';
+    const method = _caEditName ? 'PUT' : 'POST';
+    const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    if (!r.ok) { alert((await r.json()).detail || 'Save failed'); return; }
+    caHideForm();
+    await caLoad();
+  }
+
+  async function caToggle(name) {
+    await fetch(`/api/agents/${encodeURIComponent(name)}/toggle`, {method:'POST'});
+    await caLoad();
+  }
+
+  async function caDelete(name) {
+    if (!confirm(`Delete agent '${name}'?`)) return;
+    await fetch(`/api/agents/${encodeURIComponent(name)}`, {method:'DELETE'});
+    await caLoad();
+  }
+
+  // load on section show
+  const _caOrigShowSection = typeof showSection === 'function' ? showSection : null;
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-section="customagents"]').forEach(btn => {
+      btn.addEventListener('click', caLoad);
+    });
+  });
 
   // ── Tool playground ──────────────────────────────────────────────────────
 
