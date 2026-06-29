@@ -125,15 +125,15 @@ async def _run_step(
     step_results: list[str],
     payload: dict | None,
     run_vars: dict[str, dict] | None = None,
-) -> tuple[str, str | None]:
-    """Dispatch one workflow step. Returns (result_str, error_str | None)."""
+) -> tuple[str, str | None, list[dict]]:
+    """Dispatch one workflow step. Returns (result_str, error_str | None, sub_steps)."""
     step_type = step.get("step_type", "tool")
 
     if step_type == "tool":
         tool = step.get("tool", "")
         params = _interpolate_params(step.get("params", {}), step_results, payload, run_vars)
         result = await call_tool_async(tool, params)
-        return str(result), None
+        return str(result), None, []
 
     elif step_type == "llm":
         prompt = _interpolate(step.get("prompt", ""), step_results, payload, run_vars)
@@ -142,7 +142,7 @@ async def _run_step(
         msgs.append({"role": "user", "content": prompt})
         import agents.llm
         msg = await agents.llm.call_llm(msgs)
-        return msg.get("content") or "", None
+        return msg.get("content") or "", None, []
 
     elif step_type == "agent":
         from agents.custom_agent import custom_agent_node
@@ -159,7 +159,7 @@ async def _run_step(
         }
         result = await custom_agent_node(state)
         results_list = result.get("tool_results", [])
-        return results_list[0] if results_list else "", None
+        return results_list[0] if results_list else "", None, []
 
     elif step_type == "if":
         prev = step_results[-1] if step_results else ""
@@ -167,16 +167,23 @@ async def _run_step(
         branch = step.get("then", []) if _evaluate_condition(condition, prev) else step.get("else", [])
         sub_step_results = list(step_results)  # copy — sub-steps see parent results but don't pollute index
         branch_prev = prev
-        for sub_step in branch:
-            sub_result, sub_error = await _run_step(sub_step, sub_step_results, payload, run_vars)
+        sub_steps: list[dict] = []
+        for i, sub_step in enumerate(branch):
+            sub_result, sub_error, _ = await _run_step(sub_step, sub_step_results, payload, run_vars)
+            sub_steps.append({
+                "step": i,
+                "step_type": sub_step.get("step_type", "tool"),
+                "result": sub_result,
+                "error": sub_error,
+            })
             sub_step_results.append(sub_result)
             if sub_error:
-                return sub_result, sub_error
+                return sub_result, sub_error, sub_steps
             branch_prev = sub_result
-        return branch_prev, None
+        return branch_prev, None, sub_steps
 
     else:
-        return "", f"Unknown step_type: {step_type!r}"
+        return "", f"Unknown step_type: {step_type!r}", []
 
 
 async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
@@ -198,10 +205,11 @@ async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
             step_type = step.get("step_type", "tool")
             t0 = time.monotonic()
             try:
-                result_str, error = await _run_step(step, step_results, payload, run_vars)
+                result_str, error, sub_steps = await _run_step(step, step_results, payload, run_vars)
             except Exception as exc:
                 result_str = ""
                 error = str(exc)
+                sub_steps = []
             duration_ms = int((time.monotonic() - t0) * 1000)
             step_results.append(result_str)
             if step_name := step.get("name"):
@@ -218,6 +226,7 @@ async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
                 "result": result_str,
                 "error": error,
                 "duration_ms": duration_ms,
+                "sub_steps": sub_steps,
             })
             if error:
                 break

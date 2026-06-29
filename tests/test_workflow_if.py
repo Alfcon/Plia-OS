@@ -37,6 +37,9 @@ async def test_if_true_branch_runs_then(wf_path):
     with patch("agents.workflow_store.call_tool_async", AsyncMock(side_effect=["hello world", "yes_result"])):
         output = await run_workflow("w")
     assert output[-1]["result"] == "yes_result"
+    assert "sub_steps" in output[-1]
+    assert len(output[-1]["sub_steps"]) == 1
+    assert output[-1]["sub_steps"][0]["result"] == "yes_result"
 
 
 @pytest.mark.asyncio
