@@ -59,6 +59,8 @@ def create_app() -> FastAPI:
     # fires (e.g. during testing with httpx ASGITransport).
     load_modules()
     setup_event_forwarding()
+    from core.event_triggers import setup_event_triggers
+    setup_event_triggers()
     from core.notifier import setup_notifier
     setup_notifier()
 
