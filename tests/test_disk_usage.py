@@ -81,3 +81,19 @@ async def test_disk_usage_total_matches_partitions():
             r = await c.get("/api/disk")
     d = r.json()
     assert d["total"] == len(d["partitions"])
+
+
+_SPACEY_DF = b"""Filesystem     Type     Size  Used Avail Use% Mounted on
+/dev/sda1      ext4      50G   20G   28G  42% /
+/dev/sda2      ext4     100G   80G   15G  85% /run/media/user/My USB Drive
+"""
+
+
+@pytest.mark.asyncio
+async def test_disk_usage_mount_with_spaces():
+    with patch("asyncio.create_subprocess_exec", return_value=_mock_proc(0, _SPACEY_DF)):
+        async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
+            r = await c.get("/api/disk")
+    parts = r.json()["partitions"]
+    spacey = next(p for p in parts if "sda2" in p["source"])
+    assert spacey["target"] == "/run/media/user/My USB Drive"

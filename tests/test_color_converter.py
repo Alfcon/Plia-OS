@@ -68,3 +68,17 @@ async def test_missing_value_422():
     async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
         r = await c.post("/api/color", json={})
     assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rgba_rejected_422():
+    async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
+        r = await c.post("/api/color", json={"value": "rgba(255, 0, 0, 0.5)"})
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_hsla_rejected_422():
+    async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
+        r = await c.post("/api/color", json={"value": "hsla(0, 100%, 50%, 0.5)"})
+    assert r.status_code == 422

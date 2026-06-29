@@ -4557,7 +4557,8 @@ async def disk_usage():
     lines = stdout.decode(errors="replace").splitlines()
     partitions = []
     for line in lines[1:]:
-        parts = line.split()
+        # split with maxsplit=6 so mount points containing spaces stay intact in parts[6]
+        parts = line.split(None, 6)
         if len(parts) >= 7:
             pct_str = parts[5].rstrip("%")
             try:
@@ -4630,14 +4631,17 @@ async def color_convert(body: dict):
     value = str(body.get("value", "")).strip()
     if not value:
         raise HTTPException(status_code=422, detail="value required")
+    vl = value.lower()
     if _re.match(r"^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$", value):
         r, g, b = _hex_to_rgb(value)
-    elif value.lower().startswith("rgb"):
+    elif vl.startswith("rgba") or vl.startswith("hsla"):
+        raise HTTPException(status_code=422, detail="rgba/hsla not supported; use rgb/hsl")
+    elif vl.startswith("rgb"):
         nums = _re.findall(r"\d+", value)
         if len(nums) < 3:
             raise HTTPException(status_code=422, detail="Invalid rgb value")
         r, g, b = int(nums[0]), int(nums[1]), int(nums[2])
-    elif value.lower().startswith("hsl"):
+    elif vl.startswith("hsl"):
         nums = _re.findall(r"[\d.]+", value)
         if len(nums) < 3:
             raise HTTPException(status_code=422, detail="Invalid hsl value")
@@ -4740,22 +4744,24 @@ async def jwt_decode(body: dict):
 
     header = _b64d(parts[0])
     payload = _b64d(parts[1])
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="JWT payload must be a JSON object")
 
     import time as _time
     now = _time.time()
     exp = payload.get("exp")
     iat = payload.get("iat")
     nbf = payload.get("nbf")
-    expired = bool(exp and now > exp)
+    expired = exp is not None and now > exp
     return {
         "header": header,
         "payload": payload,
         "signature": parts[2],
-        "exp_iso": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(exp)) if exp else None,
-        "iat_iso": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(iat)) if iat else None,
-        "nbf_iso": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(nbf)) if nbf else None,
+        "exp_iso": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(exp)) if exp is not None else None,
+        "iat_iso": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(iat)) if iat is not None else None,
+        "nbf_iso": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(nbf)) if nbf is not None else None,
         "expired": expired,
-        "seconds_until_exp": round(exp - now) if exp else None,
+        "seconds_until_exp": round(exp - now) if exp is not None else None,
     }
 
 

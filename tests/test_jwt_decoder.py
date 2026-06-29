@@ -78,3 +78,22 @@ async def test_iat_iso_field():
     async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
         r = await c.post("/api/jwt/decode", json={"token": token})
     assert r.json()["iat_iso"] is not None
+
+
+@pytest.mark.asyncio
+async def test_exp_zero_is_expired():
+    token = _make_token({"alg": "HS256"}, {"exp": 0})
+    async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
+        r = await c.post("/api/jwt/decode", json={"token": token})
+    assert r.status_code == 200
+    assert r.json()["expired"] is True
+
+
+@pytest.mark.asyncio
+async def test_array_payload_422():
+    # payload segment that decodes to a JSON array, not a dict
+    arr_payload = base64.urlsafe_b64encode(b"[1,2,3]").rstrip(b"=").decode()
+    token = f"eyJhbGciOiJIUzI1NiJ9.{arr_payload}.sig"
+    async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
+        r = await c.post("/api/jwt/decode", json={"token": token})
+    assert r.status_code == 422
