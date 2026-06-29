@@ -19,6 +19,19 @@ async def custom_agent_node(state: "AgentState") -> dict:
     if not defn or not defn.enabled:
         return {"tool_results": [f"Custom agent '{name}' not found or disabled"]}
 
+    if defn.workflow_name:
+        from agents.workflow_store import run_workflow
+        user_msg = next(
+            (m["content"] for m in state["messages"] if m["role"] == "user"), ""
+        )
+        try:
+            output = await run_workflow(defn.workflow_name, payload={"message": user_msg})
+        except KeyError:
+            return {"tool_results": [f"Workflow '{defn.workflow_name}' not found"]}
+        if output and output[-1].get("error"):
+            return {"tool_results": [f"Workflow error: {output[-1]['error']}"]}
+        return {"tool_results": [output[-1]["result"] if output else ""]}
+
     messages = [
         {"role": "system", "content": defn.system_prompt},
         *[m for m in state["messages"] if m["role"] != "system"],
