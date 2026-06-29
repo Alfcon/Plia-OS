@@ -821,6 +821,10 @@
         <button class="m-nav-btn" data-section="uuidgen" onclick="showMenuSection('uuidgen')">UUID</button>
         <button class="m-nav-btn" data-section="mdrender" onclick="showMenuSection('mdrender')">Markdown</button>
         <button class="m-nav-btn" data-section="csvview" onclick="showMenuSection('csvview')">CSV</button>
+        <button class="m-nav-btn" data-section="jwtdec" onclick="showMenuSection('jwtdec')">JWT</button>
+        <button class="m-nav-btn" data-section="ipcalc" onclick="showMenuSection('ipcalc')">IP/CIDR</button>
+        <button class="m-nav-btn" data-section="proclist" onclick="showMenuSection('proclist');loadProcesses()">Processes</button>
+        <button class="m-nav-btn" data-section="urlparse" onclick="showMenuSection('urlparse')">URL</button>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -2730,6 +2734,56 @@
           <div style="overflow:auto;max-height:280px;">
             <table id="csv-table" style="width:100%;border-collapse:collapse;font-size:12px;display:none;"></table>
           </div>
+        </div>
+
+        <!-- JWT Decoder -->
+        <div id="m-section-jwtdec" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-weight:600;font-size:13px;">JWT Decoder</div>
+          <textarea id="jwt-input" placeholder="Paste JWT token..." style="min-height:72px;padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:11px;resize:vertical;font-family:monospace;word-break:break-all;" oninput="decodeJWT()"></textarea>
+          <div id="jwt-status" style="font-size:11px;"></div>
+          <div id="jwt-header-box" style="display:none;flex-direction:column;gap:6px;">
+            <div style="font-size:11px;color:#aaa;font-weight:600;">HEADER</div>
+            <div id="jwt-header" style="background:#111;padding:8px;border-radius:4px;font-size:12px;font-family:monospace;color:#7ec8e3;white-space:pre-wrap;"></div>
+            <div style="font-size:11px;color:#aaa;font-weight:600;">PAYLOAD</div>
+            <div id="jwt-payload" style="background:#111;padding:8px;border-radius:4px;font-size:12px;font-family:monospace;color:#b5e48c;white-space:pre-wrap;"></div>
+            <div id="jwt-claims" style="display:flex;flex-direction:column;gap:3px;"></div>
+          </div>
+        </div>
+
+        <!-- IP/CIDR Calculator -->
+        <div id="m-section-ipcalc" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-weight:600;font-size:13px;">IP / CIDR Calculator</div>
+          <div style="display:flex;gap:6px;">
+            <input id="ip-input" placeholder="192.168.1.0/24 or 10.0.0.1 or ::1/128" style="flex:1;padding:5px 8px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:12px;" oninput="calcIP()">
+          </div>
+          <div id="ip-results" style="display:flex;flex-direction:column;gap:4px;"></div>
+        </div>
+
+        <!-- Process List -->
+        <div id="m-section-proclist" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="font-weight:600;font-size:13px;flex:1;">Processes</div>
+            <label style="font-size:12px;color:#aaa;">Sort</label>
+            <select id="proc-sort" onchange="loadProcesses()" style="padding:3px 6px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:12px;">
+              <option value="cpu">CPU</option>
+              <option value="mem">MEM</option>
+            </select>
+            <input id="proc-limit" type="number" value="25" min="1" max="200" style="width:50px;padding:3px 5px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:12px;">
+            <button onclick="loadProcesses()" style="padding:3px 10px;background:#2a5298;border:none;border-radius:4px;color:#fff;font-size:12px;cursor:pointer;">Refresh</button>
+          </div>
+          <div id="proc-status" style="font-size:11px;color:#666;"></div>
+          <div style="overflow:auto;max-height:320px;">
+            <table id="proc-table" style="width:100%;border-collapse:collapse;font-size:11px;"></table>
+          </div>
+        </div>
+
+        <!-- URL Parser -->
+        <div id="m-section-urlparse" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-weight:600;font-size:13px;">URL Parser</div>
+          <div style="display:flex;gap:6px;">
+            <input id="url-input" placeholder="https://example.com/path?foo=bar#section" style="flex:1;padding:5px 8px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#eee;font-size:12px;" oninput="parseURL()">
+          </div>
+          <div id="url-results" style="display:flex;flex-direction:column;gap:4px;"></div>
         </div>
 
         <!-- Wake Word Test -->
@@ -8311,6 +8365,139 @@
       return _csvSortAsc?cmp:-cmp;
     });
     renderCSVTable({..._csvData,rows});
+  }
+
+  // ── JWT decoder ───────────────────────────────────────────────────────────────
+  let _jwtTimer = null;
+  function decodeJWT() {
+    clearTimeout(_jwtTimer);
+    _jwtTimer = setTimeout(async () => {
+      const token = document.getElementById('jwt-input').value.trim();
+      const status = document.getElementById('jwt-status');
+      const box = document.getElementById('jwt-header-box');
+      if (!token) { status.textContent=''; box.style.display='none'; return; }
+      try {
+        const r = await fetch('/api/jwt/decode', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
+        const d = await r.json();
+        if (!r.ok) { status.textContent=d.detail||'Error'; status.style.color='#f66'; box.style.display='none'; return; }
+        status.textContent = d.expired ? '⚠ EXPIRED' : (d.seconds_until_exp!=null ? `Valid — expires in ${Math.round(d.seconds_until_exp/60)}m` : 'No expiry');
+        status.style.color = d.expired ? '#f66' : '#6f6';
+        document.getElementById('jwt-header').textContent = JSON.stringify(d.header, null, 2);
+        document.getElementById('jwt-payload').textContent = JSON.stringify(d.payload, null, 2);
+        const claims = [];
+        if (d.iat_iso) claims.push(['Issued at', d.iat_iso]);
+        if (d.exp_iso) claims.push(['Expires', d.exp_iso]);
+        if (d.nbf_iso) claims.push(['Not before', d.nbf_iso]);
+        document.getElementById('jwt-claims').innerHTML = claims.map(([k,v])=>`
+          <div style="display:flex;gap:8px;font-size:11px;color:#aaa;padding:2px 0;">
+            <span style="width:90px;">${_esc(k)}</span><span style="color:#ddd;">${_esc(v)}</span>
+          </div>`).join('');
+        box.style.display = 'flex';
+      } catch(e) { status.textContent=e.message; status.style.color='#f66'; box.style.display='none'; }
+    }, 300);
+  }
+
+  // ── IP/CIDR calculator ────────────────────────────────────────────────────────
+  let _ipTimer = null;
+  function calcIP() {
+    clearTimeout(_ipTimer);
+    _ipTimer = setTimeout(async () => {
+      const val = document.getElementById('ip-input').value.trim();
+      const out = document.getElementById('ip-results');
+      if (!val) { out.innerHTML=''; return; }
+      try {
+        const r = await fetch('/api/ip/calc', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:val})});
+        const d = await r.json();
+        if (!r.ok) { out.innerHTML=`<div style="color:#f66;font-size:12px;">${_esc(d.detail||'Error')}</div>`; return; }
+        const fields = [
+          ['CIDR', d.cidr], ['Network', d.network], ['Broadcast', d.broadcast],
+          ['Mask', d.mask], ['Prefix', '/'+d.prefix], ['Version', 'IPv'+d.version],
+          ['Total addresses', d.total_addresses?.toLocaleString()],
+          ['Usable hosts', d.usable_hosts?.toLocaleString()],
+          ['First host', d.first_host], ['Last host', d.last_host],
+          ['Private', d.is_private?'Yes':'No'], ['Loopback', d.is_loopback?'Yes':'No'],
+          ['Multicast', d.is_multicast?'Yes':'No'],
+        ].filter(([,v])=>v!=null);
+        out.innerHTML = fields.map(([k,v])=>`
+          <div style="display:flex;align-items:center;gap:6px;background:#1a1a1a;padding:4px 8px;border-radius:4px;">
+            <span style="font-size:11px;color:#666;width:130px;">${_esc(k)}</span>
+            <code style="flex:1;font-size:12px;color:#7ec8e3;">${_esc(String(v))}</code>
+            <button onclick="navigator.clipboard.writeText('${_esc(String(v))}')" style="padding:2px 6px;background:#333;border:none;border-radius:3px;color:#aaa;font-size:10px;cursor:pointer;">Copy</button>
+          </div>`).join('');
+      } catch(e) { out.innerHTML=`<div style="color:#f66;font-size:12px;">${_esc(e.message)}</div>`; }
+    }, 300);
+  }
+
+  // ── Process list ──────────────────────────────────────────────────────────────
+  async function loadProcesses() {
+    const sort = document.getElementById('proc-sort').value;
+    const limit = parseInt(document.getElementById('proc-limit').value) || 25;
+    const status = document.getElementById('proc-status');
+    const tbl = document.getElementById('proc-table');
+    status.textContent = 'Loading...'; status.style.color='#888';
+    try {
+      const r = await fetch(`/api/processes?sort=${sort}&limit=${limit}`);
+      const d = await r.json();
+      if (!r.ok) { status.textContent=d.detail||'Error'; status.style.color='#f66'; return; }
+      status.textContent = `${d.processes.length} of ${d.total} processes — sorted by ${sort.toUpperCase()}`;
+      status.style.color='#666';
+      const head = `<thead><tr>${['USER','PID','CPU%','MEM%','STAT','COMMAND'].map(h=>`<th style="padding:4px 8px;background:#1a1a1a;border:1px solid #333;text-align:left;font-size:11px;color:#7ec8e3;white-space:nowrap;">${h}</th>`).join('')}<th style="padding:4px 8px;background:#1a1a1a;border:1px solid #333;"></th></tr></thead>`;
+      const body = `<tbody>${d.processes.map(p=>`<tr>
+        <td style="padding:3px 8px;border:1px solid #222;font-size:11px;color:#aaa;">${_esc(p.user)}</td>
+        <td style="padding:3px 8px;border:1px solid #222;font-size:11px;color:#ddd;">${p.pid}</td>
+        <td style="padding:3px 8px;border:1px solid #222;font-size:11px;color:${p.cpu>50?'#f66':p.cpu>20?'#fa0':'#ddd'};">${p.cpu.toFixed(1)}</td>
+        <td style="padding:3px 8px;border:1px solid #222;font-size:11px;color:${p.mem>20?'#f66':p.mem>10?'#fa0':'#ddd'};">${p.mem.toFixed(1)}</td>
+        <td style="padding:3px 8px;border:1px solid #222;font-size:11px;color:#888;">${_esc(p.stat)}</td>
+        <td style="padding:3px 8px;border:1px solid #222;font-size:11px;color:#ddd;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(p.command)}">${_esc(p.command)}</td>
+        <td style="padding:3px 8px;border:1px solid #222;"><button onclick="killProcess(${p.pid})" style="padding:1px 6px;background:#5a1a1a;border:none;border-radius:3px;color:#f99;font-size:10px;cursor:pointer;">Kill</button></td>
+      </tr>`).join('')}</tbody>`;
+      tbl.innerHTML = head + body;
+    } catch(e) { status.textContent=e.message; status.style.color='#f66'; }
+  }
+  async function killProcess(pid) {
+    if (!confirm(`Send SIGTERM to PID ${pid}?`)) return;
+    try {
+      const r = await fetch(`/api/processes/${pid}/kill`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({signal:'TERM'})});
+      const d = await r.json();
+      if (!r.ok) { alert('Error: '+(d.detail||'failed')); return; }
+      loadProcesses();
+    } catch(e) { alert(e.message); }
+  }
+
+  // ── URL parser ────────────────────────────────────────────────────────────────
+  let _urlTimer = null;
+  function parseURL() {
+    clearTimeout(_urlTimer);
+    _urlTimer = setTimeout(async () => {
+      const url = document.getElementById('url-input').value.trim();
+      const out = document.getElementById('url-results');
+      if (!url) { out.innerHTML=''; return; }
+      try {
+        const r = await fetch('/api/url/parse', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+        const d = await r.json();
+        if (!r.ok) { out.innerHTML=`<div style="color:#f66;font-size:12px;">${_esc(d.detail||'Error')}</div>`; return; }
+        const main = [
+          ['Scheme', d.scheme], ['Host', d.host], ['Port', d.port],
+          ['Path', d.path], ['Fragment', d.fragment||null],
+          ['Username', d.username||null], ['Origin', d.origin],
+        ].filter(([,v])=>v!=null);
+        let html = main.map(([k,v])=>`
+          <div style="display:flex;align-items:center;gap:6px;background:#1a1a1a;padding:4px 8px;border-radius:4px;">
+            <span style="font-size:11px;color:#666;width:80px;">${_esc(k)}</span>
+            <code style="flex:1;font-size:12px;color:#7ec8e3;">${_esc(String(v))}</code>
+            <button onclick="navigator.clipboard.writeText('${_esc(String(v)).replace(/'/g,'&apos;')}')" style="padding:2px 6px;background:#333;border:none;border-radius:3px;color:#aaa;font-size:10px;cursor:pointer;">Copy</button>
+          </div>`).join('');
+        if (Object.keys(d.params).length) {
+          html += `<div style="font-size:11px;color:#aaa;margin-top:4px;">Query params</div>`;
+          html += Object.entries(d.params).map(([k,v])=>`
+            <div style="display:flex;align-items:center;gap:6px;background:#111;padding:3px 8px;border-radius:4px;border-left:2px solid #444;">
+              <code style="font-size:11px;color:#fa0;width:120px;overflow:hidden;text-overflow:ellipsis;">${_esc(k)}</code>
+              <code style="flex:1;font-size:11px;color:#ddd;">${_esc(Array.isArray(v)?v.join(', '):String(v))}</code>
+            </div>`).join('');
+        }
+        out.innerHTML = html;
+      } catch(e) { out.innerHTML=`<div style="color:#f66;font-size:12px;">${_esc(e.message)}</div>`; }
+    }, 250);
   }
 
   // ── Tool playground ──────────────────────────────────────────────────────

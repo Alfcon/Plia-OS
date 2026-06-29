@@ -4708,6 +4708,174 @@ async def csv_parse(body: dict):
     return {"headers": headers, "rows": rows, "total": len(rows), "columns": len(headers)}
 
 
+# ── JWT decoder ───────────────────────────────────────────────────────────────
+
+@router.post("/api/jwt/decode")
+async def jwt_decode(body: dict):
+    import base64
+    import json as _json
+
+    token = str(body.get("token", "")).strip()
+    if not token:
+        raise HTTPException(status_code=422, detail="token required")
+    parts = token.split(".")
+    if len(parts) != 3:
+        raise HTTPException(status_code=422, detail="JWT must have 3 parts")
+
+    def _b64d(s: str) -> dict:
+        pad = (-len(s)) % 4
+        try:
+            return _json.loads(base64.urlsafe_b64decode(s + "=" * pad).decode("utf-8"))
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"Invalid JWT segment: {exc}") from exc
+
+    header = _b64d(parts[0])
+    payload = _b64d(parts[1])
+
+    import time as _time
+    now = _time.time()
+    exp = payload.get("exp")
+    iat = payload.get("iat")
+    nbf = payload.get("nbf")
+    expired = bool(exp and now > exp)
+    return {
+        "header": header,
+        "payload": payload,
+        "signature": parts[2],
+        "exp_iso": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(exp)) if exp else None,
+        "iat_iso": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(iat)) if iat else None,
+        "nbf_iso": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(nbf)) if nbf else None,
+        "expired": expired,
+        "seconds_until_exp": round(exp - now) if exp else None,
+    }
+
+
+# ── IP / CIDR calculator ──────────────────────────────────────────────────────
+
+@router.post("/api/ip/calc")
+async def ip_calc(body: dict):
+    import ipaddress
+
+    value = str(body.get("value", "")).strip()
+    if not value:
+        raise HTTPException(status_code=422, detail="value required")
+    try:
+        net = ipaddress.ip_network(value, strict=False)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    hosts = list(net.hosts())
+    total_hosts = net.num_addresses
+    usable = len(hosts)
+    return {
+        "network": str(net.network_address),
+        "broadcast": str(net.broadcast_address) if net.version == 4 else None,
+        "mask": str(net.netmask) if net.version == 4 else None,
+        "prefix": net.prefixlen,
+        "version": net.version,
+        "total_addresses": total_hosts,
+        "usable_hosts": usable,
+        "first_host": str(hosts[0]) if hosts else None,
+        "last_host": str(hosts[-1]) if hosts else None,
+        "cidr": str(net),
+        "is_private": net.is_private,
+        "is_loopback": net.is_loopback,
+        "is_multicast": net.is_multicast,
+    }
+
+
+# ── Process list ──────────────────────────────────────────────────────────────
+
+@router.get("/api/processes")
+async def list_processes(sort: str = "cpu", limit: int = 25):
+    sort = sort if sort in ("cpu", "mem") else "cpu"
+    limit = min(max(int(limit), 1), 200)
+    col_map = {"cpu": "%cpu", "mem": "%mem"}
+    sort_key = col_map[sort]
+
+    proc = await asyncio.create_subprocess_exec(
+        "ps", "aux", "--no-headers",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0:
+        raise HTTPException(status_code=503, detail="ps failed")
+
+    rows = []
+    for line in stdout.decode(errors="replace").splitlines():
+        parts = line.split(None, 10)
+        if len(parts) < 11:
+            continue
+        try:
+            rows.append({
+                "user": parts[0],
+                "pid": int(parts[1]),
+                "cpu": float(parts[2]),
+                "mem": float(parts[3]),
+                "vsz": int(parts[4]),
+                "rss": int(parts[5]),
+                "stat": parts[7],
+                "command": parts[10],
+            })
+        except (ValueError, IndexError):
+            continue
+
+    rows.sort(key=lambda r: r[sort], reverse=True)
+    return {"processes": rows[:limit], "total": len(rows), "sort": sort}
+
+
+@router.post("/api/processes/{pid}/kill")
+async def kill_process(pid: int, body: dict):
+    import re as _re
+    signal = str(body.get("signal", "TERM"))
+    if not _re.match(r"^[A-Z0-9]+$", signal):
+        raise HTTPException(status_code=422, detail="invalid signal")
+    proc = await asyncio.create_subprocess_exec(
+        "kill", f"-{signal}", str(pid),
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise HTTPException(status_code=400, detail=stderr.decode(errors="replace").strip())
+    return {"killed": pid, "signal": signal}
+
+
+# ── URL parser ────────────────────────────────────────────────────────────────
+
+@router.post("/api/url/parse")
+async def url_parse(body: dict):
+    from urllib.parse import urlparse, parse_qs, unquote, quote
+
+    raw = str(body.get("url", "")).strip()
+    if not raw:
+        raise HTTPException(status_code=422, detail="url required")
+    if "://" not in raw and not raw.startswith("//"):
+        raw = "https://" + raw
+    try:
+        p = urlparse(raw)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    params = parse_qs(p.query, keep_blank_values=True)
+    params_flat = {k: v[0] if len(v) == 1 else v for k, v in params.items()}
+    return {
+        "scheme": p.scheme,
+        "host": p.hostname,
+        "port": p.port,
+        "path": p.path,
+        "query": p.query,
+        "fragment": p.fragment,
+        "username": p.username,
+        "password": p.password,
+        "params": params_flat,
+        "decoded_path": unquote(p.path),
+        "encoded_url": quote(raw, safe=":/?#[]@!$&'()*+,;=%"),
+        "origin": f"{p.scheme}://{p.netloc}" if p.netloc else None,
+    }
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
