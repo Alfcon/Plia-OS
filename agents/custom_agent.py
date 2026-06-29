@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_TOOL_CALL_LIMIT = 10
+
 
 async def custom_agent_node(state: "AgentState") -> dict:
     name = state["active_agent"].removeprefix("custom:")
@@ -38,8 +40,25 @@ async def custom_agent_node(state: "AgentState") -> dict:
     ]
     all_tools = core.registry.get_tool_schemas()
     tools = [t for t in all_tools if t["function"]["name"] in defn.tool_names]
-    msg = await agents.llm.call_llm(messages, tools=tools or None)
-    content = msg.get("content") or ""
-    if not content and msg.get("tool_calls"):
-        content = "[Custom agent attempted a tool call but tool execution is not yet supported in Phase 1.]"
+
+    content = ""
+    for _ in range(_TOOL_CALL_LIMIT):
+        msg = await agents.llm.call_llm(messages, tools=tools or None)
+        messages.append(msg)
+        if not msg.get("tool_calls"):
+            content = msg.get("content") or ""
+            break
+        for tc in msg["tool_calls"]:
+            fn = tc["function"]
+            try:
+                result = await core.registry.call_tool_async(fn["name"], fn.get("arguments") or {})
+            except Exception as exc:
+                result = f"[Tool error: {exc}]"
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.get("id", ""),
+                "content": str(result),
+            })
+    else:
+        content = "[Tool call limit reached]"
     return {"tool_results": [content]}
