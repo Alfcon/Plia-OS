@@ -10753,13 +10753,6 @@
     }).catch(() => {});
   }
 
-  function _wfToolSelect(selected) {
-    const opts = _wfToolNames.map(t =>
-      `<option value="${_esc(t)}" ${t === selected ? 'selected' : ''}>${_esc(t)}</option>`
-    ).join('');
-    return `<select style="background:#111;border:1px solid #333;color:#ccc;font-size:0.7rem;padding:2px 4px;border-radius:3px;font-family:monospace;max-width:180px;">${opts}</select>`;
-  }
-
   let _wfStepIdx = 0;
   function wfAddStep(step) {
     const idx = _wfStepIdx++;
