@@ -10738,6 +10738,7 @@
     document.getElementById('wf-steps').innerHTML = '';
     document.getElementById('wf-results').style.display = 'none';
     document.getElementById('wf-results').innerHTML = '';
+    _wfUpdateVarPicker();
   }
 
   function wfLoad(name) {
@@ -10750,6 +10751,7 @@
       document.getElementById('wf-steps').innerHTML = '';
       document.getElementById('wf-results').style.display = 'none';
       (wf.steps || []).forEach(step => wfAddStep(step));
+      _wfUpdateVarPicker();
     }).catch(() => {});
   }
 
@@ -10762,19 +10764,24 @@
     const note = (step && step.note) || '';
     const prompt = (step && step.prompt) || '';
     const system = (step && step.system) || '';
-    const agentName = (step && step.name) || '';
+    const agentName = (step && step.step_type === 'agent') ? (step.name || '') : '';
+    const stepName = (step && step.step_type !== 'agent') ? (step.name || '') : '';
     const message = (step && step.message) || '{{prev}}';
     const container = document.getElementById('wf-steps');
     const div = document.createElement('div');
     div.dataset.stepIdx = idx;
     div.style.cssText = 'border:1px solid #1a1a1a;border-radius:3px;padding:5px 7px;background:#0a0a0a;display:flex;flex-direction:column;gap:4px;';
     div.innerHTML = `
+      <input class="wf-step-name" placeholder="Step name (optional, for {{steps.name.result}})"
+        value="${_esc(stepName)}" oninput="_wfUpdateVarPicker()"
+        style="display:${stepType==='agent'?'none':'block'};width:100%;margin-bottom:.35rem;background:#111;border:1px solid #333;color:#aaa;border-radius:3px;padding:3px 6px;font-size:0.75rem;font-family:monospace;box-sizing:border-box;">
       <div style="display:flex;align-items:center;gap:5px;">
         <select class="wf-step-type" onchange="_wfStepTypeChanged(this)"
           style="background:#111;border:1px solid #333;color:#ccc;font-size:0.7rem;padding:2px 4px;border-radius:3px;">
           <option value="tool" ${stepType==='tool'?'selected':''}>Tool</option>
           <option value="llm" ${stepType==='llm'?'selected':''}>LLM</option>
           <option value="agent" ${stepType==='agent'?'selected':''}>Agent</option>
+          <option value="if" ${stepType==='if'?'selected':''}>If (condition)</option>
         </select>
         <button onclick="this.closest('[data-step-idx]').remove()" style="background:none;border:none;color:#555;font-size:0.8rem;cursor:pointer;padding:0 3px;margin-left:auto;">✕</button>
         <button onclick="_wfMoveStep(this,-1)" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;padding:0 2px;">↑</button>
@@ -10819,12 +10826,37 @@
             style="flex:1;background:#111;border:1px solid #1a1a1a;color:#888;font-size:0.68rem;padding:2px 5px;border-radius:2px;">
         </div>
       </div>
+      <div class="wf-if-fields" style="display:${stepType==='if'?'block':'none'};margin-top:.4rem">
+        <div style="display:flex;gap:.4rem;align-items:center;margin-bottom:.35rem">
+          <span style="color:#888;font-size:0.75rem">if prev</span>
+          <select class="wf-if-op" style="background:#111;border:1px solid #333;color:#ccc;font-size:0.75rem;padding:2px 4px;border-radius:3px;">
+            <option value="not_empty" ${(step&&step.condition&&step.condition.op)==='not_empty'?'selected':''}>is not empty</option>
+            <option value="empty" ${(step&&step.condition&&step.condition.op)==='empty'?'selected':''}>is empty</option>
+            <option value="contains" ${(step&&step.condition&&step.condition.op)==='contains'?'selected':''}>contains</option>
+            <option value="not_contains" ${(step&&step.condition&&step.condition.op)==='not_contains'?'selected':''}>does not contain</option>
+            <option value="eq" ${(step&&step.condition&&step.condition.op)==='eq'?'selected':''}>equals</option>
+            <option value="ne" ${(step&&step.condition&&step.condition.op)==='ne'?'selected':''}>does not equal</option>
+          </select>
+          <input class="wf-if-value" placeholder="value" value="${_esc((step&&step.condition&&step.condition.value)||'')}"
+            style="flex:1;background:#111;border:1px solid #333;color:#ccc;border-radius:3px;padding:2px 6px;font-size:0.75rem;font-family:monospace;">
+        </div>
+        <label style="color:#888;font-size:0.75rem">then (JSON step array):</label>
+        <textarea class="wf-if-then" rows="3" placeholder='[{"step_type":"tool","tool":"...","params":{}}]'
+          style="width:100%;background:#0a0a0a;border:1px solid #333;color:#ccc;border-radius:3px;padding:4px 6px;font-size:0.72rem;font-family:monospace;resize:vertical;box-sizing:border-box;margin-top:.2rem"
+        >${step && step.then ? JSON.stringify(step.then, null, 2) : ''}</textarea>
+        <label style="color:#888;font-size:0.75rem;margin-top:.35rem;display:block">else (JSON step array, optional):</label>
+        <textarea class="wf-if-else" rows="3" placeholder='[{"step_type":"llm","prompt":"..."}]'
+          style="width:100%;background:#0a0a0a;border:1px solid #333;color:#ccc;border-radius:3px;padding:4px 6px;font-size:0.72rem;font-family:monospace;resize:vertical;box-sizing:border-box;margin-top:.2rem"
+        >${step && step.else ? JSON.stringify(step.else, null, 2) : ''}</textarea>
+      </div>
+      <div class="wf-var-picker" style="font-size:0.7rem;color:#555;margin-top:.2rem;min-height:1rem"></div>
       <div style="display:flex;align-items:center;gap:5px;">
         <span style="color:#333;font-size:0.65rem;flex-shrink:0;">Note</span>
         <input type="text" class="wf-note" value="${_esc(note)}" placeholder="optional step label"
           style="flex:1;background:#111;border:1px solid #1a1a1a;color:#555;font-size:0.68rem;padding:2px 5px;border-radius:2px;">
       </div>`;
     container.appendChild(div);
+    _wfUpdateVarPicker();
   }
 
   function _wfStepTypeChanged(sel) {
@@ -10832,6 +10864,9 @@
     div.querySelector('.wf-tool-fields').style.display = sel.value === 'tool' ? 'flex' : 'none';
     div.querySelector('.wf-llm-fields').style.display = sel.value === 'llm' ? 'flex' : 'none';
     div.querySelector('.wf-agent-fields').style.display = sel.value === 'agent' ? 'flex' : 'none';
+    div.querySelector('.wf-if-fields').style.display = sel.value === 'if' ? 'block' : 'none';
+    div.querySelector('.wf-step-name').style.display = sel.value === 'agent' ? 'none' : 'block';
+    _wfUpdateVarPicker();
   }
 
   function _wfMoveStep(btn, dir) {
@@ -10849,13 +10884,17 @@
     return Array.from(document.querySelectorAll('#wf-steps > [data-step-idx]')).map(div => {
       const stepType = div.querySelector('.wf-step-type').value;
       const note = div.querySelector('.wf-note').value;
+      const stepNameEl = div.querySelector('.wf-step-name');
+      const stepNameVal = stepNameEl ? stepNameEl.value.trim() : '';
       if (stepType === 'llm') {
-        return {
+        const step = {
           step_type: 'llm',
           prompt: div.querySelector('.wf-prompt').value,
           system: div.querySelector('.wf-system').value,
           note,
         };
+        if (stepNameVal) step.name = stepNameVal;
+        return step;
       } else if (stepType === 'agent') {
         return {
           step_type: 'agent',
@@ -10863,12 +10902,45 @@
           message: div.querySelector('.wf-agent-msg').value,
           note,
         };
+      } else if (stepType === 'if') {
+        const op = div.querySelector('.wf-if-op').value;
+        const val = div.querySelector('.wf-if-value').value.trim();
+        const thenRaw = div.querySelector('.wf-if-then').value.trim();
+        const elseRaw = div.querySelector('.wf-if-else').value.trim();
+        const step = { step_type: 'if', note };
+        if (stepNameVal) step.name = stepNameVal;
+        step.condition = { op };
+        if (val) step.condition.value = val;
+        try { step.then = thenRaw ? JSON.parse(thenRaw) : []; } catch(e) { step.then = []; }
+        try { if (elseRaw) step.else = JSON.parse(elseRaw); } catch(e) {}
+        return step;
       } else {
         const tool = div.querySelector('.wf-tool-sel').value;
         let params = {};
         try { params = JSON.parse(div.querySelector('.wf-params').value || '{}'); } catch(e) {}
-        return {tool, params, note};
+        const step = {tool, params, note};
+        if (stepNameVal) step.name = stepNameVal;
+        return step;
       }
+    });
+  }
+
+  function _wfUpdateVarPicker() {
+    const cards = Array.from(document.querySelectorAll('.wf-step-card, #wf-steps > [data-step-idx]'));
+    const names = [];
+    cards.forEach((card, i) => {
+      const n = card.querySelector('.wf-step-name')?.value.trim();
+      if (n) names.push({ idx: i, name: n });
+      const picker = card.querySelector('.wf-var-picker');
+      if (!picker) return;
+      const available = names.filter(x => x.idx < i);
+      picker.innerHTML = available.length
+        ? available.map(x =>
+            `<span onclick="navigator.clipboard.writeText('{{steps.${_esc(x.name)}.result}}')"
+              style="cursor:pointer;margin-right:.4rem;color:#4af;text-decoration:underline"
+              title="Click to copy">{{steps.${_esc(x.name)}.result}}</span>`
+          ).join('')
+        : '';
     });
   }
 
