@@ -66,7 +66,7 @@ async def test_node_filters_tools(mock_store):
          patch("core.registry.get_tool_schemas", return_value=fake_tools):
         await custom_agent_node(_state("custom:finance"))
     _, kwargs = mock_llm.call_args
-    passed_tools = kwargs.get("tools") or mock_llm.call_args[0][1] if len(mock_llm.call_args[0]) > 1 else []
+    passed_tools = kwargs.get("tools") or []
     assert len(passed_tools) == 1
     assert passed_tools[0]["function"]["name"] == "calculate"
 
