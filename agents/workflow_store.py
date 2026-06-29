@@ -97,6 +97,50 @@ def _interpolate_params(params: dict, results: list[str], payload: dict | None =
 from core.registry import call_tool_async
 
 
+async def _run_step(
+    step: dict,
+    step_results: list[str],
+    payload: dict | None,
+) -> tuple[str, str | None]:
+    """Dispatch one workflow step. Returns (result_str, error_str | None)."""
+    step_type = step.get("step_type", "tool")
+
+    if step_type == "tool":
+        tool = step.get("tool", "")
+        params = _interpolate_params(step.get("params", {}), step_results, payload)
+        result = await call_tool_async(tool, params)
+        return str(result), None
+
+    elif step_type == "llm":
+        prompt = _interpolate(step.get("prompt", ""), step_results, payload)
+        system = step.get("system", "")
+        msgs = ([{"role": "system", "content": system}] if system else [])
+        msgs.append({"role": "user", "content": prompt})
+        import agents.llm
+        msg = await agents.llm.call_llm(msgs)
+        return msg.get("content") or "", None
+
+    elif step_type == "agent":
+        from agents.custom_agent import custom_agent_node
+        name = step.get("name", "")
+        message = _interpolate(step.get("message", "{{prev}}"), step_results, payload)
+        state = {
+            "active_agent": f"custom:{name}",
+            "messages": [{"role": "user", "content": message}],
+            "memory_context": "",
+            "search_provider": "ddg",
+            "hop_count": 0,
+            "tool_results": [],
+            "direct_result": "",
+        }
+        result = await custom_agent_node(state)
+        results_list = result.get("tool_results", [])
+        return results_list[0] if results_list else "", None
+
+    else:
+        return "", f"Unknown step_type: {step_type!r}"
+
+
 async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
     wf = get_workflow(name)
     if wf is None:
@@ -106,15 +150,11 @@ async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
     output: list[dict] = []
 
     for i, step in enumerate(wf["steps"]):
-        tool = step.get("tool", "")
-        raw_params = step.get("params", {})
         note = step.get("note", "")
-        params = _interpolate_params(raw_params, step_results, payload)
+        step_type = step.get("step_type", "tool")
         t0 = time.monotonic()
         try:
-            result = await call_tool_async(tool, params)
-            result_str = str(result)
-            error = None
+            result_str, error = await _run_step(step, step_results, payload)
         except Exception as exc:
             result_str = ""
             error = str(exc)
@@ -122,8 +162,9 @@ async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
         step_results.append(result_str)
         output.append({
             "step": i,
-            "tool": tool,
-            "params": params,
+            "step_type": step_type,
+            "tool": step.get("tool", ""),
+            "params": step.get("params", {}),
             "note": note,
             "result": result_str,
             "error": error,
@@ -145,14 +186,26 @@ async def dry_run_workflow(name: str, payload: dict | None = None) -> list[dict]
     output: list[dict] = []
 
     for i, step in enumerate(wf["steps"]):
+        step_type = step.get("step_type", "tool")
         tool = step.get("tool", "")
         raw_params = step.get("params", {})
         note = step.get("note", "")
         params = _interpolate_params(raw_params, step_results, payload)
-        dry_result = f"[DRY RUN] would call {tool!r} with {params}"
+
+        if step_type == "llm":
+            prompt = _interpolate(step.get("prompt", ""), step_results, payload)
+            dry_result = f"[DRY RUN] would call LLM with prompt: {prompt!r}"
+        elif step_type == "agent":
+            agent_name = step.get("name", "")
+            message = _interpolate(step.get("message", "{{prev}}"), step_results, payload)
+            dry_result = f"[DRY RUN] would call agent {agent_name!r} with: {message!r}"
+        else:
+            dry_result = f"[DRY RUN] would call {tool!r} with {params}"
+
         step_results.append(dry_result)
         output.append({
             "step": i,
+            "step_type": step_type,
             "tool": tool,
             "params": params,
             "note": note,
