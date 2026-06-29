@@ -27,6 +27,7 @@ class AgentDef:
     llm_description: str
     enabled: bool = True
     created_at: str = ""
+    workflow_name: str | None = None
 
 
 def _load() -> dict:
@@ -86,4 +87,5 @@ def _from_dict(d: dict) -> AgentDef:
         llm_description=d.get("llm_description", ""),
         enabled=bool(d.get("enabled", True)),
         created_at=d.get("created_at", ""),
+        workflow_name=d.get("workflow_name", None),
     )

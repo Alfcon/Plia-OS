@@ -81,3 +81,15 @@ def test_invalid_slug_raises(store):
 
 def test_list_empty(store):
     assert list_agents() == []
+
+
+def test_workflow_name_roundtrips(store):
+    save_agent(_defn(workflow_name="my-wf"))
+    result = get_agent("finance")
+    assert result.workflow_name == "my-wf"
+
+
+def test_workflow_name_defaults_none(store):
+    save_agent(_defn())
+    result = get_agent("finance")
+    assert result.workflow_name is None
