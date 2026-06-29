@@ -8632,14 +8632,6 @@
     await caLoad();
   }
 
-  // load on section show
-  const _caOrigShowSection = typeof showSection === 'function' ? showSection : null;
-  document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('[data-section="customagents"]').forEach(btn => {
-      btn.addEventListener('click', caLoad);
-    });
-  });
-
   // ── Tool playground ──────────────────────────────────────────────────────
 
   let _toolsData = [];
