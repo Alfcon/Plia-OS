@@ -26,4 +26,7 @@ async def custom_agent_node(state: "AgentState") -> dict:
     all_tools = core.registry.get_tool_schemas()
     tools = [t for t in all_tools if t["function"]["name"] in defn.tool_names]
     msg = await agents.llm.call_llm(messages, tools=tools or None)
-    return {"tool_results": [msg.get("content") or ""]}
+    content = msg.get("content") or ""
+    if not content and msg.get("tool_calls"):
+        content = "[Custom agent attempted a tool call but tool execution is not yet supported in Phase 1.]"
+    return {"tool_results": [content]}

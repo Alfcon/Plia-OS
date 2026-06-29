@@ -4960,8 +4960,7 @@ async def get_custom_agent(name: str):
     defn = await asyncio.to_thread(get_agent, name)
     if defn is None:
         raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
-    import dataclasses as _dc
-    return _dc.asdict(defn)
+    return _agent_dc.asdict(defn)
 
 
 @router.put("/api/agents/{name}")
@@ -4984,8 +4983,7 @@ async def update_custom_agent(name: str, body: dict):
     await asyncio.to_thread(save_agent, updated)
     _reload_custom_agents()
     await events.emit("agents_updated", {"action": "update", "name": name})
-    import dataclasses as _dc
-    return _dc.asdict(await asyncio.to_thread(get_agent, name))
+    return _agent_dc.asdict(await asyncio.to_thread(get_agent, name))
 
 
 @router.delete("/api/agents/{name}")

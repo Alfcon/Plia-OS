@@ -1,8 +1,7 @@
 # tests/test_custom_agent_routing.py
 from __future__ import annotations
 import pytest
-from pathlib import Path
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 from httpx import AsyncClient
 from httpx._transports.asgi import ASGITransport
 
@@ -172,3 +171,32 @@ async def test_agents_updated_event_fires_on_delete(agents_file):
         finally:
             events.unsubscribe(capture)
     assert len(fired) == 1
+
+
+def test_keyword_routing_after_reload(agents_file):
+    from core.agent_store import AgentDef, save_agent
+    from core.supervisor import _reload_custom_agents, _custom_keyword_routes
+    save_agent(AgentDef(
+        name="finance", display_name="Finance",
+        system_prompt="You are a finance specialist.",
+        tool_names=[], keywords=["stock", "portfolio"],
+        llm_description="Use for financial questions",
+        enabled=True, created_at="",
+    ))
+    _reload_custom_agents()
+    assert "custom:finance" in _custom_keyword_routes
+    assert "stock" in _custom_keyword_routes["custom:finance"]
+
+
+def test_disabled_agent_excluded_from_routing(agents_file):
+    from core.agent_store import AgentDef, save_agent
+    from core.supervisor import _reload_custom_agents, _custom_keyword_routes
+    save_agent(AgentDef(
+        name="finance", display_name="Finance",
+        system_prompt="You are a finance specialist.",
+        tool_names=[], keywords=["stock"],
+        llm_description="Use for financial questions",
+        enabled=False, created_at="",
+    ))
+    _reload_custom_agents()
+    assert "custom:finance" not in _custom_keyword_routes
