@@ -2810,6 +2810,10 @@
             <input id="ca-llm-desc" placeholder="Use for stock prices and portfolio questions" style="width:100%;margin-bottom:.75rem" />
             <label>Tools</label>
             <div id="ca-tools-list" style="max-height:200px;overflow-y:auto;background:#111;border:1px solid #333;border-radius:4px;padding:.5rem;margin-bottom:.75rem">Loading tools…</div>
+            <label>Workflow Name <small style="color:#555">(optional — overrides LLM at runtime if set)</small></label>
+            <select id="ca-workflow-name" style="width:100%;margin-bottom:.75rem;background:#111;border:1px solid #333;color:#e0e0e0;border-radius:4px;padding:4px 7px;font-size:0.85rem;">
+              <option value="">None (LLM-backed)</option>
+            </select>
             <label style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem">
               <input type="checkbox" id="ca-enabled" checked /> Enabled
             </label>
@@ -3068,6 +3072,11 @@
                 <input id="wf-desc" placeholder="Description (optional)" style="flex:2;min-width:100px;background:#111;border:1px solid #333;color:#888;border-radius:3px;padding:3px 7px;font-size:0.72rem;">
                 <button onclick="wfSave()" style="background:#0d2a1a;border:1px solid #1b5e20;color:#81c784;font-size:0.7rem;padding:3px 9px;border-radius:3px;cursor:pointer;">Save</button>
                 <button onclick="wfRun()" id="wf-run-btn" style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.7rem;padding:3px 9px;border-radius:3px;cursor:pointer;">▶ Run</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                <span style="color:#333;font-size:0.65rem;flex-shrink:0;white-space:nowrap;">Event trigger</span>
+                <input id="wf-trigger" placeholder="reminder_fired (blank = none)" title="Plia event type that auto-fires this workflow"
+                  style="flex:1;background:#111;border:1px solid #333;color:#888;border-radius:3px;padding:3px 7px;font-size:0.72rem;">
               </div>
               <!-- Steps -->
               <div id="wf-steps" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #1a1a1a;border-radius:3px;padding:4px;display:flex;flex-direction:column;gap:4px;"></div>
@@ -8594,6 +8603,18 @@
         <span>${_esc(t.name)}</span> <small style="color:#888">${_esc(t.description||'')}</small>
       </label>`
     ).join('');
+    const wfSel = document.getElementById('ca-workflow-name');
+    try {
+      const wr = await fetch('/api/workflows');
+      if (wr.ok) {
+        const wd = await wr.json();
+        const currentWf = defn.workflow_name || '';
+        wfSel.innerHTML = '<option value="">None (LLM-backed)</option>'
+          + (wd.workflows || []).map(w =>
+              `<option value="${_esc(w.name)}" ${w.name === currentWf ? 'selected' : ''}>${_esc(w.name)}</option>`
+            ).join('');
+      }
+    } catch(e) {}
     document.getElementById('ca-form-wrap').style.display = 'block';
   }
 
@@ -8612,6 +8633,7 @@
       llm_description: document.getElementById('ca-llm-desc').value.trim(),
       tool_names: [...document.querySelectorAll('#ca-tools-list input:checked')].map(el=>el.value),
       enabled: document.getElementById('ca-enabled').checked,
+      workflow_name: document.getElementById('ca-workflow-name').value || null,
     };
     const url = _caEditName ? `/api/agents/${encodeURIComponent(_caEditName)}` : '/api/agents';
     const method = _caEditName ? 'PUT' : 'POST';
@@ -10712,6 +10734,7 @@
   function wfNew() {
     document.getElementById('wf-name').value = '';
     document.getElementById('wf-desc').value = '';
+    document.getElementById('wf-trigger').value = '';
     document.getElementById('wf-steps').innerHTML = '';
     document.getElementById('wf-results').style.display = 'none';
     document.getElementById('wf-results').innerHTML = '';
@@ -10723,6 +10746,7 @@
       if (!wf) return;
       document.getElementById('wf-name').value = wf.name;
       document.getElementById('wf-desc').value = wf.description || '';
+      document.getElementById('wf-trigger').value = wf.event_trigger || '';
       document.getElementById('wf-steps').innerHTML = '';
       document.getElementById('wf-results').style.display = 'none';
       (wf.steps || []).forEach(step => wfAddStep(step));
@@ -10739,28 +10763,68 @@
   let _wfStepIdx = 0;
   function wfAddStep(step) {
     const idx = _wfStepIdx++;
-    const tool = step && step.tool || '';
-    const params = step && step.params ? JSON.stringify(step.params, null, 2) : '{}';
-    const note = step && step.note || '';
+    const stepType = (step && step.step_type) || 'tool';
+    const tool = (step && step.tool) || '';
+    const params = (step && step.params) ? JSON.stringify(step.params, null, 2) : '{}';
+    const note = (step && step.note) || '';
+    const prompt = (step && step.prompt) || '';
+    const system = (step && step.system) || '';
+    const agentName = (step && step.name) || '';
+    const message = (step && step.message) || '{{prev}}';
     const container = document.getElementById('wf-steps');
     const div = document.createElement('div');
     div.dataset.stepIdx = idx;
     div.style.cssText = 'border:1px solid #1a1a1a;border-radius:3px;padding:5px 7px;background:#0a0a0a;display:flex;flex-direction:column;gap:4px;';
     div.innerHTML = `
       <div style="display:flex;align-items:center;gap:5px;">
-        <span style="color:#333;font-size:0.65rem;flex-shrink:0;">Tool</span>
-        <select class="wf-tool-sel" style="background:#111;border:1px solid #333;color:#ccc;font-size:0.7rem;padding:2px 4px;border-radius:3px;font-family:monospace;flex:1;min-width:0;">
-          ${_wfToolNames.map(t => `<option value="${_esc(t)}" ${t === tool ? 'selected' : ''}>${_esc(t)}</option>`).join('')}
+        <select class="wf-step-type" onchange="_wfStepTypeChanged(this)"
+          style="background:#111;border:1px solid #333;color:#ccc;font-size:0.7rem;padding:2px 4px;border-radius:3px;">
+          <option value="tool" ${stepType==='tool'?'selected':''}>Tool</option>
+          <option value="llm" ${stepType==='llm'?'selected':''}>LLM</option>
+          <option value="agent" ${stepType==='agent'?'selected':''}>Agent</option>
         </select>
-        <button onclick="this.closest('[data-step-idx]').remove()" style="background:none;border:none;color:#555;font-size:0.8rem;cursor:pointer;padding:0 3px;">✕</button>
+        <button onclick="this.closest('[data-step-idx]').remove()" style="background:none;border:none;color:#555;font-size:0.8rem;cursor:pointer;padding:0 3px;margin-left:auto;">✕</button>
         <button onclick="_wfMoveStep(this,-1)" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;padding:0 2px;">↑</button>
         <button onclick="_wfMoveStep(this,1)" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;padding:0 2px;">↓</button>
       </div>
-      <div style="display:flex;align-items:flex-start;gap:5px;">
-        <span style="color:#333;font-size:0.65rem;flex-shrink:0;padding-top:3px;">Params</span>
-        <textarea class="wf-params" rows="3"
-          style="flex:1;background:#060606;border:1px solid #222;color:#aaa;font-size:0.68rem;font-family:monospace;padding:3px 5px;border-radius:2px;resize:vertical;min-height:44px;"
-          placeholder='{"key": "{{prev}}"}'>${_esc(params)}</textarea>
+      <div class="wf-tool-fields" style="display:${stepType==='tool'?'flex':'none'};flex-direction:column;gap:4px;">
+        <div style="display:flex;align-items:center;gap:5px;">
+          <span style="color:#333;font-size:0.65rem;flex-shrink:0;">Tool</span>
+          <select class="wf-tool-sel" style="background:#111;border:1px solid #333;color:#ccc;font-size:0.7rem;padding:2px 4px;border-radius:3px;font-family:monospace;flex:1;min-width:0;">
+            ${_wfToolNames.map(t => `<option value="${_esc(t)}" ${t === tool ? 'selected' : ''}>${_esc(t)}</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:5px;">
+          <span style="color:#333;font-size:0.65rem;flex-shrink:0;padding-top:3px;">Params</span>
+          <textarea class="wf-params" rows="3"
+            style="flex:1;background:#060606;border:1px solid #222;color:#aaa;font-size:0.68rem;font-family:monospace;padding:3px 5px;border-radius:2px;resize:vertical;min-height:44px;"
+            placeholder='{"key": "{{prev}}"}'>${_esc(params)}</textarea>
+        </div>
+      </div>
+      <div class="wf-llm-fields" style="display:${stepType==='llm'?'flex':'none'};flex-direction:column;gap:4px;">
+        <div style="display:flex;align-items:flex-start;gap:5px;">
+          <span style="color:#333;font-size:0.65rem;flex-shrink:0;padding-top:3px;">Prompt</span>
+          <textarea class="wf-prompt" rows="3"
+            style="flex:1;background:#060606;border:1px solid #222;color:#aaa;font-size:0.68rem;font-family:monospace;padding:3px 5px;border-radius:2px;resize:vertical;min-height:44px;"
+            placeholder="Summarize: {{prev}}">${_esc(prompt)}</textarea>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;">
+          <span style="color:#333;font-size:0.65rem;flex-shrink:0;">System</span>
+          <input type="text" class="wf-system" value="${_esc(system)}" placeholder="optional system prompt"
+            style="flex:1;background:#111;border:1px solid #1a1a1a;color:#888;font-size:0.68rem;padding:2px 5px;border-radius:2px;">
+        </div>
+      </div>
+      <div class="wf-agent-fields" style="display:${stepType==='agent'?'flex':'none'};flex-direction:column;gap:4px;">
+        <div style="display:flex;align-items:center;gap:5px;">
+          <span style="color:#333;font-size:0.65rem;flex-shrink:0;">Agent</span>
+          <input type="text" class="wf-agent-name" value="${_esc(agentName)}" placeholder="agent-slug"
+            style="flex:1;background:#111;border:1px solid #333;color:#ccc;font-size:0.68rem;padding:2px 5px;border-radius:2px;font-family:monospace;">
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;">
+          <span style="color:#333;font-size:0.65rem;flex-shrink:0;">Msg</span>
+          <input type="text" class="wf-agent-msg" value="${_esc(message)}" placeholder="{{prev}}"
+            style="flex:1;background:#111;border:1px solid #1a1a1a;color:#888;font-size:0.68rem;padding:2px 5px;border-radius:2px;">
+        </div>
       </div>
       <div style="display:flex;align-items:center;gap:5px;">
         <span style="color:#333;font-size:0.65rem;flex-shrink:0;">Note</span>
@@ -10768,6 +10832,13 @@
           style="flex:1;background:#111;border:1px solid #1a1a1a;color:#555;font-size:0.68rem;padding:2px 5px;border-radius:2px;">
       </div>`;
     container.appendChild(div);
+  }
+
+  function _wfStepTypeChanged(sel) {
+    const div = sel.closest('[data-step-idx]');
+    div.querySelector('.wf-tool-fields').style.display = sel.value === 'tool' ? 'flex' : 'none';
+    div.querySelector('.wf-llm-fields').style.display = sel.value === 'llm' ? 'flex' : 'none';
+    div.querySelector('.wf-agent-fields').style.display = sel.value === 'agent' ? 'flex' : 'none';
   }
 
   function _wfMoveStep(btn, dir) {
@@ -10783,23 +10854,41 @@
 
   function _wfCollectSteps() {
     return Array.from(document.querySelectorAll('#wf-steps > [data-step-idx]')).map(div => {
-      const tool = div.querySelector('.wf-tool-sel').value;
-      let params = {};
-      try { params = JSON.parse(div.querySelector('.wf-params').value || '{}'); } catch(e) {}
+      const stepType = div.querySelector('.wf-step-type').value;
       const note = div.querySelector('.wf-note').value;
-      return {tool, params, note};
+      if (stepType === 'llm') {
+        return {
+          step_type: 'llm',
+          prompt: div.querySelector('.wf-prompt').value,
+          system: div.querySelector('.wf-system').value,
+          note,
+        };
+      } else if (stepType === 'agent') {
+        return {
+          step_type: 'agent',
+          name: div.querySelector('.wf-agent-name').value,
+          message: div.querySelector('.wf-agent-msg').value,
+          note,
+        };
+      } else {
+        const tool = div.querySelector('.wf-tool-sel').value;
+        let params = {};
+        try { params = JSON.parse(div.querySelector('.wf-params').value || '{}'); } catch(e) {}
+        return {tool, params, note};
+      }
     });
   }
 
   async function wfSave() {
     const name = document.getElementById('wf-name').value.trim();
     const description = document.getElementById('wf-desc').value.trim();
+    const event_trigger = document.getElementById('wf-trigger').value.trim() || null;
     if (!name) { alert('Workflow name required'); return; }
     const steps = _wfCollectSteps();
     try {
       const r = await fetch('/api/workflows', {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({name, description, steps}),
+        body: JSON.stringify({name, description, steps, event_trigger}),
       });
       if (!r.ok) { const e = await r.json(); alert(e.detail || 'Save failed'); return; }
       loadWorkflows();
@@ -10823,7 +10912,7 @@
       const data = await r.json();
       res.innerHTML = data.steps.map((s, i) => {
         const ok = !s.error;
-        const hdr = `<span style="color:${ok?'#81c784':'#ef5350'};font-size:0.65rem;font-weight:600;">[${i}] ${_esc(s.tool)}</span>
+        const hdr = `<span style="color:${ok?'#81c784':'#ef5350'};font-size:0.65rem;font-weight:600;">[${i}] ${_esc(s.tool || s.step_type || '')}</span>
           ${s.note ? `<span style="color:#444;font-size:0.65rem;"> — ${_esc(s.note)}</span>` : ''}
           <span style="color:#333;font-size:0.62rem;float:right;">${s.duration_ms}ms</span>`;
         const body = s.error
