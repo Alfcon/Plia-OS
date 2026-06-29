@@ -102,6 +102,21 @@ def _interpolate_params(params: dict, results: list[str], payload: dict | None =
     return {k: _interpolate(v, results, payload, run_vars) for k, v in params.items()}
 
 
+def _evaluate_condition(condition: dict, prev: str) -> bool:
+    """Evaluate a structured condition against prev (the preceding step's result)."""
+    op = condition.get("op", "not_empty")
+    value = condition.get("value", "")
+    actual = prev
+    match op:
+        case "eq":           return actual == value
+        case "ne":           return actual != value
+        case "contains":     return value in actual
+        case "not_contains": return value not in actual
+        case "empty":        return not actual.strip()
+        case "not_empty":    return bool(actual.strip())
+        case _:              return False
+
+
 from core.registry import call_tool_async
 
 
@@ -145,6 +160,20 @@ async def _run_step(
         result = await custom_agent_node(state)
         results_list = result.get("tool_results", [])
         return results_list[0] if results_list else "", None
+
+    elif step_type == "if":
+        prev = step_results[-1] if step_results else ""
+        condition = step.get("condition", {})
+        branch = step.get("then", []) if _evaluate_condition(condition, prev) else step.get("else", [])
+        sub_step_results = list(step_results)  # copy — sub-steps see parent results but don't pollute index
+        branch_prev = prev
+        for sub_step in branch:
+            sub_result, sub_error = await _run_step(sub_step, sub_step_results, payload, run_vars)
+            sub_step_results.append(sub_result)
+            if sub_error:
+                return sub_result, sub_error
+            branch_prev = sub_result
+        return branch_prev, None
 
     else:
         return "", f"Unknown step_type: {step_type!r}"
@@ -222,6 +251,13 @@ async def dry_run_workflow(name: str, payload: dict | None = None) -> list[dict]
             agent_name = step.get("name", "")
             message = _interpolate(step.get("message", "{{prev}}"), step_results, payload, run_vars)
             dry_result = f"[DRY RUN] would call agent {agent_name!r} with: {message!r}"
+        elif step_type == "if":
+            condition = step.get("condition", {})
+            op = condition.get("op", "not_empty")
+            value = condition.get("value", "")
+            then_n = len(step.get("then", []))
+            else_n = len(step.get("else", []))
+            dry_result = f"[DRY RUN] [if] {op} {value!r} → then: {then_n} steps / else: {else_n} steps"
         else:
             dry_result = f"[DRY RUN] would call {tool!r} with {params}"
 
