@@ -21,4 +21,5 @@ async def _on_event(payload: dict) -> None:
 
 
 def setup_event_triggers() -> None:
-    events.subscribe(_on_event)
+    if not events.is_subscribed(_on_event):
+        events.subscribe(_on_event)
