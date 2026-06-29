@@ -76,6 +76,31 @@ async def test_if_no_else_returns_prev_unchanged(wf_path):
 
 
 @pytest.mark.asyncio
+async def test_named_branch_step_result_visible_to_main_flow(wf_path):
+    """Named branch sub-step outputs are written into run_vars so subsequent
+    main-flow steps can reference them via {{steps.<name>.result}}."""
+    from agents.workflow_store import save_workflow, run_workflow
+    # The if-step's prev is "" when it is the first step; "empty" fires on "".
+    save_workflow("w", [
+        {
+            "step_type": "if",
+            "condition": {"op": "empty"},
+            "then": [
+                {"name": "branch_step", "step_type": "tool", "tool": "t_branch", "params": {}},
+            ],
+        },
+        {"step_type": "tool", "tool": "t_main", "params": {"q": "{{steps.branch_step.result}}"}},
+    ])
+    call_mock = AsyncMock(side_effect=["branch_output", "main_output"])
+    with patch("agents.workflow_store.call_tool_async", call_mock):
+        output = await run_workflow("w")
+
+    # t_main must have received the interpolated branch result
+    assert call_mock.call_args_list[1] == call("t_main", {"q": "branch_output"})
+    assert output[1]["result"] == "main_output"
+
+
+@pytest.mark.asyncio
 async def test_branch_step_references_parent_variables(wf_path):
     from agents.workflow_store import save_workflow, run_workflow
     save_workflow("w", [

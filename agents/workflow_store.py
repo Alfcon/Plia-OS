@@ -177,6 +177,8 @@ async def _run_step(
                 "error": sub_error,
             })
             sub_step_results.append(sub_result)
+            if run_vars is not None and (sub_name := sub_step.get("name")):
+                run_vars[sub_name] = {"result": sub_result, "error": sub_error or ""}
             if sub_error:
                 return sub_result, sub_error, sub_steps
             branch_prev = sub_result
