@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import json
 import os
@@ -184,6 +185,34 @@ async def _run_step(
             branch_prev = sub_result
         return branch_prev, None, sub_steps
 
+    elif step_type == "parallel":
+        branches = step.get("branches", [])
+
+        async def _run_branch(branch: dict) -> tuple[str, str, str]:
+            branch_name = branch.get("name", "")
+            branch_steps = branch.get("steps", [])
+            sub_results = list(step_results)
+            branch_prev = step_results[-1] if step_results else ""
+            for sub_step in branch_steps:
+                sub_result, sub_error, _ = await _run_step(sub_step, sub_results, payload, run_vars)
+                sub_results.append(sub_result)
+                if sub_error:
+                    return branch_name, sub_result, sub_error
+                branch_prev = sub_result
+            return branch_name, branch_prev, ""
+
+        gathered = await asyncio.gather(*[_run_branch(b) for b in branches], return_exceptions=True)
+        results_list: list[str] = []
+        for item in gathered:
+            if isinstance(item, Exception):
+                results_list.append(str(item))
+            else:
+                branch_name, branch_result, branch_error = item
+                if run_vars is not None and branch_name:
+                    run_vars[branch_name] = {"result": branch_result, "error": branch_error}
+                results_list.append(branch_result if not branch_error else branch_error)
+        return json.dumps(results_list), None, []
+
     else:
         return "", f"Unknown step_type: {step_type!r}", []
 
@@ -269,6 +298,10 @@ async def dry_run_workflow(name: str, payload: dict | None = None) -> list[dict]
             then_n = len(step.get("then", []))
             else_n = len(step.get("else", []))
             dry_result = f"[DRY RUN] [if] {op} {value!r} → then: {then_n} steps / else: {else_n} steps"
+        elif step_type == "parallel":
+            branches = step.get("branches", [])
+            branch_names = ", ".join(b.get("name", "?") for b in branches)
+            dry_result = f"[DRY RUN] parallel: {len(branches)} branches ({branch_names})"
         else:
             dry_result = f"[DRY RUN] would call {tool!r} with {params}"
 
