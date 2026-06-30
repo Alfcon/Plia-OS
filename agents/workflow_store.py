@@ -213,6 +213,17 @@ async def _run_step(
                 results_list.append(branch_result if not branch_error else branch_error)
         return json.dumps(results_list), None, []
 
+    elif step_type == "workflow":
+        wf_name = step.get("workflow_name", "")
+        params = _interpolate_params(step.get("params", {}), step_results, payload, run_vars)
+        child_output = await run_workflow(wf_name, payload=params)
+        if not child_output:
+            return "", "Subworkflow returned no output", []
+        last = child_output[-1]
+        if last.get("error"):
+            return last.get("result", ""), last["error"], []
+        return last.get("result", ""), None, []
+
     else:
         return "", f"Unknown step_type: {step_type!r}", []
 
@@ -329,6 +340,10 @@ async def dry_run_workflow(name: str, payload: dict | None = None) -> list[dict]
             branches = step.get("branches", [])
             branch_names = ", ".join(b.get("name", "?") for b in branches)
             dry_result = f"[DRY RUN] parallel: {len(branches)} branches ({branch_names})"
+        elif step_type == "workflow":
+            wf_name = step.get("workflow_name", "")
+            params = _interpolate_params(step.get("params", {}), step_results, payload, run_vars)
+            dry_result = f"[DRY RUN] would call workflow {wf_name!r} with {params}"
         else:
             dry_result = f"[DRY RUN] would call {tool!r} with {params}"
 
