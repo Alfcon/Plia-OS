@@ -188,18 +188,21 @@ async def _run_step(
     elif step_type == "parallel":
         branches = step.get("branches", [])
 
-        async def _run_branch(branch: dict) -> tuple[str, str, str]:
+        async def _run_branch(branch: dict) -> tuple[str, str, str, dict]:
             branch_name = branch.get("name", "")
             branch_steps = branch.get("steps", [])
             sub_results = list(step_results)
             branch_prev = step_results[-1] if step_results else ""
+            branch_vars: dict[str, dict] = {}
             for sub_step in branch_steps:
                 sub_result, sub_error, _ = await _run_step(sub_step, sub_results, payload, run_vars)
                 sub_results.append(sub_result)
+                if (sub_name := sub_step.get("name")):
+                    branch_vars[sub_name] = {"result": sub_result, "error": sub_error or ""}
                 if sub_error:
-                    return branch_name, sub_result, sub_error
+                    return branch_name, sub_result, sub_error, branch_vars
                 branch_prev = sub_result
-            return branch_name, branch_prev, ""
+            return branch_name, branch_prev, "", branch_vars
 
         gathered = await asyncio.gather(*[_run_branch(b) for b in branches], return_exceptions=True)
         results_list: list[str] = []
@@ -207,9 +210,11 @@ async def _run_step(
             if isinstance(item, Exception):
                 results_list.append(str(item))
             else:
-                branch_name, branch_result, branch_error = item
+                branch_name, branch_result, branch_error, branch_vars = item
                 if run_vars is not None and branch_name:
                     run_vars[branch_name] = {"result": branch_result, "error": branch_error}
+                if run_vars is not None:
+                    run_vars.update(branch_vars)
                 results_list.append(branch_result if not branch_error else branch_error)
         return json.dumps(results_list), None, []
 
@@ -267,6 +272,8 @@ async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
                             fallback_error = str(exc)
                             break
                         fallback_results.append(fb_result)
+                        if (fb_name := fb_step.get("name")):
+                            run_vars[fb_name] = {"result": fb_result, "error": fb_err or ""}
                         if fb_err:
                             fallback_error = fb_err
                             break
