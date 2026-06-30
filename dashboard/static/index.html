@@ -10767,6 +10767,10 @@
     const agentName = (step && step.step_type === 'agent') ? (step.name || '') : '';
     const stepName = (step && step.step_type !== 'agent') ? (step.name || '') : '';
     const message = (step && step.message) || '{{prev}}';
+    const workflowName = (step && step.step_type === 'workflow') ? (step.workflow_name || '') : '';
+    const workflowParams = (step && step.step_type === 'workflow' && step.params) ? JSON.stringify(step.params, null, 2) : '';
+    const continueOnError = !!(step && step.continue_on_error);
+    const onError = (step && step.on_error) ? JSON.stringify(step.on_error, null, 2) : '';
     const container = document.getElementById('wf-steps');
     const div = document.createElement('div');
     div.dataset.stepIdx = idx;
@@ -10782,6 +10786,8 @@
           <option value="llm" ${stepType==='llm'?'selected':''}>LLM</option>
           <option value="agent" ${stepType==='agent'?'selected':''}>Agent</option>
           <option value="if" ${stepType==='if'?'selected':''}>If (condition)</option>
+          <option value="parallel" ${stepType==='parallel'?'selected':''}>Parallel branches</option>
+          <option value="workflow" ${stepType==='workflow'?'selected':''}>Subworkflow</option>
         </select>
         <button onclick="this.closest('[data-step-idx]').remove()" style="background:none;border:none;color:#555;font-size:0.8rem;cursor:pointer;padding:0 3px;margin-left:auto;">✕</button>
         <button onclick="_wfMoveStep(this,-1)" style="background:none;border:none;color:#555;font-size:0.7rem;cursor:pointer;padding:0 2px;">↑</button>
@@ -10849,13 +10855,40 @@
           style="width:100%;background:#0a0a0a;border:1px solid #333;color:#ccc;border-radius:3px;padding:4px 6px;font-size:0.72rem;font-family:monospace;resize:vertical;box-sizing:border-box;margin-top:.2rem"
         >${step && step.else ? JSON.stringify(step.else, null, 2) : ''}</textarea>
       </div>
+      <div class="wf-parallel-fields" style="display:${stepType==='parallel'?'block':'none'}">
+        <div class="wf-parallel-branches"></div>
+        <button type="button" onclick="_wfAddBranch(this)" style="margin-top:4px">+ Add Branch</button>
+      </div>
+      <div class="wf-workflow-fields" style="display:${stepType==='workflow'?'block':'none'}">
+        <input class="wf-workflow-name" placeholder="Workflow name" value="${_esc(workflowName)}" style="width:100%;margin-bottom:4px">
+        <label style="font-size:0.85em">Params (JSON object):</label>
+        <textarea class="wf-workflow-params" rows="3" placeholder='{"key": "{{prev}}"}' style="width:100%;font-family:monospace;font-size:0.85em">${_esc(workflowParams)}</textarea>
+      </div>
       <div class="wf-var-picker" style="font-size:0.7rem;color:#555;margin-top:.2rem;min-height:1rem"></div>
+      <div class="wf-error-fields" style="margin-top:6px">
+        <label style="font-size:0.85em"><input type="checkbox" class="wf-continue-on-error"${continueOnError?' checked':''}> Continue on error</label>
+        <br>
+        <label style="font-size:0.85em">On error (JSON step array):</label>
+        <textarea class="wf-on-error" rows="2" placeholder='[{"step_type":"llm","prompt":"Fallback: {{prev}}"}]' style="width:100%;font-family:monospace;font-size:0.85em">${_esc(onError)}</textarea>
+      </div>
       <div style="display:flex;align-items:center;gap:5px;">
         <span style="color:#333;font-size:0.65rem;flex-shrink:0;">Note</span>
         <input type="text" class="wf-note" value="${_esc(note)}" placeholder="optional step label"
           style="flex:1;background:#111;border:1px solid #1a1a1a;color:#555;font-size:0.68rem;padding:2px 5px;border-radius:2px;">
       </div>`;
     container.appendChild(div);
+    if (stepType === 'parallel' && step && step.branches) {
+      const branchesContainer = div.querySelector('.wf-parallel-branches');
+      const addBtn = div.querySelector('.wf-parallel-fields > button');
+      (step.branches || []).forEach(branch => {
+        _wfAddBranch(addBtn);
+        const branchDiv = branchesContainer.lastElementChild;
+        if (branchDiv) {
+          branchDiv.querySelector('.wf-branch-name').value = branch.name || '';
+          branchDiv.querySelector('.wf-branch-steps').value = JSON.stringify(branch.steps || [], null, 2);
+        }
+      });
+    }
     _wfUpdateVarPicker();
   }
 
@@ -10865,6 +10898,8 @@
     div.querySelector('.wf-llm-fields').style.display = sel.value === 'llm' ? 'flex' : 'none';
     div.querySelector('.wf-agent-fields').style.display = sel.value === 'agent' ? 'flex' : 'none';
     div.querySelector('.wf-if-fields').style.display = sel.value === 'if' ? 'block' : 'none';
+    div.querySelector('.wf-parallel-fields').style.display = sel.value === 'parallel' ? 'block' : 'none';
+    div.querySelector('.wf-workflow-fields').style.display = sel.value === 'workflow' ? 'block' : 'none';
     div.querySelector('.wf-step-name').style.display = sel.value === 'agent' ? 'none' : 'block';
     _wfUpdateVarPicker();
   }
@@ -10880,23 +10915,37 @@
     else parent.insertBefore(target, el);
   }
 
+  function _wfAddBranch(btn) {
+    const container = btn.previousElementSibling; // .wf-parallel-branches
+    const div = document.createElement('div');
+    div.style.cssText = 'border:1px solid #444;padding:4px;margin-top:4px';
+    div.innerHTML = `
+      <input class="wf-branch-name" placeholder="Branch name" style="width:100%;margin-bottom:2px">
+      <label style="font-size:0.85em">Steps (JSON array):</label>
+      <textarea class="wf-branch-steps" rows="3" placeholder='[{"step_type":"tool","tool":"search_web","params":{}}]' style="width:100%;font-family:monospace;font-size:0.85em"></textarea>
+      <button type="button" onclick="this.parentElement.remove()" style="font-size:0.8em;margin-top:2px">Remove branch</button>
+    `;
+    container.appendChild(div);
+    if (typeof _wfUpdateVarPicker === 'function') _wfUpdateVarPicker();
+  }
+
   function _wfCollectSteps() {
     return Array.from(document.querySelectorAll('#wf-steps > [data-step-idx]')).map(div => {
       const stepType = div.querySelector('.wf-step-type').value;
       const note = div.querySelector('.wf-note').value;
       const stepNameEl = div.querySelector('.wf-step-name');
       const stepNameVal = stepNameEl ? stepNameEl.value.trim() : '';
+      let step;
       if (stepType === 'llm') {
-        const step = {
+        step = {
           step_type: 'llm',
           prompt: div.querySelector('.wf-prompt').value,
           system: div.querySelector('.wf-system').value,
           note,
         };
         if (stepNameVal) step.name = stepNameVal;
-        return step;
       } else if (stepType === 'agent') {
-        return {
+        step = {
           step_type: 'agent',
           name: div.querySelector('.wf-agent-name').value,
           message: div.querySelector('.wf-agent-msg').value,
@@ -10907,21 +10956,44 @@
         const val = div.querySelector('.wf-if-value').value.trim();
         const thenRaw = div.querySelector('.wf-if-then').value.trim();
         const elseRaw = div.querySelector('.wf-if-else').value.trim();
-        const step = { step_type: 'if', note };
+        step = { step_type: 'if', note };
         if (stepNameVal) step.name = stepNameVal;
         step.condition = { op };
         if (val) step.condition.value = val;
         try { step.then = thenRaw ? JSON.parse(thenRaw) : []; } catch(e) { step.then = []; }
         try { if (elseRaw) step.else = JSON.parse(elseRaw); } catch(e) {}
-        return step;
+      } else if (stepType === 'parallel') {
+        const branchDivs = div.querySelectorAll('.wf-parallel-branches > div');
+        step = {
+          step_type: 'parallel',
+          note,
+          branches: Array.from(branchDivs).map(bd => ({
+            name: bd.querySelector('.wf-branch-name').value.trim(),
+            steps: (() => { try { return JSON.parse(bd.querySelector('.wf-branch-steps').value || '[]'); } catch(e) { return []; } })(),
+          })),
+        };
+        if (stepNameVal) step.name = stepNameVal;
+      } else if (stepType === 'workflow') {
+        step = { step_type: 'workflow', note };
+        step.workflow_name = div.querySelector('.wf-workflow-name').value.trim();
+        try { step.params = JSON.parse(div.querySelector('.wf-workflow-params').value || '{}'); } catch(e) { step.params = {}; }
+        if (stepNameVal) step.name = stepNameVal;
       } else {
         const tool = div.querySelector('.wf-tool-sel').value;
         let params = {};
         try { params = JSON.parse(div.querySelector('.wf-params').value || '{}'); } catch(e) {}
-        const step = {tool, params, note};
+        step = {tool, params, note};
         if (stepNameVal) step.name = stepNameVal;
-        return step;
       }
+      // Error handling fields (all step types)
+      if (div.querySelector('.wf-continue-on-error').checked) {
+        step.continue_on_error = true;
+      }
+      const onErrVal = div.querySelector('.wf-on-error').value.trim();
+      if (onErrVal) {
+        try { step.on_error = JSON.parse(onErrVal); } catch(e) { /* invalid JSON, skip */ }
+      }
+      return step;
     });
   }
 
