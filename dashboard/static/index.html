@@ -4647,10 +4647,10 @@
     ]);
     const schemaMap = {};
     schemaList.forEach(t => { schemaMap[t.function.name] = t.function; });
-    _toolSchemas = Object.keys(toolDict).map(name => ({
-      name,
-      schema: schemaMap[name] || null,
-      module: (modules.find(m => m.tools.includes(name)) || {name: 'other'}).name,
+    _toolSchemas = (toolDict.tools || []).map(t => ({
+      name: t.name,
+      schema: schemaMap[t.name] || null,
+      module: t.module || 'other',
     }));
     renderCatChips();
     renderToolList('');
@@ -4797,12 +4797,12 @@
     ]);
     const schemaMap = {};
     schemaList.forEach(t => { schemaMap[t.function.name] = t.function; });
-    _toolRefData = Object.keys(toolDict).map(name => ({
-      name,
-      desc: toolDict[name] || '',
-      schema: schemaMap[name] || null,
-      module: (modules.find(m => m.tools.includes(name)) || {name: 'other'}).name,
-      enabled: (modules.find(m => m.tools.includes(name)) || {enabled: true}).enabled,
+    _toolRefData = (toolDict.tools || []).map(t => ({
+      name: t.name,
+      desc: t.description || '',
+      schema: schemaMap[t.name] || null,
+      module: t.module || 'other',
+      enabled: !t.disabled,
     }));
     renderToolRef('');
   }
