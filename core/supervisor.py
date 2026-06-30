@@ -286,10 +286,11 @@ async def _supervisor_node(state: AgentState) -> dict:
         routing_method = "keyword"
 
     logger.info("Supervisor routed to: %s", intent)
-    await events.emit("agent_routing", {
-        "agent": intent, "routing_method": routing_method,
-        "query": query_snippet, "latency_ms": latency_ms,
-    })
+    if intent != "respond":
+        await events.emit("agent_routing", {
+            "agent": intent, "routing_method": routing_method,
+            "query": query_snippet, "latency_ms": latency_ms,
+        })
     return {"active_agent": intent, "hop_count": state["hop_count"] + 1}
 
 

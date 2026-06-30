@@ -71,7 +71,7 @@ def create_snapshot(label: str = "") -> str:
     name = f"{ts}_{safe}.json" if safe else f"{ts}.json"
     data = dataclasses.asdict(get_config())
     data["_label"] = label
-    data["_created_at"] = int(time.time())
+    data["_created_at"] = time.time()
     (d / name).write_text(json.dumps(data, indent=2))
     return name
 
