@@ -241,6 +241,33 @@ async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
                 result_str = ""
                 error = str(exc)
                 sub_steps = []
+
+            # Error handling: on_error fallback, then continue_on_error
+            if error:
+                on_error_steps = step.get("on_error")
+                if on_error_steps:
+                    fallback_results = list(step_results)
+                    fallback_prev = ""
+                    fallback_error: str | None = error
+                    for fb_step in on_error_steps:
+                        try:
+                            fb_result, fb_err, _ = await _run_step(fb_step, fallback_results, payload, run_vars)
+                        except Exception as exc:
+                            fallback_error = str(exc)
+                            break
+                        fallback_results.append(fb_result)
+                        if fb_err:
+                            fallback_error = fb_err
+                            break
+                        fallback_prev = fb_result
+                        fallback_error = None
+                    result_str = fallback_prev
+                    error = fallback_error
+                elif step.get("continue_on_error"):
+                    # No on_error fallback, but continue_on_error is True: use error as result
+                    result_str = error
+                    error = None
+
             duration_ms = int((time.monotonic() - t0) * 1000)
             step_results.append(result_str)
             if step_name := step.get("name"):
@@ -259,7 +286,7 @@ async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
                 "duration_ms": duration_ms,
                 "sub_steps": sub_steps,
             })
-            if error:
+            if error and not step.get("continue_on_error"):
                 break
 
         return output
