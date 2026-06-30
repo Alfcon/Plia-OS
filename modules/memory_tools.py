@@ -72,6 +72,19 @@ def clear_conversation() -> str:
     return "Conversation cleared. Starting fresh."
 
 
+@tool(description="Permanently delete all conversation history with no archiving or recovery. "
+      "Use when asked to 'permanently delete history', 'wipe all history', or 'delete history forever'.")
+def delete_history_permanent() -> str:
+    import asyncio
+    from agents.chat_history import clear_permanent
+    from agents.memory_store import get_memory_store
+    from core import events
+    clear_permanent()
+    get_memory_store().clear_history()
+    asyncio.get_event_loop().create_task(events.emit("clear_history", {}))
+    return "All history permanently deleted."
+
+
 @tool(description="Add a quick note. Unlike save_memory, no key needed — just the text to remember.")
 def add_note(text: str) -> str:
     from datetime import datetime, timezone

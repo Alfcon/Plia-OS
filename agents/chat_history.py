@@ -76,3 +76,10 @@ def clear() -> None:
     with _conn() as con:
         con.execute("DELETE FROM messages")
         con.execute("DELETE FROM sqlite_sequence WHERE name='messages'")
+
+
+def clear_permanent() -> None:
+    """Delete all chat history with no archiving."""
+    with _conn() as con:
+        con.execute("DELETE FROM messages")
+        con.execute("DELETE FROM sqlite_sequence WHERE name='messages'")
