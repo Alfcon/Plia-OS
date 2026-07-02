@@ -126,6 +126,9 @@ class PliaConfig:
     # Tool guard — tools in this list require user approval before execution
     tool_guard_list: list = field(default_factory=list)
 
+    # Credential store backend
+    credential_backend: str = "keyring"
+
     # Audio devices (None = system default)
     audio_input_device: int | None = None
     audio_output_device: int | None = None
@@ -144,6 +147,7 @@ _LITERAL_CONSTRAINTS: dict[str, tuple[str, ...]] = {
     "studio_pipeline_mode": ("cpu_stt", "pause"),
     "stt_model_size": ("tiny", "base", "small", "medium", "large"),
     "airllm_compression": ("4bit", "8bit", "none"),
+    "credential_backend": ("keyring", "file"),
 }
 
 

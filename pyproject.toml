@@ -22,6 +22,8 @@ dependencies = [
     "ddgs>=0.1",
     "icalendar>=5.0",
     "psutil>=5.9",
+    "keyring>=25.0",
+    "cryptography>=42.0",
 ]
 
 [project.optional-dependencies]
