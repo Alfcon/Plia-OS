@@ -173,6 +173,11 @@ _DIRECT_TOOL_KEYWORDS: dict[str, str] = {
     "read my inbox": "list_inbox",
     "show my inbox": "list_inbox",
     "new emails": "list_inbox",
+    # Research sites
+    "list research sites": "list_research_sites",
+    "show research sites": "list_research_sites",
+    "my research sites": "list_research_sites",
+    "research sites": "list_research_sites",
 }
 
 _EMAIL_SEARCH_RE = re.compile(
