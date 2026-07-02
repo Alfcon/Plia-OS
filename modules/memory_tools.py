@@ -72,17 +72,39 @@ def clear_conversation() -> str:
     return "Conversation cleared. Starting fresh."
 
 
-@tool(description="Permanently delete all conversation history with no archiving or recovery. "
-      "Use when asked to 'permanently delete history', 'wipe all history', or 'delete history forever'.")
-def delete_history_permanent() -> str:
+@tool(description="Permanently delete history with no archiving or recovery. "
+      "target: 'chat' = conversation history only, 'memory' = stored facts/memories only, 'all' = both. "
+      "Leave blank to see what's available before deleting.")
+def delete_history_permanent(target: str = "") -> str:
     import asyncio
-    from agents.chat_history import clear_permanent
+    from agents.chat_history import clear_permanent, get_recent
     from agents.memory_store import get_memory_store
     from core import events
-    clear_permanent()
-    get_memory_store().clear_history()
-    asyncio.get_event_loop().create_task(events.emit("clear_history", {}))
-    return "All history permanently deleted."
+
+    if not target:
+        store = get_memory_store()
+        chat_count = len(get_recent(n=10000))
+        facts_count = len(store.list_all())
+        return (
+            f"Available to delete:\n"
+            f"  chat    — {chat_count} conversation message(s)\n"
+            f"  memory  — {facts_count} stored fact(s) + memory turn history\n"
+            f"  all     — everything above\n"
+            f"Re-run with target='chat', 'memory', or 'all'."
+        )
+
+    deleted = []
+    if target in ("chat", "all"):
+        clear_permanent()
+        asyncio.get_event_loop().create_task(events.emit("clear_history", {}))
+        deleted.append("chat history")
+    if target in ("memory", "all"):
+        store = get_memory_store()
+        store.clear_history()
+        deleted.append("memory history")
+    if not deleted:
+        return f"Unknown target '{target}'. Use 'chat', 'memory', or 'all'."
+    return f"Permanently deleted: {', '.join(deleted)}."
 
 
 @tool(description="Add a quick note. Unlike save_memory, no key needed — just the text to remember.")
