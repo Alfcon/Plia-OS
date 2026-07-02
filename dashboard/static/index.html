@@ -101,6 +101,13 @@
     .m-nav-btn { background: none; border: none; border-left: 2px solid transparent; border-radius: 0; color: #555; font-size: 0.72rem; padding: 10px 0; cursor: pointer; width: 100%; text-align: center; }
     .m-nav-btn:hover { color: #ccc; background: #181818; }
     .m-nav-btn.active { color: #4fc3f7; border-left-color: #4fc3f7; background: #0d1b2a; }
+    .m-nav-group-label { font-size: 0.58rem; letter-spacing: 0.1em; color: #333; text-transform: uppercase; padding: 14px 10px 3px; user-select: none; pointer-events: none; }
+    #m-nav-dev-toggle { background: none; border: none; border-left: 2px solid transparent; border-top: 1px solid #1e1e1e; color: #3a3a3a; font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.1em; padding: 10px 10px; cursor: pointer; width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+    #m-nav-dev-toggle:hover { color: #666; background: #181818; }
+    #m-nav-dev-items { display: none; }
+    #m-nav-dev-items.open { display: block; }
+    .m-nav-sub { padding-left: 18px !important; font-size: 0.68rem !important; }
+    .m-nav-sub-label { font-size: 0.54rem; letter-spacing: 0.08em; color: #2a2a2a; text-transform: uppercase; padding: 8px 18px 2px; user-select: none; pointer-events: none; }
     #m-content { flex: 1; overflow: hidden; padding: 0; display: flex; flex-direction: column; }
     .m-pane { flex: 1; overflow-y: auto; padding: 12px 14px; min-height: 0; }
     .m-pane label { font-size: 0.78rem; color: #999; display: block; margin-bottom: 6px; }
@@ -721,112 +728,125 @@
 </div>
 <div id="settings-panel">
       <div id="m-nav">
+        <div class="m-nav-group-label">Configure</div>
         <button class="m-nav-btn active" data-section="voice" onclick="showMenuSection('voice')">Voice</button>
-        <button class="m-nav-btn" data-section="web" onclick="showMenuSection('web')">Web</button>
         <button class="m-nav-btn" data-section="llm" onclick="showMenuSection('llm');loadAirLLMStatus()">LLM</button>
-        <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system');loadPipelineStatus();loadSystemStats()">System</button>
-        <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders();loadTimers()">Reminders</button>
-        <button class="m-nav-btn" data-section="calendar" onclick="showMenuSection('calendar');loadCalendar();loadGcalStatus()">Calendar</button>
-        <button class="m-nav-btn" data-section="memory" onclick="showMenuSection('memory');loadMemory()">Memory</button>
-        <button class="m-nav-btn" data-section="history" onclick="showMenuSection('history');loadHistory()">History</button>
-        <button class="m-nav-btn" data-section="modules" onclick="showMenuSection('modules');loadModules()">Modules</button>
-        <button class="m-nav-btn" data-section="mcp" onclick="showMenuSection('mcp');loadMcpServers();loadMcpConfig()">MCP</button>
+        <button class="m-nav-btn" data-section="web" onclick="showMenuSection('web')">Web</button>
         <button class="m-nav-btn" data-section="home" onclick="showMenuSection('home');loadHassEntities()">Home</button>
+        <button class="m-nav-btn" data-section="email" onclick="showMenuSection('email');loadEmailAccounts()">Email</button>
+        <button class="m-nav-btn" data-section="calendar" onclick="showMenuSection('calendar');loadCalendar();loadGcalStatus()">Calendar</button>
+        <button class="m-nav-btn" data-section="mcp" onclick="showMenuSection('mcp');loadMcpServers();loadMcpConfig()">MCP</button>
         <button class="m-nav-btn" data-section="permissions" onclick="showMenuSection('permissions');loadPermissions()">Permissions</button>
         <button class="m-nav-btn" data-section="news" onclick="showMenuSection('news')">News</button>
-        <button class="m-nav-btn" data-section="network" onclick="showMenuSection('network');loadTorStatus();loadNetworkPanel()">Network</button>
-        <button class="m-nav-btn" data-section="cron" onclick="showMenuSection('cron');loadCronJobs()">Cron</button>
-        <button class="m-nav-btn" data-section="tokens" onclick="showMenuSection('tokens');loadTokenUsage()">Tokens</button>
-        <button class="m-nav-btn" data-section="briefing" onclick="showMenuSection('briefing')">Briefing</button>
+        <button class="m-nav-btn" data-section="modules" onclick="showMenuSection('modules');loadModules()">Modules</button>
+        <button class="m-nav-btn" data-section="vars" onclick="showMenuSection('vars');loadVars()">Variables</button>
         <button class="m-nav-btn" data-section="docs" onclick="showMenuSection('docs');loadDocSources()">Docs</button>
-        <button class="m-nav-btn" data-section="email" onclick="showMenuSection('email');loadEmailAccounts()">Email</button>
-        <button class="m-nav-btn" data-section="observer" onclick="showMenuSection('observer');loadObserverStatus()">Observer</button>
-        <button class="m-nav-btn" data-section="proactive" onclick="showMenuSection('proactive');loadProactiveStatus()">Proactive</button>
-        <button class="m-nav-btn" data-section="files" onclick="showMenuSection('files');loadFileBrowser()">Files</button>
-        <button class="m-nav-btn" data-section="logs" onclick="showMenuSection('logs');loadLogs()">Logs</button>
+
+        <div class="m-nav-group-label">Manage</div>
+        <button class="m-nav-btn" data-section="memory" onclick="showMenuSection('memory');loadMemory()">Memory</button>
+        <button class="m-nav-btn" data-section="history" onclick="showMenuSection('history');loadHistory()">History</button>
+        <button class="m-nav-btn" data-section="reminders" onclick="showMenuSection('reminders');loadReminders();loadTimers()">Reminders</button>
+        <button class="m-nav-btn" data-section="cron" onclick="showMenuSection('cron');loadCronJobs()">Cron</button>
         <button class="m-nav-btn" data-section="flows" onclick="showMenuSection('flows');loadWorkflows()">Flows</button>
         <button class="m-nav-btn" data-section="hooks" onclick="showMenuSection('hooks');loadWebhooks()">Hooks</button>
         <button class="m-nav-btn" data-section="clips" onclick="showMenuSection('clips');loadClips()">Clips</button>
-        <button class="m-nav-btn" data-section="snaps" onclick="showMenuSection('snaps');loadSnapshots()">Snaps</button>
-        <button class="m-nav-btn" data-section="git" onclick="showMenuSection('git');loadGit()">Git</button>
-        <button class="m-nav-btn" data-section="vars" onclick="showMenuSection('vars');loadVars()">Vars</button>
-        <button class="m-nav-btn" data-section="tools" onclick="showMenuSection('tools');loadTools()">Tools</button>
-        <button class="m-nav-btn" data-section="evtlog" onclick="showMenuSection('evtlog');loadEventLog()">Events</button>
-        <button class="m-nav-btn" data-section="search" onclick="showMenuSection('search');document.getElementById('search-input').focus()">Search</button>
-        <button class="m-nav-btn" data-section="inspector" onclick="showMenuSection('inspector');loadInspector()">Inspector</button>
-        <button class="m-nav-btn" data-section="health" onclick="showMenuSection('health');loadHealth()">Health</button>
-        <button class="m-nav-btn" data-section="bench" onclick="showMenuSection('bench');loadBenchHistory()">Bench</button>
-        <button class="m-nav-btn" data-section="vramtl" onclick="showMenuSection('vramtl');startVramTimeline()">VRAM</button>
-        <button class="m-nav-btn" data-section="netdiag" onclick="showMenuSection('netdiag')">Network</button>
-        <button class="m-nav-btn" data-section="notiflog" onclick="showMenuSection('notiflog');loadNotifLog()">Notif Log</button>
-        <button class="m-nav-btn" data-section="cfgdiff" onclick="showMenuSection('cfgdiff');loadConfigDiff()">Config Diff</button>
-        <button class="m-nav-btn" data-section="prompts" onclick="showMenuSection('prompts');loadPrompts()">Prompts</button>
-        <button class="m-nav-btn" data-section="voicetest" onclick="showMenuSection('voicetest')">STT Test</button>
-        <button class="m-nav-btn" data-section="ttstest" onclick="showMenuSection('ttstest')">TTS Test</button>
-        <button class="m-nav-btn" data-section="waketest" onclick="showMenuSection('waketest');loadWakeModels()">Wake Test</button>
-        <button class="m-nav-btn" data-section="audiodev" onclick="showMenuSection('audiodev');loadAudioDevices()">Audio Devices</button>
-        <button class="m-nav-btn" data-section="audiolevel" onclick="showMenuSection('audiolevel');startAudioLevelMeter()">Audio Level</button>
-        <button class="m-nav-btn" data-section="llmstream" onclick="showMenuSection('llmstream')">LLM Stream</button>
-        <button class="m-nav-btn" data-section="chatfork" onclick="showMenuSection('chatfork');loadChatForks()">Chat Forks</button>
-        <button class="m-nav-btn" data-section="replay" onclick="showMenuSection('replay');loadReplayHistory()">Replay</button>
-        <button class="m-nav-btn" data-section="compactstats" onclick="showMenuSection('compactstats');loadCompactStats()">Compact Stats</button>
-        <button class="m-nav-btn" data-section="mcphealth" onclick="showMenuSection('mcphealth');loadMcpHealth()">MCP Health</button>
-        <button class="m-nav-btn" data-section="waketrain" onclick="showMenuSection('waketrain');loadWakePhrases()">Wake Train</button>
-        <button class="m-nav-btn" data-section="schedmsg" onclick="showMenuSection('schedmsg');loadScheduledMsgs()">Sched Msgs</button>
-        <button class="m-nav-btn" data-section="sandbox" onclick="showMenuSection('sandbox')">Sandbox</button>
-        <button class="m-nav-btn" data-section="sysalerts" onclick="showMenuSection('sysalerts');loadAlertConfig();loadAlertLog()">Sys Alerts</button>
-        <button class="m-nav-btn" data-section="cfghistory" onclick="showMenuSection('cfghistory');loadCfgHistory()">Cfg History</button>
-        <button class="m-nav-btn" data-section="toolstats" onclick="showMenuSection('toolstats');loadToolStats()">Tool Stats</button>
-        <button class="m-nav-btn" data-section="voiceshortcuts" onclick="showMenuSection('voiceshortcuts');loadVoiceShortcuts()">Shortcuts</button>
-        <button class="m-nav-btn" data-section="agenttrace" onclick="showMenuSection('agenttrace');loadAgentTrace()">Agent Trace</button>
-        <button class="m-nav-btn" data-section="tokencount" onclick="showMenuSection('tokencount');loadTokenCount()">Token Count</button>
-        <button class="m-nav-btn" data-section="pipelinerestart" onclick="showMenuSection('pipelinerestart')">Pipeline Ctrl</button>
-        <button class="m-nav-btn" data-section="ollamamodels" onclick="showMenuSection('ollamamodels');loadOllamaModels()">LLM Switch</button>
-        <button class="m-nav-btn" data-section="historysearch" onclick="showMenuSection('historysearch')">Hist Search</button>
-        <button class="m-nav-btn" data-section="ttsprev" onclick="showMenuSection('ttsprev')">TTS Preview</button>
-        <button class="m-nav-btn" data-section="promptdiff" onclick="showMenuSection('promptdiff');loadPromptDiff()">Prompt Diff</button>
-        <button class="m-nav-btn" data-section="llmcache" onclick="showMenuSection('llmcache');loadCacheStats()">LLM Cache</button>
-        <button class="m-nav-btn" data-section="uptime" onclick="showMenuSection('uptime');loadUptime()">Uptime</button>
-        <button class="m-nav-btn" data-section="wfhistory" onclick="showMenuSection('wfhistory');loadWfHistory()">WF History</button>
-        <button class="m-nav-btn" data-section="sttdetect" onclick="showMenuSection('sttdetect')">STT Detect</button>
-        <button class="m-nav-btn" data-section="memexport" onclick="showMenuSection('memexport')">Mem Export</button>
-        <button class="m-nav-btn" data-section="cronnext" onclick="showMenuSection('cronnext');loadCronNext()">Cron Next</button>
-        <button class="m-nav-btn" data-section="ollamapull" onclick="showMenuSection('ollamapull')">Ollama Pull</button>
-        <button class="m-nav-btn" data-section="micviz" onclick="showMenuSection('micviz')">Mic Viz</button>
-        <button class="m-nav-btn" data-section="cfgpresets" onclick="showMenuSection('cfgpresets');loadCfgPresets()">Presets</button>
-        <button class="m-nav-btn" data-section="remindersbulk" onclick="showMenuSection('remindersbulk');loadBulkReminders()">Rem Bulk</button>
-        <button class="m-nav-btn" data-section="notify" onclick="showMenuSection('notify');loadNotifyHistory()">Notify</button>
-        <button class="m-nav-btn" data-section="logtail" onclick="showMenuSection('logtail');startLogTail()">Log Tail</button>
-        <button class="m-nav-btn" data-section="benchchart" onclick="showMenuSection('benchchart');loadBenchChart()">Bench Chart</button>
-        <button class="m-nav-btn" data-section="clipboard" onclick="showMenuSection('clipboard');loadClipboard()">Clipboard</button>
-        <button class="m-nav-btn" data-section="audioupload" onclick="showMenuSection('audioupload')">Audio Upload</button>
-        <button class="m-nav-btn" data-section="watchdog" onclick="showMenuSection('watchdog');loadWatchdog()">Watchdog</button>
-        <button class="m-nav-btn" data-section="chatexport" onclick="showMenuSection('chatexport');loadChatExportCount()">Chat Export</button>
-        <button class="m-nav-btn" data-section="screenshot" onclick="showMenuSection('screenshot')">Screenshot</button>
-        <button class="m-nav-btn" data-section="shellrun" onclick="showMenuSection('shellrun');loadShellHistory()">Shell</button>
-        <button class="m-nav-btn" data-section="httpprobe" onclick="showMenuSection('httpprobe');loadProbeHistory()">HTTP Probe</button>
-        <button class="m-nav-btn" data-section="docker" onclick="showMenuSection('docker');loadDocker()">Docker</button>
-        <button class="m-nav-btn" data-section="services" onclick="showMenuSection('services');loadServices()">Services</button>
-        <button class="m-nav-btn" data-section="qrcode" onclick="showMenuSection('qrcode')">QR Code</button>
-        <button class="m-nav-btn" data-section="filewatcher" onclick="showMenuSection('filewatcher')">File Watch</button>
-        <button class="m-nav-btn" data-section="textdiff" onclick="showMenuSection('textdiff')">Diff</button>
-        <button class="m-nav-btn" data-section="passgen" onclick="showMenuSection('passgen')">Passwords</button>
-        <button class="m-nav-btn" data-section="timestamp" onclick="showMenuSection('timestamp');convertTimestampNow()">Timestamp</button>
-        <button class="m-nav-btn" data-section="jsonformat" onclick="showMenuSection('jsonformat')">JSON</button>
-        <button class="m-nav-btn" data-section="netif" onclick="showMenuSection('netif');loadNetworkInterfaces()">Net Ifaces</button>
-        <button class="m-nav-btn" data-section="encoder" onclick="showMenuSection('encoder')">Encode</button>
-        <button class="m-nav-btn" data-section="hasher" onclick="showMenuSection('hasher')">Hash</button>
-        <button class="m-nav-btn" data-section="regextester" onclick="showMenuSection('regextester')">Regex</button>
-        <button class="m-nav-btn" data-section="diskusage" onclick="showMenuSection('diskusage');loadDiskUsage()">Disk</button>
-        <button class="m-nav-btn" data-section="colorconv" onclick="showMenuSection('colorconv')">Color</button>
-        <button class="m-nav-btn" data-section="uuidgen" onclick="showMenuSection('uuidgen')">UUID</button>
-        <button class="m-nav-btn" data-section="mdrender" onclick="showMenuSection('mdrender')">Markdown</button>
-        <button class="m-nav-btn" data-section="csvview" onclick="showMenuSection('csvview')">CSV</button>
-        <button class="m-nav-btn" data-section="jwtdec" onclick="showMenuSection('jwtdec')">JWT</button>
-        <button class="m-nav-btn" data-section="ipcalc" onclick="showMenuSection('ipcalc')">IP/CIDR</button>
-        <button class="m-nav-btn" data-section="proclist" onclick="showMenuSection('proclist');loadProcesses()">Processes</button>
-        <button class="m-nav-btn" data-section="urlparse" onclick="showMenuSection('urlparse')">URL</button>
+        <button class="m-nav-btn" data-section="snaps" onclick="showMenuSection('snaps');loadSnapshots()">Snapshots</button>
+        <button class="m-nav-btn" data-section="files" onclick="showMenuSection('files');loadFileBrowser()">Files</button>
+        <button class="m-nav-btn" data-section="briefing" onclick="showMenuSection('briefing')">Briefing</button>
+        <button class="m-nav-btn" data-section="observer" onclick="showMenuSection('observer');loadObserverStatus()">Observer</button>
+        <button class="m-nav-btn" data-section="proactive" onclick="showMenuSection('proactive');loadProactiveStatus()">Proactive</button>
         <button class="m-nav-btn" data-section="customagents" onclick="showMenuSection('customagents');caLoad()">Custom Agents</button>
+        <button class="m-nav-btn" data-section="schedmsg" onclick="showMenuSection('schedmsg');loadScheduledMsgs()">Scheduled Msgs</button>
+        <button class="m-nav-btn" data-section="notify" onclick="showMenuSection('notify');loadNotifyHistory()">Notifications</button>
+
+        <div class="m-nav-group-label">Monitor</div>
+        <button class="m-nav-btn" data-section="system" onclick="showMenuSection('system');loadPipelineStatus();loadSystemStats()">System</button>
+        <button class="m-nav-btn" data-section="network" onclick="showMenuSection('network');loadTorStatus();loadNetworkPanel()">Network</button>
+        <button class="m-nav-btn" data-section="logs" onclick="showMenuSection('logs');loadLogs()">Logs</button>
+        <button class="m-nav-btn" data-section="uptime" onclick="showMenuSection('uptime');loadUptime()">Uptime</button>
+        <button class="m-nav-btn" data-section="sysalerts" onclick="showMenuSection('sysalerts');loadAlertConfig();loadAlertLog()">Alerts</button>
+        <button class="m-nav-btn" data-section="watchdog" onclick="showMenuSection('watchdog');loadWatchdog()">Watchdog</button>
+        <button class="m-nav-btn" data-section="services" onclick="showMenuSection('services');loadServices()">Services</button>
+        <button class="m-nav-btn" data-section="docker" onclick="showMenuSection('docker');loadDocker()">Docker</button>
+        <button class="m-nav-btn" data-section="proclist" onclick="showMenuSection('proclist');loadProcesses()">Processes</button>
+
+        <button id="m-nav-dev-toggle" onclick="toggleDevNav()">Developer <span class="dev-chevron">▸</span></button>
+        <div id="m-nav-dev-items">
+          <div class="m-nav-sub-label">Audio</div>
+          <button class="m-nav-btn m-nav-sub" data-section="voicetest" onclick="showMenuSection('voicetest')">STT Test</button>
+          <button class="m-nav-btn m-nav-sub" data-section="ttstest" onclick="showMenuSection('ttstest')">TTS Test</button>
+          <button class="m-nav-btn m-nav-sub" data-section="waketest" onclick="showMenuSection('waketest');loadWakeModels()">Wake Test</button>
+          <button class="m-nav-btn m-nav-sub" data-section="audiodev" onclick="showMenuSection('audiodev');loadAudioDevices()">Audio Devices</button>
+          <button class="m-nav-btn m-nav-sub" data-section="audiolevel" onclick="showMenuSection('audiolevel');startAudioLevelMeter()">Audio Level</button>
+          <button class="m-nav-btn m-nav-sub" data-section="micviz" onclick="showMenuSection('micviz')">Mic Viz</button>
+          <button class="m-nav-btn m-nav-sub" data-section="ttsprev" onclick="showMenuSection('ttsprev')">TTS Preview</button>
+          <button class="m-nav-btn m-nav-sub" data-section="waketrain" onclick="showMenuSection('waketrain');loadWakePhrases()">Wake Train</button>
+          <button class="m-nav-btn m-nav-sub" data-section="sttdetect" onclick="showMenuSection('sttdetect')">STT Detect</button>
+          <button class="m-nav-btn m-nav-sub" data-section="audioupload" onclick="showMenuSection('audioupload')">Audio Upload</button>
+          <button class="m-nav-btn m-nav-sub" data-section="voiceshortcuts" onclick="showMenuSection('voiceshortcuts');loadVoiceShortcuts()">Voice Shortcuts</button>
+          <div class="m-nav-sub-label">LLM</div>
+          <button class="m-nav-btn m-nav-sub" data-section="ollamamodels" onclick="showMenuSection('ollamamodels');loadOllamaModels()">Model Switch</button>
+          <button class="m-nav-btn m-nav-sub" data-section="ollamapull" onclick="showMenuSection('ollamapull')">Pull Model</button>
+          <button class="m-nav-btn m-nav-sub" data-section="llmstream" onclick="showMenuSection('llmstream')">LLM Stream</button>
+          <button class="m-nav-btn m-nav-sub" data-section="llmcache" onclick="showMenuSection('llmcache');loadCacheStats()">LLM Cache</button>
+          <button class="m-nav-btn m-nav-sub" data-section="prompts" onclick="showMenuSection('prompts');loadPrompts()">Prompts</button>
+          <button class="m-nav-btn m-nav-sub" data-section="promptdiff" onclick="showMenuSection('promptdiff');loadPromptDiff()">Prompt Diff</button>
+          <button class="m-nav-btn m-nav-sub" data-section="tokens" onclick="showMenuSection('tokens');loadTokenUsage()">Token Usage</button>
+          <button class="m-nav-btn m-nav-sub" data-section="tokencount" onclick="showMenuSection('tokencount');loadTokenCount()">Token Count</button>
+          <div class="m-nav-sub-label">Diagnostics</div>
+          <button class="m-nav-btn m-nav-sub" data-section="inspector" onclick="showMenuSection('inspector');loadInspector()">Inspector</button>
+          <button class="m-nav-btn m-nav-sub" data-section="health" onclick="showMenuSection('health');loadHealth()">Health</button>
+          <button class="m-nav-btn m-nav-sub" data-section="bench" onclick="showMenuSection('bench');loadBenchHistory()">Bench</button>
+          <button class="m-nav-btn m-nav-sub" data-section="benchchart" onclick="showMenuSection('benchchart');loadBenchChart()">Bench Chart</button>
+          <button class="m-nav-btn m-nav-sub" data-section="vramtl" onclick="showMenuSection('vramtl');startVramTimeline()">VRAM</button>
+          <button class="m-nav-btn m-nav-sub" data-section="evtlog" onclick="showMenuSection('evtlog');loadEventLog()">Event Log</button>
+          <button class="m-nav-btn m-nav-sub" data-section="agenttrace" onclick="showMenuSection('agenttrace');loadAgentTrace()">Agent Trace</button>
+          <button class="m-nav-btn m-nav-sub" data-section="toolstats" onclick="showMenuSection('toolstats');loadToolStats()">Tool Stats</button>
+          <button class="m-nav-btn m-nav-sub" data-section="compactstats" onclick="showMenuSection('compactstats');loadCompactStats()">Compact Stats</button>
+          <button class="m-nav-btn m-nav-sub" data-section="mcphealth" onclick="showMenuSection('mcphealth');loadMcpHealth()">MCP Health</button>
+          <button class="m-nav-btn m-nav-sub" data-section="pipelinerestart" onclick="showMenuSection('pipelinerestart')">Pipeline Ctrl</button>
+          <button class="m-nav-btn m-nav-sub" data-section="netdiag" onclick="showMenuSection('netdiag')">Net Diagnostics</button>
+          <button class="m-nav-btn m-nav-sub" data-section="netif" onclick="showMenuSection('netif');loadNetworkInterfaces()">Net Interfaces</button>
+          <button class="m-nav-btn m-nav-sub" data-section="httpprobe" onclick="showMenuSection('httpprobe');loadProbeHistory()">HTTP Probe</button>
+          <button class="m-nav-btn m-nav-sub" data-section="logtail" onclick="showMenuSection('logtail');startLogTail()">Log Tail</button>
+          <button class="m-nav-btn m-nav-sub" data-section="notiflog" onclick="showMenuSection('notiflog');loadNotifLog()">Notif Log</button>
+          <div class="m-nav-sub-label">Data</div>
+          <button class="m-nav-btn m-nav-sub" data-section="search" onclick="showMenuSection('search');document.getElementById('search-input').focus()">Search</button>
+          <button class="m-nav-btn m-nav-sub" data-section="historysearch" onclick="showMenuSection('historysearch')">History Search</button>
+          <button class="m-nav-btn m-nav-sub" data-section="memexport" onclick="showMenuSection('memexport')">Mem Export</button>
+          <button class="m-nav-btn m-nav-sub" data-section="remindersbulk" onclick="showMenuSection('remindersbulk');loadBulkReminders()">Bulk Reminders</button>
+          <button class="m-nav-btn m-nav-sub" data-section="chatfork" onclick="showMenuSection('chatfork');loadChatForks()">Chat Forks</button>
+          <button class="m-nav-btn m-nav-sub" data-section="replay" onclick="showMenuSection('replay');loadReplayHistory()">Replay</button>
+          <button class="m-nav-btn m-nav-sub" data-section="chatexport" onclick="showMenuSection('chatexport');loadChatExportCount()">Chat Export</button>
+          <button class="m-nav-btn m-nav-sub" data-section="wfhistory" onclick="showMenuSection('wfhistory');loadWfHistory()">Flow History</button>
+          <button class="m-nav-btn m-nav-sub" data-section="cfghistory" onclick="showMenuSection('cfghistory');loadCfgHistory()">Config History</button>
+          <button class="m-nav-btn m-nav-sub" data-section="cfgdiff" onclick="showMenuSection('cfgdiff');loadConfigDiff()">Config Diff</button>
+          <button class="m-nav-btn m-nav-sub" data-section="cfgpresets" onclick="showMenuSection('cfgpresets');loadCfgPresets()">Config Presets</button>
+          <button class="m-nav-btn m-nav-sub" data-section="cronnext" onclick="showMenuSection('cronnext');loadCronNext()">Cron Schedule</button>
+          <div class="m-nav-sub-label">Utilities</div>
+          <button class="m-nav-btn m-nav-sub" data-section="git" onclick="showMenuSection('git');loadGit()">Git</button>
+          <button class="m-nav-btn m-nav-sub" data-section="sandbox" onclick="showMenuSection('sandbox')">Sandbox</button>
+          <button class="m-nav-btn m-nav-sub" data-section="shellrun" onclick="showMenuSection('shellrun');loadShellHistory()">Shell</button>
+          <button class="m-nav-btn m-nav-sub" data-section="screenshot" onclick="showMenuSection('screenshot')">Screenshot</button>
+          <button class="m-nav-btn m-nav-sub" data-section="clipboard" onclick="showMenuSection('clipboard');loadClipboard()">Clipboard</button>
+          <button class="m-nav-btn m-nav-sub" data-section="filewatcher" onclick="showMenuSection('filewatcher')">File Watch</button>
+          <button class="m-nav-btn m-nav-sub" data-section="qrcode" onclick="showMenuSection('qrcode')">QR Code</button>
+          <button class="m-nav-btn m-nav-sub" data-section="textdiff" onclick="showMenuSection('textdiff')">Text Diff</button>
+          <button class="m-nav-btn m-nav-sub" data-section="passgen" onclick="showMenuSection('passgen')">Passwords</button>
+          <button class="m-nav-btn m-nav-sub" data-section="timestamp" onclick="showMenuSection('timestamp');convertTimestampNow()">Timestamp</button>
+          <button class="m-nav-btn m-nav-sub" data-section="jsonformat" onclick="showMenuSection('jsonformat')">JSON</button>
+          <button class="m-nav-btn m-nav-sub" data-section="encoder" onclick="showMenuSection('encoder')">Encode</button>
+          <button class="m-nav-btn m-nav-sub" data-section="hasher" onclick="showMenuSection('hasher')">Hash</button>
+          <button class="m-nav-btn m-nav-sub" data-section="regextester" onclick="showMenuSection('regextester')">Regex</button>
+          <button class="m-nav-btn m-nav-sub" data-section="diskusage" onclick="showMenuSection('diskusage');loadDiskUsage()">Disk Usage</button>
+          <button class="m-nav-btn m-nav-sub" data-section="colorconv" onclick="showMenuSection('colorconv')">Color</button>
+          <button class="m-nav-btn m-nav-sub" data-section="uuidgen" onclick="showMenuSection('uuidgen')">UUID</button>
+          <button class="m-nav-btn m-nav-sub" data-section="mdrender" onclick="showMenuSection('mdrender')">Markdown</button>
+          <button class="m-nav-btn m-nav-sub" data-section="csvview" onclick="showMenuSection('csvview')">CSV</button>
+          <button class="m-nav-btn m-nav-sub" data-section="jwtdec" onclick="showMenuSection('jwtdec')">JWT</button>
+          <button class="m-nav-btn m-nav-sub" data-section="ipcalc" onclick="showMenuSection('ipcalc')">IP/CIDR</button>
+          <button class="m-nav-btn m-nav-sub" data-section="urlparse" onclick="showMenuSection('urlparse')">URL Parser</button>
+        </div>
       </div>
       <div id="m-content">
         <!-- Voice pane -->
@@ -5745,6 +5765,13 @@
     document.querySelector('.sb-settings-btn').classList.remove('active');
     document.removeEventListener('keydown', _menuKeyHandler);
   }
+  function toggleDevNav() {
+    const items = document.getElementById('m-nav-dev-items');
+    const chevron = document.querySelector('#m-nav-dev-toggle .dev-chevron');
+    const open = items.classList.toggle('open');
+    if (chevron) chevron.textContent = open ? '▾' : '▸';
+  }
+
   function openSettings() {
     const panel = document.getElementById('settings-panel');
     if (panel.classList.contains('open')) {
