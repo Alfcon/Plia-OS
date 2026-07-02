@@ -183,6 +183,15 @@
     <button class="docs-nav-btn" data-doc="home" onclick="showDocSection('home')">Home</button>
     <button class="docs-nav-btn" data-doc="commands" onclick="showDocSection('commands')">Commands</button>
     <button class="docs-nav-btn" data-doc="faq" onclick="showDocSection('faq')">FAQ</button>
+    <button class="docs-nav-btn" data-doc="toolref" onclick="showDocSection('toolref')">Tools</button>
+    <button class="docs-nav-btn" data-doc="email" onclick="showDocSection('email')">Email</button>
+    <button class="docs-nav-btn" data-doc="files" onclick="showDocSection('files')">Files</button>
+    <button class="docs-nav-btn" data-doc="media" onclick="showDocSection('media')">Media</button>
+    <button class="docs-nav-btn" data-doc="cron" onclick="showDocSection('cron')">Cron</button>
+    <button class="docs-nav-btn" data-doc="flows" onclick="showDocSection('flows')">Flows</button>
+    <button class="docs-nav-btn" data-doc="research" onclick="showDocSection('research')">Research</button>
+    <button class="docs-nav-btn" data-doc="customagents" onclick="showDocSection('customagents')">Agents+</button>
+    <button class="docs-nav-btn" data-doc="network" onclick="showDocSection('network')">Network</button>
     <button class="docs-nav-btn" data-doc="toolref" onclick="showDocSection('toolref');loadDocToolRef()">Tools</button>
   </div>
   <div id="docs-content">
@@ -226,11 +235,23 @@
 
       <h4>5. Key Concepts</h4>
       <ul>
-        <li><strong>Settings</strong> — configure voice, LLM, integrations. All changes persist to <code>~/.plia/config.json</code>.</li>
+        <li><strong>Settings</strong> — configure voice, LLM, integrations. All changes persist to <code>~/.plia/config.json</code>. Organized in groups: Configure / Manage / Monitor / Developer.</li>
         <li><strong>Modules</strong> — Python files in <code>modules/</code> that add tools. Drop a file in and restart to add new capabilities.</li>
-        <li><strong>Agents</strong> — specialist handlers (memory, web, code, calendar, home, reminder). The supervisor routes your message to the right one automatically.</li>
+        <li><strong>Agents</strong> — specialist handlers (memory, web, code, calendar, home, reminder) plus custom agents you define. The supervisor routes your message automatically.</li>
         <li><strong>Commands</strong> — see <strong>Docs → Commands</strong> for the full list of trigger phrases.</li>
-        <li><strong>Tools</strong> — see <strong>Docs → Tools</strong> for all 47 functions the LLM can call.</li>
+        <li><strong>Tools</strong> — see <strong>Docs → Tools</strong> for all registered functions the LLM can call. Run them manually via the <strong>🔧 Tools</strong> panel.</li>
+        <li><strong>Run Tools</strong> — click <strong>🔧 Tools</strong> in the nav bar to open the tools panel. Pick a category on the left, find a tool, expand it, fill in parameters, and click ▶ Run.</li>
+      </ul>
+
+      <h4>6. New Features</h4>
+      <ul>
+        <li><strong>Research Sites</strong> — add sites with <code>add_research_site</code> and search across them via <code>research_search</code>. Credentials stored per-site. See <strong>Docs → Research</strong>.</li>
+        <li><strong>Custom Agents</strong> — create specialist agents with <code>create_agent</code>. Each gets its own system prompt, allowed tools, and keyword triggers. See <strong>Docs → Agents+</strong>.</li>
+        <li><strong>Workflows (Flows)</strong> — multi-step sequences built in <strong>Settings → Flows</strong>. Run via <code>run_workflow</code> or chat. See <strong>Docs → Flows</strong>.</li>
+        <li><strong>Cron Jobs</strong> — repeating scheduled messages via cron expressions. See <strong>Docs → Cron</strong>.</li>
+        <li><strong>Tor Routing</strong> — route all traffic through Tor with <code>enable_tor</code>. See <strong>Docs → Network</strong>.</li>
+        <li><strong>Observer</strong> — screen/activity capture for context-aware suggestions. Enable in <strong>Settings → Observer</strong>.</li>
+        <li><strong>Proactive Assistant</strong> — context-aware suggestions sent automatically. Enable in <strong>Settings → Proactive</strong>.</li>
       </ul>
     </div>
 
@@ -364,7 +385,7 @@
       <p>Plia-OS uses a <strong>supervisor + specialist</strong> architecture. Every message goes through the supervisor, which routes to one specialist agent, then back to the supervisor to form the final response.</p>
 
       <h4>Routing Logic</h4>
-      <p>The supervisor first tries a fast keyword match. If no keyword matches, it asks the LLM to classify the intent into one of:</p>
+      <p>The supervisor first tries a fast keyword match (no LLM call). If no keyword matches, it asks the LLM to classify the intent into one of:</p>
       <ul>
         <li><strong>memory</strong> — storing or recalling facts ("remember that…", "what do you know about…")</li>
         <li><strong>web</strong> — searching the internet ("search for…", "look it up…")</li>
@@ -374,12 +395,13 @@
         <li><strong>reminder</strong> — setting reminders or timers ("remind me…", "set a timer for…")</li>
         <li><strong>respond</strong> — general conversation; no specialist needed</li>
       </ul>
+      <p>Custom agents you create also register keyword triggers that the supervisor checks in the same fast-path. See <strong>Docs → Agents+</strong>.</p>
 
-      <h4>Agent Badges</h4>
-      <p>The badges in the <strong>left sidebar</strong> show which specialist handled the last turn. The top-bar badge also shows the active agent during processing. A badge lights up blue when active.</p>
+      <h4>Active Agent Badge</h4>
+      <p>The top-bar badge shows which specialist is handling the current turn. Useful for debugging — if a message routed to the wrong agent, rephrase using the trigger keywords listed above or in <strong>Docs → Commands</strong>.</p>
 
-      <h4>Agent Log</h4>
-      <p>The log below the badges shows recent routing decisions — useful for debugging unexpected responses. If a message went to the wrong agent, rephrase using the trigger keywords above.</p>
+      <h4>Direct Tool Path</h4>
+      <p>Some keywords bypass routing entirely and call a tool directly: timers, volume, system info, notes, research sites. These are the fastest responses — no LLM classification overhead.</p>
     </div>
 
     <!-- System -->
@@ -629,8 +651,25 @@
         <li>"<strong>Don't forget</strong>…" (note, not reminder)</li>
       </ul>
 
+      <h4>Research Sites</h4>
+      <p>Direct-path commands — no LLM routing needed.</p>
+      <ul>
+        <li>"<strong>List research sites</strong>" / "<strong>Show research sites</strong>" / "<strong>My research sites</strong>"</li>
+        <li>"<strong>Research sites</strong>" — shows your registered sites.</li>
+        <li>To search: use <code>research_search</code> tool in <strong>🔧 Tools → Schedule</strong> or say "research search for…"</li>
+      </ul>
+
+      <h4>Custom Agents</h4>
+      <p>Custom agents you create register keywords that trigger them automatically via the same fast-path as built-in agents. Say their registered trigger phrase and the supervisor routes directly to them.</p>
+
+      <h4>Workflows</h4>
+      <ul>
+        <li>"<strong>Run workflow</strong> [name]" — runs a saved workflow by name.</li>
+        <li>"<strong>List workflows</strong>" — shows all saved workflows.</li>
+      </ul>
+
       <h4>General Conversation</h4>
-      <p>Anything that doesn't match the above phrases is classified by the LLM and routed to the best agent, or answered directly if no specialist is needed.</p>
+      <p>Anything not matching the above is classified by the LLM and routed to the best agent, or answered directly if no specialist is needed.</p>
     </div>
 
     <!-- FAQ -->
@@ -701,6 +740,286 @@
         <span id="toolref-count" style="font-size:0.72rem;color:#555;white-space:nowrap;"></span>
       </div>
       <div id="toolref-list"></div>
+    </div>
+
+    <!-- Email -->
+    <div id="docs-section-email" class="docs-pane">
+      <h3>Email</h3>
+      <p>Plia-OS can read, search, and send email via configured accounts. Set up accounts in <strong>Settings → Email</strong>.</p>
+
+      <h4>Setup</h4>
+      <ol style="padding-left:16px;margin:0 0 8px;">
+        <li>Go to <strong>Settings → Email</strong> and click <strong>Add Account</strong>.</li>
+        <li>Enter a name, IMAP server, SMTP server, username, and password (or app password for Gmail).</li>
+        <li>Click <strong>Save</strong>. The account appears in the accounts list.</li>
+      </ol>
+
+      <h4>Tools</h4>
+      <ul>
+        <li><code>list_inbox(account, max_items)</code> — lists recent inbox messages. Leave <code>account</code> blank for the default account.</li>
+        <li><code>search_email(query, account, max_items)</code> — searches for emails matching a query string.</li>
+        <li><code>send_email(to, subject, body, account)</code> — sends an email. <code>to</code> is the recipient address.</li>
+      </ul>
+
+      <h4>Via Chat</h4>
+      <ul>
+        <li>"<strong>Check my email</strong>" / "<strong>What's in my inbox</strong>"</li>
+        <li>"<strong>Search email for</strong> invoice from last week."</li>
+        <li>"<strong>Send an email to</strong> alice@example.com about the meeting."</li>
+      </ul>
+
+      <h4>Running via Tools Panel</h4>
+      <p>Open <strong>🔧 Tools → Email</strong>, expand <code>List Inbox</code>, set <code>max_items</code>, click <strong>▶ Run</strong>. Results appear inline below the tool.</p>
+    </div>
+
+    <!-- Files -->
+    <div id="docs-section-files" class="docs-pane">
+      <h3>Files &amp; Code</h3>
+      <p>Read, write, search, and run files. Browse the filesystem in <strong>Settings → Files</strong>.</p>
+
+      <h4>File Tools</h4>
+      <ul>
+        <li><code>read_file(path, start_line, end_line)</code> — read file contents. Negative <code>start_line</code> reads last N lines.</li>
+        <li><code>list_directory(path)</code> — list directory contents. Blank = home directory.</li>
+        <li><code>find_files(pattern, directory)</code> — glob search, <code>**</code> supported.</li>
+        <li><code>search_in_file(path, query)</code> — find matching lines in a file (case-insensitive).</li>
+        <li><code>write_file(path, content)</code> — create or overwrite a file.</li>
+        <li><code>append_to_file(path, content)</code> — add text to the end of a file.</li>
+        <li><code>delete_file(path)</code> — delete a file.</li>
+        <li><code>move_file(source, destination)</code> — move or rename.</li>
+        <li><code>copy_file(source, destination)</code> — copy a file.</li>
+        <li><code>run_file(path, args)</code> — run a Python, shell, or executable file. 30s timeout.</li>
+      </ul>
+
+      <h4>Code Execution</h4>
+      <ul>
+        <li><code>run_python_code(code)</code> — execute Python in a sandbox. Returns stdout.</li>
+        <li><code>run_shell_command(command)</code> — run a shell command in a restricted sandbox.</li>
+      </ul>
+
+      <h4>Document Reading</h4>
+      <ul>
+        <li><code>read_pdf(path, max_pages)</code> — extract text from PDF. <code>max_pages=0</code> = all pages.</li>
+        <li><code>read_docx(path)</code> — read a Word document.</li>
+        <li><code>read_xlsx(path, sheet)</code> — read an Excel file (all sheets or a named one).</li>
+        <li><code>read_pptx(path)</code> — extract text from a PowerPoint presentation.</li>
+      </ul>
+
+      <h4>Document Index</h4>
+      <p>Index directories for semantic search:</p>
+      <ul>
+        <li><code>index_documents(directory, glob)</code> — index a folder. Default glob: common text/doc types.</li>
+        <li><code>query_documents(query, n_results)</code> — semantic search across indexed content.</li>
+        <li><code>list_indexed_sources()</code> — show what's indexed.</li>
+        <li><code>remove_indexed_source(source_path)</code> — remove a source from the index.</li>
+      </ul>
+
+      <h4>Running via Tools Panel</h4>
+      <p>Open <strong>🔧 Tools → Files</strong>. Expand any tool, fill in the path, and click <strong>▶ Run</strong>.</p>
+    </div>
+
+    <!-- Media -->
+    <div id="docs-section-media" class="docs-pane">
+      <h3>Media &amp; Audio</h3>
+      <p>Control media playback and system audio volume via chat or the tools panel.</p>
+
+      <h4>Playback Controls</h4>
+      <ul>
+        <li><code>get_now_playing()</code> — current track, artist, and player.</li>
+        <li><code>media_play()</code> / <code>media_pause()</code> / <code>media_stop()</code></li>
+        <li><code>media_next()</code> / <code>media_previous()</code></li>
+      </ul>
+
+      <h4>Volume Controls</h4>
+      <ul>
+        <li><code>set_volume(percent)</code> — set system audio level (0–100).</li>
+        <li><code>get_volume()</code> — read current volume.</li>
+        <li><code>mute_audio()</code> / <code>unmute_audio()</code></li>
+      </ul>
+
+      <h4>Screenshots</h4>
+      <ul>
+        <li><code>take_screenshot(monitor)</code> — capture desktop. <code>monitor=0</code> = all, <code>1+</code> = specific monitor.</li>
+      </ul>
+
+      <h4>Via Chat</h4>
+      <ul>
+        <li>"<strong>Set the volume</strong> to 50."</li>
+        <li>"<strong>Mute</strong> / <strong>Unmute</strong>."</li>
+        <li>"<strong>What's playing</strong>?" / "<strong>Next track</strong>." / "<strong>Pause</strong>."</li>
+        <li>"<strong>Take a screenshot</strong>."</li>
+      </ul>
+    </div>
+
+    <!-- Cron -->
+    <div id="docs-section-cron" class="docs-pane">
+      <h3>Cron Jobs</h3>
+      <p>Schedule repeating messages using cron expressions. Manage in <strong>Settings → Cron</strong> or via tools.</p>
+
+      <h4>Cron Expressions</h4>
+      <p>Standard 5-field format: <code>minute hour day-of-month month day-of-week</code></p>
+      <ul>
+        <li><code>0 8 * * 1-5</code> — 8 AM every weekday</li>
+        <li><code>*/30 * * * *</code> — every 30 minutes</li>
+        <li><code>0 9 * * 1</code> — 9 AM every Monday</li>
+      </ul>
+
+      <h4>Tools</h4>
+      <ul>
+        <li><code>add_cron(name, expr, message)</code> — create a cron job. <code>name</code> is a unique identifier, <code>expr</code> is the cron expression, <code>message</code> is what Plia announces when it fires.</li>
+        <li><code>list_crons()</code> — show all cron jobs with their status.</li>
+        <li><code>remove_cron(name)</code> — delete a cron job permanently.</li>
+        <li><code>disable_cron(name)</code> — pause a cron job without deleting it.</li>
+        <li><code>enable_cron(name)</code> — resume a paused cron job.</li>
+      </ul>
+
+      <h4>How Cron Jobs Fire</h4>
+      <p>When a cron expression matches the current time, Plia sends the message to the chat and announces it via TTS (same as reminders). Cron jobs repeat; reminders fire once.</p>
+
+      <h4>Running via Tools Panel</h4>
+      <p>Open <strong>🔧 Tools → Schedule</strong>, expand <code>Add Cron</code>, fill in name, expression, and message, then click <strong>▶ Run</strong>.</p>
+    </div>
+
+    <!-- Flows -->
+    <div id="docs-section-flows" class="docs-pane">
+      <h3>Workflows (Flows)</h3>
+      <p>Multi-step sequences of tool calls and LLM prompts. Build in <strong>Settings → Flows</strong>, run from chat or the tools panel.</p>
+
+      <h4>Building a Workflow</h4>
+      <ol style="padding-left:16px;margin:0 0 8px;">
+        <li>Go to <strong>Settings → Flows</strong> and click <strong>New Workflow</strong>.</li>
+        <li>Give it a name (used to run it).</li>
+        <li>Add steps: each step is a tool call or LLM prompt. Steps run in order.</li>
+        <li>Use <code>{{payload.input}}</code> in step configs to inject values passed at run time.</li>
+        <li>Save. The workflow is now available via <code>run_workflow</code>.</li>
+      </ol>
+
+      <h4>Running Workflows</h4>
+      <ul>
+        <li><strong>Via chat</strong>: "Run workflow [name]" or "List workflows."</li>
+        <li><strong>Via tools panel</strong>: <strong>🔧 Tools → Schedule → Run Workflow</strong>. Enter name and optional payload JSON.</li>
+        <li><strong>Via tool</strong>: <code>run_workflow(name, payload_json)</code></li>
+      </ul>
+
+      <h4>Tools</h4>
+      <ul>
+        <li><code>list_workflows()</code> — show all saved workflows with step counts.</li>
+        <li><code>run_workflow(name, payload_json)</code> — execute a workflow. <code>payload_json</code> is optional JSON object (e.g. <code>{"input": "hello"}</code>) for <code>{{payload.X}}</code> variables.</li>
+      </ul>
+
+      <h4>Parallel &amp; Error Steps</h4>
+      <p>Workflows support parallel step execution and <code>on_error</code> branches. Variables set in any branch are available to subsequent steps.</p>
+    </div>
+
+    <!-- Research -->
+    <div id="docs-section-research" class="docs-pane">
+      <h3>Research Sites</h3>
+      <p>Register sites to search across multiple sources simultaneously. Credentials are stored per-site for authenticated access.</p>
+
+      <h4>Adding a Site</h4>
+      <p>Use <code>add_research_site</code> or ask "Add a research site called [name] at [url]."</p>
+      <ul>
+        <li><code>add_research_site(name, url, slug, description)</code> — registers a site. <code>slug</code> is a short identifier (e.g. <code>arxiv</code>).</li>
+        <li><code>list_research_sites()</code> — see all registered sites.</li>
+        <li><code>remove_research_site(slug)</code> — remove a site by its slug.</li>
+      </ul>
+
+      <h4>Credentials</h4>
+      <p>For sites requiring login:</p>
+      <ul>
+        <li><code>set_site_credentials(site_slug, username, password)</code> — store login. Credentials are saved locally.</li>
+        <li><code>check_site_credentials(site_slug)</code> — verify credentials are set (does not reveal the password).</li>
+        <li><code>remove_site_credentials(site_slug)</code> — delete stored credentials for a site.</li>
+      </ul>
+
+      <h4>Searching</h4>
+      <ul>
+        <li><code>research_search(query, sites)</code> — search across registered sites. <code>sites</code> is optional comma-separated list of slugs; leave blank to search all sites.</li>
+      </ul>
+
+      <h4>Via Chat</h4>
+      <ul>
+        <li>"<strong>List research sites</strong>" / "<strong>My research sites</strong>"</li>
+        <li>"<strong>Research search for</strong> quantum computing papers."</li>
+      </ul>
+
+      <h4>Running via Tools Panel</h4>
+      <p>Open <strong>🔧 Tools → Schedule</strong> (research tools are categorized there). Expand <code>Research Search</code>, enter your query, and click <strong>▶ Run</strong>.</p>
+    </div>
+
+    <!-- Custom Agents -->
+    <div id="docs-section-customagents" class="docs-pane">
+      <h3>Custom Agents</h3>
+      <p>Create your own specialist agents with custom system prompts, allowed tools, and keyword triggers. Managed in <strong>Settings → Custom Agents</strong> or via tools.</p>
+
+      <h4>Creating an Agent</h4>
+      <p>Via <code>create_agent</code> tool or <strong>Settings → Custom Agents → New Agent</strong>:</p>
+      <ul>
+        <li><strong>name</strong> — slug: lowercase letters, digits, hyphens only (e.g. <code>research-assistant</code>).</li>
+        <li><strong>system_prompt</strong> — instructions that define the agent's behavior and personality.</li>
+        <li><strong>display_name</strong> — friendly label shown in lists.</li>
+        <li><strong>description</strong> — what this agent does (shown in <code>list_custom_agents</code>).</li>
+        <li><strong>tool_names</strong> — comma-separated tools the agent may call (e.g. <code>research_search,read_file</code>). Leave blank for no tools.</li>
+        <li><strong>keywords</strong> — comma-separated trigger phrases (e.g. <code>mhd,saltwater</code>). When your message contains any of these, Plia routes directly to this agent.</li>
+      </ul>
+
+      <h4>Workflow-Backed Agents</h4>
+      <p>Link an agent to a saved workflow instead of a system prompt. The agent runs the workflow with <code>payload.input</code> set to the user message. Configure via <strong>Settings → Custom Agents</strong>.</p>
+
+      <h4>Tools</h4>
+      <ul>
+        <li><code>list_custom_agents()</code> — show all enabled agents with names and descriptions.</li>
+        <li><code>run_agent(name, message)</code> — invoke a custom agent with a message directly.</li>
+        <li><code>create_agent(name, system_prompt, display_name, description, tool_names, keywords)</code></li>
+        <li><code>edit_agent(name, display_name, description, system_prompt, tool_names, keywords)</code> — only non-empty fields are updated.</li>
+        <li><code>delete_agent(name)</code> — permanently delete an agent by its slug.</li>
+      </ul>
+
+      <h4>Running via Tools Panel</h4>
+      <p>Open <strong>🔧 Tools → Memory</strong>. Expand <code>List Custom Agents</code> or <code>Run Agent</code> and click <strong>▶ Run</strong>.</p>
+    </div>
+
+    <!-- Network -->
+    <div id="docs-section-network" class="docs-pane">
+      <h3>Network &amp; Privacy</h3>
+
+      <h4>Tor Routing</h4>
+      <p>Route all system traffic through the Tor anonymity network.</p>
+      <ul>
+        <li><code>enable_tor()</code> — activates Tor routing. All subsequent network traffic is anonymized.</li>
+        <li><code>disable_tor()</code> — restores direct clearnet access.</li>
+        <li><code>tor_status()</code> — shows whether Tor is active, the current exit node IP, and kill switch state.</li>
+      </ul>
+      <p>Via chat: "Enable Tor" / "Disable Tor" / "Tor status".</p>
+
+      <h4>MAC Address</h4>
+      <ul>
+        <li><code>list_macs()</code> — show all interfaces with MAC addresses.</li>
+        <li><code>show_mac(interface)</code> — current MAC of a specific interface.</li>
+        <li><code>randomize_mac(interface)</code> — set a random MAC. Original is saved for restore.</li>
+        <li><code>set_mac(interface, mac_address)</code> — set a specific MAC (format: <code>XX:XX:XX:XX:XX:XX</code>).</li>
+        <li><code>restore_mac(interface)</code> — restore the original MAC saved before randomization.</li>
+      </ul>
+
+      <h4>WiFi</h4>
+      <ul>
+        <li><code>list_wifi_interfaces()</code> — list WiFi adapters and their state.</li>
+        <li><code>scan_wifi(interface)</code> — scan for nearby networks (SSID, signal, security, channel).</li>
+        <li><code>wifi_status()</code> — current connection: SSID, signal, IP.</li>
+      </ul>
+
+      <h4>Wireless Security Tools</h4>
+      <p style="color:#e57373;">Use only on networks you own or have explicit permission to test. Unauthorized use is illegal.</p>
+      <ul>
+        <li><code>scan_wps_networks(interface, scan_seconds)</code> — scan for WPS-enabled networks. Requires monitor mode.</li>
+        <li><code>attack_wps(interface, bssid, channel)</code> — WPS PIN attack via reaver.</li>
+        <li><code>crack_handshake_rockyou(capture_file, bssid)</code> — crack a captured WPA handshake using rockyou.txt.</li>
+        <li><code>crack_handshake_wordlist(capture_file, bssid, wordlist_file)</code> — crack using a custom wordlist.</li>
+        <li><code>crack_handshake_auto(capture_file, bssid)</code> — crack by generating digit candidates on the fly.</li>
+      </ul>
+
+      <h4>Running via Tools Panel</h4>
+      <p>Open <strong>🔧 Tools → Network</strong>. All network and privacy tools are listed there.</p>
     </div>
 
   </div>
