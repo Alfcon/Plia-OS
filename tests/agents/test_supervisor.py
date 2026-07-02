@@ -154,7 +154,7 @@ async def test_supervisor_emits_agent_routing_for_specialist():
 
 
 @pytest.mark.asyncio
-async def test_supervisor_does_not_emit_for_respond():
+async def test_supervisor_emits_for_respond():
     captured = []
     async def capture(payload):
         captured.append(payload)
@@ -173,7 +173,8 @@ async def test_supervisor_does_not_emit_for_respond():
         events.unsubscribe(capture)
 
     routing = [e for e in captured if e["type"] == "agent_routing"]
-    assert len(routing) == 0
+    assert len(routing) == 1
+    assert routing[0]["agent"] == "respond"
 
 
 @pytest.mark.asyncio
