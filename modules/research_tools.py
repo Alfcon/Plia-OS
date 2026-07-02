@@ -103,22 +103,44 @@ def remove_site_credentials(site_slug: str) -> str:
 _RESEARCH_DIR = Path.home() / "research"
 
 
-def _extract_snippets(html: str, max_results: int = 10) -> list[dict]:
-    html = _re.sub(r"<(script|style)[^>]*>.*?</\1>", "", html, flags=_re.DOTALL | _re.IGNORECASE)
+_BOILERPLATE_PHRASES = (
+    "skip to", "sign in", "sign up", "log in", "learn more", "advanced search",
+    "privacy policy", "cookie policy", "terms of service", "terms of use",
+    "create account", "forgot password", "subscribe to", "newsletter",
+)
+
+
+def _extract_snippets(html: str, base_url: str, max_results: int = 10) -> list[dict]:
+    from urllib.parse import urljoin
+    html = _re.sub(
+        r"<(script|style|nav|header|footer|aside|form)[^>]*>.*?</\1>",
+        "", html, flags=_re.DOTALL | _re.IGNORECASE,
+    )
     pattern = _re.compile(
-        r'<a[^>]+href=["\']([^"\'#][^"\']*)["\'][^>]*>(.*?)</a>',
+        r'<a[^>]+href=["\']([^"\']*)["\'][^>]*>(.*?)</a>',
         _re.DOTALL | _re.IGNORECASE,
     )
-    results = []
+    results: list[dict] = []
+    seen: set[str] = set()
     for m in pattern.finditer(html):
         href = m.group(1).strip()
-        text = _re.sub(r"<[^>]+>", "", m.group(2)).strip()
-        if not href.startswith("http") or len(text) < 5 or len(text) > 300:
+        if not href or href.startswith(("#", "mailto:", "tel:", "javascript:")):
+            continue
+        url = urljoin(base_url, href)
+        if url == base_url or url in seen:
+            continue
+        text = _re.sub(r"<[^>]+>", "", m.group(2))
+        text = _re.sub(r"\s+", " ", text).strip()
+        if len(text) < 15 or len(text) > 300:
+            continue
+        low = text.lower()
+        if any(p in low for p in _BOILERPLATE_PHRASES):
             continue
         raw_after = html[m.end():m.end() + 600]
         snippet = _re.sub(r"<[^>]+>", " ", raw_after)
         snippet = _re.sub(r"\s+", " ", snippet).strip()[:200]
-        results.append({"title": text, "url": href, "snippet": snippet})
+        results.append({"title": text, "url": url, "snippet": snippet})
+        seen.add(url)
         if len(results) >= max_results:
             break
     return results
@@ -234,7 +256,7 @@ async def research_search(
                 return site_name, "[HTTP 401 — credentials stored but site requires browser login (Phase 2)]"
             return site_name, f"[HTTP {resp.status_code}]"
 
-        snippets = _extract_snippets(resp.text)
+        snippets = _extract_snippets(resp.text, url)
         return site_name, (snippets if snippets else [{"title": "(no results parsed)", "url": url, "snippet": ""}])
 
     # Fetch all sites concurrently — one slow site no longer blocks the rest,

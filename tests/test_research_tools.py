@@ -2,6 +2,38 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
 
+def test_extract_snippets_absolutizes_relative_urls():
+    from modules.research_tools import _extract_snippets
+    html = '<a href="/abs/2301.001">Quantum Turbulence in Superfluids</a> abstract text here'
+    out = _extract_snippets(html, "https://arxiv.org/search/?q=x")
+    assert out[0]["url"] == "https://arxiv.org/abs/2301.001"
+    assert out[0]["title"] == "Quantum Turbulence in Superfluids"
+
+
+def test_extract_snippets_filters_nav_and_boilerplate():
+    from modules.research_tools import _extract_snippets
+    html = (
+        '<nav><a href="/home">Home</a></nav>'
+        '<a href="https://x.org/login">Log in to your account</a>'
+        '<a href="/donate">Donate</a>'
+        '<a href="/paper/1">Magnetohydrodynamic Saltwater Generators</a> some context'
+    )
+    out = _extract_snippets(html, "https://x.org/search")
+    assert [r["title"] for r in out] == ["Magnetohydrodynamic Saltwater Generators"]
+
+
+def test_extract_snippets_dedupes_and_drops_self_link():
+    from modules.research_tools import _extract_snippets
+    html = (
+        '<a href="https://x.org/search">the search page itself here</a>'
+        '<a href="/p/1">A Genuine Result Title One</a> a'
+        '<a href="/p/1">A Genuine Result Title One</a> b'
+    )
+    out = _extract_snippets(html, "https://x.org/search")
+    assert len(out) == 1
+    assert out[0]["url"] == "https://x.org/p/1"
+
+
 def test_list_research_sites_shows_all(tmp_path):
     mock_sites = [
         {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?query={query}", "requires_login": False, "category": "academic", "credential_key": None},
@@ -258,7 +290,7 @@ async def test_research_search_tts_output_emits_speak():
     mock_sites = [
         {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?query={query}", "requires_login": False, "category": "academic", "credential_key": None},
     ]
-    fake_html = '<a href="https://arxiv.org/abs/001">Title One</a> Some context here.'
+    fake_html = '<a href="https://arxiv.org/abs/001">Title One Paper Result</a> Some context here.'
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.text = fake_html
@@ -282,7 +314,7 @@ async def test_research_search_file_output_writes_file(tmp_path):
     mock_sites = [
         {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?query={query}", "requires_login": False, "category": "academic", "credential_key": None},
     ]
-    fake_html = '<a href="https://arxiv.org/abs/001">Paper Title</a> Abstract text here.'
+    fake_html = '<a href="https://arxiv.org/abs/001">Paper Title Extended</a> Abstract text here.'
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.text = fake_html
@@ -306,7 +338,7 @@ async def test_research_search_browser_output_calls_xdg_open(tmp_path):
     mock_sites = [
         {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?query={query}", "requires_login": False, "category": "academic", "credential_key": None},
     ]
-    fake_html = '<a href="https://arxiv.org/abs/001">Browser Title</a>'
+    fake_html = '<a href="https://arxiv.org/abs/001">Browser Title Result</a>'
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.text = fake_html
