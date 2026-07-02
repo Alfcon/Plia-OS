@@ -71,6 +71,33 @@ def test_get_credentials_from_keyring(tmp_path):
     assert creds == {"username": "alice", "password": "secret"}
 
 
+def test_derive_key_mixes_persisted_install_secret(tmp_path):
+    import base64
+    import getpass
+    import hashlib
+    import socket
+    cred_file = tmp_path / "credentials.enc"
+    key_file = tmp_path / "credentials.key"
+
+    with patch("core.credential_store._CRED_FILE", cred_file):
+        from core.credential_store import _derive_key
+        k1 = _derive_key()
+        # secret file is created, 0600, and reused on subsequent calls
+        assert key_file.exists()
+        assert (key_file.stat().st_mode & 0o777) == 0o600
+        assert _derive_key() == k1
+
+    # key must differ from the old host/user-only derivation
+    try:
+        user = getpass.getuser()
+    except Exception:
+        user = "plia"
+    naive = base64.urlsafe_b64encode(
+        hashlib.sha256((socket.gethostname() + user).encode()).digest()
+    )
+    assert k1 != naive
+
+
 def test_get_credentials_transient_keyring_error_does_not_switch_backend(tmp_path):
     # A transient keyring failure (locked/headless session) must not persist a
     # backend downgrade — that would hide credentials still stored in the keyring.
