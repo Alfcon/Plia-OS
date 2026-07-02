@@ -240,7 +240,6 @@ async def _supervisor_node(state: AgentState) -> dict:
         try:
             result = await call_tool_async("search_email", {"query": email_query})
             result_str = str(result)
-            await events.emit("transcript", {"role": "tool", "text": f"[search_email]\n{result_str}"})
             logger.info("Supervisor direct-called search_email query=%r", email_query)
             await events.emit("agent_routing", {
                 "agent": "respond", "routing_method": "email_search",
@@ -256,7 +255,6 @@ async def _supervisor_node(state: AgentState) -> dict:
         try:
             result = await call_tool_async(direct, {})
             result_str = str(result)
-            await events.emit("transcript", {"role": "tool", "text": f"[{direct}]\n{result_str}"})
             logger.info("Supervisor direct-called tool: %s", direct)
             await events.emit("agent_routing", {
                 "agent": "respond", "routing_method": "direct_tool",
