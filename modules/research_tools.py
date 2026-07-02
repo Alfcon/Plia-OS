@@ -106,7 +106,7 @@ _RESEARCH_DIR = Path.home() / "research"
 _BOILERPLATE_PHRASES = (
     "skip to", "sign in", "sign up", "log in", "learn more", "advanced search",
     "privacy policy", "cookie policy", "terms of service", "terms of use",
-    "create account", "forgot password", "subscribe to", "newsletter",
+    "create account", "forgot password", "subscribe to",
 )
 
 
