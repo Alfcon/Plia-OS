@@ -59,11 +59,11 @@
     .comp-option { display: flex; align-items: center; gap: 6px; padding: 5px 8px; cursor: pointer; font-size: 0.75rem; color: #ccc; }
     .comp-option:hover { background: #2a2a2a; }
     .comp-dot { font-size: 0.7rem; flex-shrink: 0; }
-    #left-sidebar { width: 130px; flex-shrink: 0; background: #111; border-right: 1px solid #2a2a2a; display: flex; flex-direction: column; padding: 12px 8px; gap: 8px; }
-    #left-sidebar .sb-settings-btn { background: #0d1b2a; color: #4fc3f7; border: 1px solid #1e3a5f; border-radius: 4px; padding: 8px 10px; font-size: 0.8rem; cursor: pointer; width: 100%; }
-    #left-sidebar .sb-settings-btn:hover { background: #1e3a5f; }
-    #left-sidebar .sb-exit-btn { background: #1a0808; color: #ef9a9a; border: 1px solid #7f1d1d; border-radius: 4px; padding: 8px 10px; font-size: 0.8rem; cursor: pointer; width: 100%; }
-    #left-sidebar .sb-exit-btn:hover { background: #7f1d1d; }
+    #nav-bar { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 4px 14px; background: #0d0d0d; border-bottom: 1px solid #1e1e1e; }
+    #nav-bar .sb-settings-btn { background: #0d1b2a; color: #4fc3f7; border: 1px solid #1e3a5f; border-radius: 3px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; font-family: monospace; }
+    #nav-bar .sb-settings-btn:hover, #nav-bar .sb-settings-btn.active { background: #1e3a5f; color: #fff; }
+    #nav-bar .sb-exit-btn { background: #1a0808; color: #ef9a9a; border: 1px solid #7f1d1d; border-radius: 3px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; font-family: monospace; }
+    #nav-bar .sb-exit-btn:hover { background: #7f1d1d; }
     .agent-badge { padding: 3px 8px; border-radius: 3px; font-size: 0.75rem; display: inline-block; background: #1a1a1a; color: #555; border: 1px solid #333; }
     .agent-badge.active { background: #1e3a5f; color: #4fc3f7; border-color: #4fc3f7; }
     #agent-log { margin-top: 6px; }
@@ -74,17 +74,15 @@
     #google-fields { margin-top: 4px; }
     #settings-panel { width: 0; overflow: hidden; transition: width 0.2s ease; display: flex; flex-direction: row; background: #111; border-right: 1px solid #2a2a2a; flex-shrink: 0; min-height: 0; }
     #settings-panel.open { width: 750px; }
-    #left-sidebar .sb-settings-btn.active { background: #1e3a5f; color: #fff; }
+    #nav-bar .sb-settings-btn.active { background: #1e3a5f; color: #fff; }
     #docs-panel { width: 0; overflow: hidden; transition: width 0.2s ease; display: flex; flex-direction: row; background: #111; border-right: 1px solid #2a2a2a; flex-shrink: 0; min-height: 0; }
     #docs-panel.open { width: 1125px; }
     #tools-panel { width: 0; overflow: hidden; transition: width 0.2s ease; display: flex; flex-direction: column; background: #111; border-right: 1px solid #2a2a2a; flex-shrink: 0; min-height: 0; }
     #tools-panel.open { width: 540px; }
-    #left-sidebar .sb-docs-btn { background: #0d2a1a; color: #81c784; border: 1px solid #2a5f3a; border-radius: 4px; padding: 8px 10px; font-size: 0.8rem; cursor: pointer; width: 100%; }
-    #left-sidebar .sb-docs-btn:hover { background: #2a5f3a; }
-    #left-sidebar .sb-docs-btn.active { background: #2a5f3a; color: #fff; }
-    #left-sidebar .sb-tools-btn { background: #1a1a0d; color: #ffd54f; border: 1px solid #5f5a1e; border-radius: 4px; padding: 8px 10px; font-size: 0.8rem; cursor: pointer; width: 100%; }
-    #left-sidebar .sb-tools-btn:hover { background: #3a3510; }
-    #left-sidebar .sb-tools-btn.active { background: #3a3510; color: #fff; }
+    #nav-bar .sb-docs-btn { background: #0d2a1a; color: #81c784; border: 1px solid #2a5f3a; border-radius: 3px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; font-family: monospace; }
+    #nav-bar .sb-docs-btn:hover, #nav-bar .sb-docs-btn.active { background: #2a5f3a; color: #fff; }
+    #nav-bar .sb-tools-btn { background: #1a1a0d; color: #ffd54f; border: 1px solid #5f5a1e; border-radius: 3px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; font-family: monospace; }
+    #nav-bar .sb-tools-btn:hover, #nav-bar .sb-tools-btn.active { background: #3a3510; color: #fff; }
     #docs-nav { width: 122px; border-right: 1px solid #1e1e1e; padding: 10px 0; display: flex; flex-direction: column; flex-shrink: 0; }
     .docs-nav-btn { background: none; border: none; border-left: 2px solid transparent; border-radius: 0; color: #555; font-size: 0.72rem; padding: 10px 0; cursor: pointer; width: 100%; text-align: center; }
     .docs-nav-btn:hover { color: #ccc; background: #181818; }
@@ -157,29 +155,14 @@
   </div>
 </header>
 
-<div id="app-body">
-<div id="left-sidebar">
+<div id="nav-bar">
   <button class="sb-docs-btn" onclick="openDocs()">📖 Docs</button>
   <button class="sb-tools-btn" onclick="openTools()">🔧 Tools</button>
   <button class="sb-settings-btn" onclick="openSettings()">⚙ Settings</button>
   <button class="sb-exit-btn" onclick="exitApp()">⏻ Exit</button>
-  <hr style="border:none;border-top:1px solid #2a2a2a;margin:4px 0;">
-  <div style="font-size:0.65rem;color:#444;text-align:center;letter-spacing:0.05em;">agent</div>
-  <div id="agent-badges" style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;">
-    <span class="agent-badge" data-agent="memory">memory</span>
-    <span class="agent-badge" data-agent="web">web</span>
-    <span class="agent-badge" data-agent="code">code</span>
-    <span class="agent-badge" data-agent="calendar">calendar</span>
-    <span class="agent-badge" data-agent="home">home</span>
-    <span class="agent-badge" data-agent="reminder">reminder</span>
-    <span class="agent-badge" data-agent="network">network</span>
-    <span class="agent-badge" data-agent="wifi">wifi</span>
-    <span class="agent-badge" data-agent="file">file</span>
-    <span class="agent-badge" data-agent="weather">weather</span>
-    <span class="agent-badge" data-agent="respond">direct</span>
-  </div>
-  <div id="agent-log"></div>
 </div>
+
+<div id="app-body">
 <div id="docs-panel">
   <div id="docs-nav">
     <button class="docs-nav-btn active" data-doc="start" onclick="showDocSection('start')">Start</button>
@@ -3250,11 +3233,13 @@
       const badge = document.querySelector(`.agent-badge[data-agent="${msg.agent}"]`);
       if (badge) badge.classList.add('active');
       const log = document.getElementById('agent-log');
-      const entry = document.createElement('div');
-      entry.className = 'recent';
-      entry.textContent = `→ ${msg.agent}`;
-      log.insertBefore(entry, log.firstChild);
-      while (log.children.length > 5) log.removeChild(log.lastChild);
+      if (log) {
+        const entry = document.createElement('div');
+        entry.className = 'recent';
+        entry.textContent = `→ ${msg.agent}`;
+        log.insertBefore(entry, log.firstChild);
+        while (log.children.length > 5) log.removeChild(log.lastChild);
+      }
     }
     if (msg.type === 'dramabox_progress') {
       const el = document.getElementById('db-progress');
