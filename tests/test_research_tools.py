@@ -1,5 +1,7 @@
+import asyncio
+
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import AsyncMock, patch, MagicMock
 
 
 def test_list_research_sites_shows_all(tmp_path):
@@ -108,3 +110,154 @@ def test_remove_site_credentials_not_found():
         from modules.research_tools import remove_site_credentials
         result = remove_site_credentials("jstor")
     assert "no credentials" in result.lower() or "not found" in result.lower()
+
+
+@pytest.mark.asyncio
+async def test_research_search_returns_chat_results():
+    mock_sites = [
+        {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?searchtype=all&query={query}", "requires_login": False, "category": "academic", "credential_key": None},
+    ]
+    fake_html = '<a href="https://arxiv.org/abs/2301.00001">MHD Saltwater Research</a> Abstract about magnetohydrodynamics.'
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = fake_html
+
+    with patch("core.research_site_store.list_sites", return_value=mock_sites), \
+         patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
+         patch("core.credential_store.has_credentials", return_value=False), \
+         patch("httpx.get", return_value=mock_response), \
+         patch("core.events.emit", new_callable=AsyncMock):
+        from modules.research_tools import research_search
+        result = await research_search("MHD saltwater generators", sites="arxiv", output_formats="chat")
+
+    assert "arXiv" in result
+    assert "arxiv.org" in result
+
+
+@pytest.mark.asyncio
+async def test_research_search_login_required_no_creds():
+    mock_sites = [
+        {"slug": "jstor", "name": "JSTOR", "url": "https://www.jstor.org/", "search_url": "https://www.jstor.org/action/doBasicSearch?Query={query}", "requires_login": True, "category": "academic", "credential_key": None},
+    ]
+    with patch("core.research_site_store.list_sites", return_value=mock_sites), \
+         patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
+         patch("core.credential_store.has_credentials", return_value=False), \
+         patch("core.events.emit", new_callable=AsyncMock):
+        from modules.research_tools import research_search
+        result = await research_search("test query", sites="jstor", output_formats="chat")
+
+    assert "LOGIN REQUIRED" in result or "login required" in result.lower()
+    assert "set_site_credentials" in result
+
+
+@pytest.mark.asyncio
+async def test_research_search_timeout_handled():
+    import httpx
+    mock_sites = [
+        {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?query={query}", "requires_login": False, "category": "academic", "credential_key": None},
+    ]
+    with patch("core.research_site_store.list_sites", return_value=mock_sites), \
+         patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
+         patch("core.credential_store.has_credentials", return_value=False), \
+         patch("httpx.get", side_effect=httpx.TimeoutException("timeout")), \
+         patch("core.events.emit", new_callable=AsyncMock):
+        from modules.research_tools import research_search
+        result = await research_search("test", sites="arxiv", output_formats="chat")
+
+    assert "Timeout" in result or "timeout" in result.lower()
+
+
+@pytest.mark.asyncio
+async def test_research_search_http_error_handled():
+    import httpx
+    mock_sites = [
+        {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?query={query}", "requires_login": False, "category": "academic", "credential_key": None},
+    ]
+    mock_response = MagicMock()
+    mock_response.status_code = 403
+    mock_response.text = ""
+
+    with patch("core.research_site_store.list_sites", return_value=mock_sites), \
+         patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
+         patch("core.credential_store.has_credentials", return_value=False), \
+         patch("httpx.get", return_value=mock_response), \
+         patch("core.events.emit", new_callable=AsyncMock):
+        from modules.research_tools import research_search
+        result = await research_search("test", sites="arxiv", output_formats="chat")
+
+    assert "403" in result or "HTTP" in result
+
+
+@pytest.mark.asyncio
+async def test_research_search_tts_output_emits_speak():
+    from unittest.mock import AsyncMock
+    mock_sites = [
+        {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?query={query}", "requires_login": False, "category": "academic", "credential_key": None},
+    ]
+    fake_html = '<a href="https://arxiv.org/abs/001">Title One</a> Some context here.'
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = fake_html
+    mock_emit = AsyncMock()
+
+    with patch("core.research_site_store.list_sites", return_value=mock_sites), \
+         patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
+         patch("core.credential_store.has_credentials", return_value=False), \
+         patch("httpx.get", return_value=mock_response), \
+         patch("core.events.emit", mock_emit):
+        from modules.research_tools import research_search
+        await research_search("test query", sites="arxiv", output_formats="chat,tts")
+
+    speak_calls = [c for c in mock_emit.call_args_list if c.args[0] == "speak"]
+    assert len(speak_calls) == 1
+    assert "test query" in speak_calls[0].args[1]["message"]
+
+
+@pytest.mark.asyncio
+async def test_research_search_file_output_writes_file(tmp_path):
+    mock_sites = [
+        {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?query={query}", "requires_login": False, "category": "academic", "credential_key": None},
+    ]
+    fake_html = '<a href="https://arxiv.org/abs/001">Paper Title</a> Abstract text here.'
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = fake_html
+
+    with patch("core.research_site_store.list_sites", return_value=mock_sites), \
+         patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
+         patch("core.credential_store.has_credentials", return_value=False), \
+         patch("httpx.get", return_value=mock_response), \
+         patch("core.events.emit", new_callable=AsyncMock), \
+         patch("modules.research_tools._RESEARCH_DIR", tmp_path):
+        from modules.research_tools import research_search
+        result = await research_search("paper topic", sites="arxiv", output_formats="chat,file")
+
+    written = list(tmp_path.glob("*.md"))
+    assert len(written) == 1
+    assert "Paper Title" in written[0].read_text()
+
+
+@pytest.mark.asyncio
+async def test_research_search_browser_output_calls_xdg_open(tmp_path):
+    mock_sites = [
+        {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?query={query}", "requires_login": False, "category": "academic", "credential_key": None},
+    ]
+    fake_html = '<a href="https://arxiv.org/abs/001">Browser Title</a>'
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = fake_html
+
+    with patch("core.research_site_store.list_sites", return_value=mock_sites), \
+         patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
+         patch("core.credential_store.has_credentials", return_value=False), \
+         patch("httpx.get", return_value=mock_response), \
+         patch("core.events.emit", new_callable=AsyncMock), \
+         patch("subprocess.Popen") as mock_popen, \
+         patch("modules.research_tools._RESEARCH_DIR", tmp_path):
+        from modules.research_tools import research_search
+        await research_search("browser test", sites="arxiv", output_formats="chat,browser")
+
+    assert mock_popen.called
+    args = mock_popen.call_args[0][0]
+    assert args[0] == "xdg-open"
