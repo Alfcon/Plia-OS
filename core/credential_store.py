@@ -104,8 +104,11 @@ def get_credentials(site_slug: str) -> dict | None:
             return None
         return json.loads(blob)
     except Exception as exc:
-        logger.warning("Keyring read failed (%s), using file backend", _classify_keyring_error(exc))
-        update_config(credential_backend="file")
+        # Do NOT persist a backend switch here: a transient keyring error
+        # (locked session, headless boot) would permanently downgrade the
+        # backend and hide credentials still stored in the keyring. Fall back
+        # to the file for this read only.
+        logger.warning("Keyring read failed (%s), reading file backend for this call", _classify_keyring_error(exc))
         data = _load_file()
         return data.get(site_slug)
 
@@ -132,8 +135,9 @@ def remove_credentials(site_slug: str) -> bool:
         keyring.delete_password(_SERVICE, site_slug)
         return True
     except Exception as exc:
-        logger.warning("Keyring remove failed (%s), using file backend", _classify_keyring_error(exc))
-        update_config(credential_backend="file")
+        # As in get_credentials: don't persist a backend switch on a transient
+        # keyring error. Attempt the removal against the file backend only.
+        logger.warning("Keyring remove failed (%s), using file backend for this call", _classify_keyring_error(exc))
         data = _load_file()
         if site_slug not in data:
             return False
