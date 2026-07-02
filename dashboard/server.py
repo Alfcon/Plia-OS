@@ -2307,6 +2307,30 @@ async def files_rename(body: dict):
     return {"ok": True}
 
 
+@router.post("/api/files/pick")
+async def files_pick(body: dict):
+    """Open native Linux file picker via zenity. mode: 'file' or 'directory'."""
+    import shutil, subprocess
+    mode = body.get("mode", "file")
+    start = body.get("start", str(pathlib.Path.home()))
+    zenity = shutil.which("zenity")
+    if not zenity:
+        raise HTTPException(status_code=501, detail="zenity not installed")
+    cmd = [zenity, "--file-selection", f"--filename={start}/"]
+    if mode == "directory":
+        cmd.append("--directory")
+    try:
+        result = await asyncio.to_thread(
+            subprocess.run, cmd, capture_output=True, text=True, timeout=120
+        )
+        path = result.stdout.strip()
+        if not path:
+            return {"path": None, "cancelled": True}
+        return {"path": path, "cancelled": False}
+    except subprocess.TimeoutExpired:
+        return {"path": None, "cancelled": True}
+
+
 # ── Voice clip manager ────────────────────────────────────────────────────────
 
 _AUDIO_EXTS = {".wav", ".mp3", ".ogg", ".flac", ".m4a", ".aac"}
