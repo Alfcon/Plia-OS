@@ -11711,7 +11711,7 @@
   async function openToolBrowse(inputId) {
     const el = document.getElementById(inputId);
     const cur = el?.value || '';
-    const isDir = inputId.includes('-directory') || inputId.includes('-path');
+    const isDir = /-directory$/.test(inputId);
     const mode = isDir ? 'directory' : 'file';
     const start = cur && cur.startsWith('/') ? cur : '';
     try {
