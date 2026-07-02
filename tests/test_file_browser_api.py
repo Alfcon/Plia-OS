@@ -168,3 +168,48 @@ async def test_rename_missing_params():
     async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
         r = await c.post("/api/files/rename", json={"from": "/tmp/x"})
     assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_files_pick_empty_start_defaults_to_home(tmp_path):
+    import subprocess
+    from unittest.mock import patch, MagicMock
+    captured = {}
+
+    def _fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        return MagicMock(stdout="/picked/path\n")
+
+    with patch("shutil.which", return_value="/usr/bin/zenity"), \
+         patch("subprocess.run", side_effect=_fake_run):
+        async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
+            r = await c.post("/api/files/pick", json={"mode": "file", "start": ""})
+
+    assert r.status_code == 200
+    assert r.json()["path"] == "/picked/path"
+    # empty start must resolve to the home dir, not "/"
+    filename_arg = next(a for a in captured["cmd"] if a.startswith("--filename="))
+    assert filename_arg != "--filename=/"
+    assert filename_arg.startswith(f"--filename={os.path.expanduser('~')}")
+
+
+@pytest.mark.asyncio
+async def test_files_pick_subprocess_error_returns_cancelled(tmp_path):
+    from unittest.mock import patch
+
+    with patch("shutil.which", return_value="/usr/bin/zenity"), \
+         patch("subprocess.run", side_effect=OSError("boom")):
+        async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
+            r = await c.post("/api/files/pick", json={"mode": "file", "start": "/home/x"})
+
+    assert r.status_code == 200
+    assert r.json()["cancelled"] is True
+
+
+@pytest.mark.asyncio
+async def test_files_pick_no_zenity_returns_501(tmp_path):
+    from unittest.mock import patch
+    with patch("shutil.which", return_value=None):
+        async with AsyncClient(transport=ASGITransport(app=_make_app()), base_url="http://test") as c:
+            r = await c.post("/api/files/pick", json={"mode": "file"})
+    assert r.status_code == 501

@@ -2312,7 +2312,9 @@ async def files_pick(body: dict):
     """Open native Linux file picker via zenity. mode: 'file' or 'directory'."""
     import shutil, subprocess
     mode = body.get("mode", "file")
-    start = body.get("start", str(pathlib.Path.home()))
+    # `or` (not a .get default) so an empty-string start still lands on home
+    # rather than the filesystem root.
+    start = body.get("start") or str(pathlib.Path.home())
     zenity = shutil.which("zenity")
     if not zenity:
         raise HTTPException(status_code=501, detail="zenity not installed")
@@ -2329,6 +2331,10 @@ async def files_pick(body: dict):
         return {"path": path, "cancelled": False}
     except subprocess.TimeoutExpired:
         return {"path": None, "cancelled": True}
+    except Exception as exc:
+        # zenity vanished after the which() check, no display, etc. — treat as a
+        # cancelled pick rather than surfacing a 500 to the browser.
+        return {"path": None, "cancelled": True, "error": str(exc)}
 
 
 # ── Voice clip manager ────────────────────────────────────────────────────────

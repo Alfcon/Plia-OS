@@ -28,12 +28,32 @@ _CRED_FILE = Path(
 )
 
 
+def _install_secret() -> bytes:
+    """Per-install random secret, persisted next to the credential file with
+    0600 perms. Mixed into the encryption key so credentials.enc is not
+    decryptable from public host/user info alone — an attacker who copies the
+    encrypted file (backup, disk image, cloud sync) also needs this key file.
+    Best-effort: returns b"" if the secret can't be created."""
+    key_file = _CRED_FILE.parent / "credentials.key"
+    try:
+        if key_file.exists():
+            return key_file.read_bytes()
+        secret = os.urandom(32)
+        key_file.parent.mkdir(parents=True, exist_ok=True)
+        key_file.write_bytes(secret)
+        key_file.chmod(0o600)
+        return secret
+    except Exception as exc:
+        logger.warning("Could not persist install secret (%s); key falls back to host/user only", exc)
+        return b""
+
+
 def _derive_key() -> bytes:
     try:
         user = getpass.getuser()
     except Exception:
         user = "plia"
-    raw = (socket.gethostname() + user).encode()
+    raw = _install_secret() + (socket.gethostname() + user).encode()
     digest = hashlib.sha256(raw).digest()
     return base64.urlsafe_b64encode(digest)
 
