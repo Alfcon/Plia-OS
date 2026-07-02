@@ -34,7 +34,8 @@ def list_research_sites() -> str:
     "Add a custom site to the research registry. "
     "slug: short identifier (lowercase, hyphens only, e.g. 'my-journal'). "
     "name: display name. url: base URL. search_url: URL with {query} placeholder. "
-    "requires_login: true if the site needs credentials."
+    "requires_login: true if the site needs credentials. "
+    "category: 'academic', 'dev', or 'general' (default: 'general')."
 )
 def add_research_site(
     slug: str,
@@ -42,16 +43,21 @@ def add_research_site(
     url: str,
     search_url: str,
     requires_login: bool = False,
+    category: str = "general",
 ) -> str:
     from core.research_site_store import add_site
-    add_site(slug=slug, name=name, url=url, search_url=search_url, requires_login=requires_login)
+    if not _re.match(r"^[a-z0-9-]+$", slug):
+        return f"Invalid slug '{slug}'. Use lowercase letters, digits, and hyphens only."
+    add_site(slug=slug, name=name, url=url, search_url=search_url, requires_login=requires_login, category=category)
     return f"Site '{slug}' ({name}) added to research registry."
 
 
 @tool("Remove a site from the research registry by its slug.")
 def remove_research_site(slug: str) -> str:
     from core.research_site_store import remove_site
+    from core.credential_store import remove_credentials
     if remove_site(slug):
+        remove_credentials(slug)
         return f"Site '{slug}' removed from research registry."
     return f"No site with slug '{slug}' found."
 

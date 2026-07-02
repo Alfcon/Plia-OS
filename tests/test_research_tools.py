@@ -43,15 +43,56 @@ def test_add_research_site_calls_store():
         url="https://mysite.com/",
         search_url="https://mysite.com/search?q={query}",
         requires_login=False,
+        category="general",
     )
     assert "my-site" in result
     assert "added" in result.lower()
 
 
+def test_add_research_site_invalid_slug():
+    with patch("core.research_site_store.add_site") as mock_add:
+        from modules.research_tools import add_research_site
+        result = add_research_site(
+            slug="My-SITE_Invalid",
+            name="My Site",
+            url="https://mysite.com/",
+            search_url="https://mysite.com/search?q={query}",
+            requires_login=False,
+        )
+    mock_add.assert_not_called()
+    assert "Invalid slug" in result
+    assert "lowercase letters, digits, and hyphens" in result
+
+
+def test_add_research_site_with_category():
+    with patch("core.research_site_store.add_site") as mock_add:
+        from modules.research_tools import add_research_site
+        result = add_research_site(
+            slug="my-journal",
+            name="My Journal",
+            url="https://myjournal.com/",
+            search_url="https://myjournal.com/search?q={query}",
+            requires_login=False,
+            category="academic",
+        )
+    mock_add.assert_called_once_with(
+        slug="my-journal",
+        name="My Journal",
+        url="https://myjournal.com/",
+        search_url="https://myjournal.com/search?q={query}",
+        requires_login=False,
+        category="academic",
+    )
+    assert "my-journal" in result
+    assert "added" in result.lower()
+
+
 def test_remove_research_site_calls_store():
-    with patch("core.research_site_store.remove_site", return_value=True):
+    with patch("core.research_site_store.remove_site", return_value=True), \
+         patch("core.credential_store.remove_credentials") as mock_remove_creds:
         from modules.research_tools import remove_research_site
         result = remove_research_site("arxiv")
+    mock_remove_creds.assert_called_once_with("arxiv")
     assert "arxiv" in result
     assert "removed" in result.lower()
 
