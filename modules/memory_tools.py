@@ -63,20 +63,18 @@ def forget_memory(key: str = "") -> str:
 
 
 @tool(description="Clear the conversation history and start fresh. Use when asked to 'forget this conversation', 'start over', or 'clear context'.")
-def clear_conversation() -> str:
-    import asyncio
+async def clear_conversation() -> str:
     from agents.memory_store import get_memory_store
     from core import events
     get_memory_store().clear_history()
-    asyncio.get_event_loop().create_task(events.emit("clear_history", {}))
+    await events.emit("clear_history", {})
     return "Conversation cleared. Starting fresh."
 
 
 @tool(description="Permanently delete history with no archiving or recovery. "
       "target: 'chat' = conversation history only, 'memory' = stored facts/memories only, 'all' = both. "
       "Leave blank to see what's available before deleting.")
-def delete_history_permanent(target: str = "") -> str:
-    import asyncio
+async def delete_history_permanent(target: str = "") -> str:
     from agents.chat_history import clear_permanent, get_recent
     from agents.memory_store import get_memory_store
     from core import events
@@ -93,15 +91,17 @@ def delete_history_permanent(target: str = "") -> str:
             f"Re-run with target='chat', 'memory', or 'all'."
         )
 
+    store = get_memory_store()
     deleted = []
     if target in ("chat", "all"):
         clear_permanent()
-        asyncio.get_event_loop().create_task(events.emit("clear_history", {}))
+        await events.emit("clear_history", {})
         deleted.append("chat history")
     if target in ("memory", "all"):
-        store = get_memory_store()
+        for f in store.list_all():
+            store.forget(f["key"])
         store.clear_history()
-        deleted.append("memory history")
+        deleted.append("memory facts and history")
     if not deleted:
         return f"Unknown target '{target}'. Use 'chat', 'memory', or 'all'."
     return f"Permanently deleted: {', '.join(deleted)}."

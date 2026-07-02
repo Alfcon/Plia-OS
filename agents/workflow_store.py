@@ -194,15 +194,26 @@ async def _run_step(
             sub_results = list(step_results)
             branch_prev = step_results[-1] if step_results else ""
             branch_vars: dict[str, dict] = {}
-            for sub_step in branch_steps:
-                sub_result, sub_error, _ = await _run_step(sub_step, sub_results, payload, run_vars)
-                sub_results.append(sub_result)
-                if (sub_name := sub_step.get("name")):
-                    branch_vars[sub_name] = {"result": sub_result, "error": sub_error or ""}
-                if sub_error:
-                    return branch_name, sub_result, sub_error, branch_vars
-                branch_prev = sub_result
-            return branch_name, branch_prev, "", branch_vars
+            # Isolated copy of run_vars so concurrent branches don't race on writes
+            branch_run_vars = dict(run_vars) if run_vars is not None else None
+            original_keys = set(run_vars.keys()) if run_vars is not None else set()
+            try:
+                for sub_step in branch_steps:
+                    sub_result, sub_error, _ = await _run_step(sub_step, sub_results, payload, branch_run_vars)
+                    sub_results.append(sub_result)
+                    if (sub_name := sub_step.get("name")):
+                        branch_vars[sub_name] = {"result": sub_result, "error": sub_error or ""}
+                    if sub_error:
+                        return branch_name, sub_result, sub_error, branch_vars
+                    branch_prev = sub_result
+                # Collect new keys written by nested steps (e.g. if-type sub-steps)
+                if branch_run_vars is not None:
+                    for k, v in branch_run_vars.items():
+                        if k not in original_keys:
+                            branch_vars.setdefault(k, v)
+                return branch_name, branch_prev, "", branch_vars
+            except Exception as exc:
+                return branch_name, "", str(exc), branch_vars
 
         gathered = await asyncio.gather(*[_run_branch(b) for b in branches], return_exceptions=True)
         results_list: list[str] = []
@@ -272,7 +283,7 @@ async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
                             fallback_error = str(exc)
                             break
                         fallback_results.append(fb_result)
-                        if (fb_name := fb_step.get("name")):
+                        if (fb_name := fb_step.get("name")) and fb_name not in run_vars:
                             run_vars[fb_name] = {"result": fb_result, "error": fb_err or ""}
                         if fb_err:
                             fallback_error = fb_err
@@ -281,6 +292,10 @@ async def run_workflow(name: str, payload: dict | None = None) -> list[dict]:
                         fallback_error = None
                     result_str = fallback_prev
                     error = fallback_error
+                    # Fallback failed and step says continue: surface the error as result
+                    if error and step.get("continue_on_error"):
+                        result_str = result_str or error
+                        error = None
                 elif step.get("continue_on_error"):
                     # No on_error fallback, but continue_on_error is True: use error as result
                     result_str = error

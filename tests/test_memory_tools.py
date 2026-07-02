@@ -1,4 +1,5 @@
 import asyncio
+import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 
 
@@ -156,20 +157,15 @@ def test_search_memories_empty():
     assert "No relevant" in result
 
 
-def test_clear_conversation_clears_db_and_emits_event():
+@pytest.mark.asyncio
+async def test_clear_conversation_clears_db_and_emits_event():
     mock_store = MagicMock()
     mock_emit = AsyncMock()
 
     with patch("agents.memory_store.get_memory_store", return_value=mock_store), \
          patch("core.events.emit", mock_emit):
-        # Need a running event loop for create_task
-        async def _run():
-            from modules.memory_tools import clear_conversation
-            result = clear_conversation()
-            # drain scheduled tasks
-            await asyncio.sleep(0)
-            return result
-        result = asyncio.run(_run())
+        from modules.memory_tools import clear_conversation
+        result = await clear_conversation()
 
     mock_store.clear_history.assert_called_once()
     mock_emit.assert_awaited_once()

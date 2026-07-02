@@ -82,7 +82,7 @@ async def run_agent(name: str, message: str) -> str:
     from agents.llm import call_llm
     all_schemas = get_tool_schemas()
     allowed = set(defn.tool_names)
-    tools = [s for s in all_schemas if s["function"]["name"] in allowed] if allowed else None
+    tools = [s for s in all_schemas if s["function"]["name"] in allowed] if allowed else []
 
     messages = [
         {"role": "system", "content": defn.system_prompt},
