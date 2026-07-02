@@ -77,8 +77,13 @@
     #nav-bar .sb-settings-btn.active { background: #1e3a5f; color: #fff; }
     #docs-panel { width: 0; overflow: hidden; transition: width 0.2s ease; display: flex; flex-direction: row; background: #111; border-right: 1px solid #2a2a2a; flex-shrink: 0; min-height: 0; }
     #docs-panel.open { width: 1125px; }
-    #tools-panel { width: 0; overflow: hidden; transition: width 0.2s ease; display: flex; flex-direction: column; background: #111; border-right: 1px solid #2a2a2a; flex-shrink: 0; min-height: 0; }
+    #tools-panel { width: 0; overflow: hidden; transition: width 0.2s ease; display: flex; flex-direction: row; background: #111; border-right: 1px solid #2a2a2a; flex-shrink: 0; min-height: 0; }
     #tools-panel.open { width: 540px; }
+    #tool-nav { width: 88px; flex-shrink: 0; border-right: 1px solid #1a1a1a; padding: 8px 0; overflow-y: auto; display: flex; flex-direction: column; }
+    .tool-nav-btn { background: none; border: none; border-left: 2px solid transparent; color: #555; font-size: 0.72rem; padding: 9px 0; cursor: pointer; width: 100%; text-align: center; font-family: monospace; }
+    .tool-nav-btn:hover { color: #ccc; background: #181818; }
+    .tool-nav-btn.active { color: #ffd54f; border-left-color: #ffd54f; background: #1a1a0d; }
+    #tool-content { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
     #nav-bar .sb-docs-btn { background: #0d2a1a; color: #81c784; border: 1px solid #2a5f3a; border-radius: 3px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; font-family: monospace; }
     #nav-bar .sb-docs-btn:hover, #nav-bar .sb-docs-btn.active { background: #2a5f3a; color: #fff; }
     #nav-bar .sb-tools-btn { background: #1a1a0d; color: #ffd54f; border: 1px solid #5f5a1e; border-radius: 3px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; font-family: monospace; }
@@ -701,13 +706,14 @@
   </div>
 </div>
 <div id="tools-panel">
-  <div style="padding:10px 14px 6px;border-bottom:1px solid #1a1a1a;flex-shrink:0;">
-    <div style="font-size:0.78rem;color:#ffd54f;margin-bottom:6px;">Run Tools</div>
-    <div id="tool-cat-chips" style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;"></div>
-    <input id="tool-search" type="text" placeholder="Search tools…" oninput="filterTools(this.value)"
-      style="width:100%;background:#1a1a1a;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:4px;padding:4px 6px;font-size:0.75rem;box-sizing:border-box;" />
+  <div id="tool-nav"></div>
+  <div id="tool-content">
+    <div style="padding:7px 10px;border-bottom:1px solid #1a1a1a;flex-shrink:0;">
+      <input id="tool-search" type="text" placeholder="Search tools…" oninput="filterTools(this.value)"
+        style="width:100%;background:#1a1a1a;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:4px 7px;font-size:0.73rem;box-sizing:border-box;font-family:monospace;" />
+    </div>
+    <div id="tool-list" style="flex:1;overflow-y:auto;padding:8px 0;"></div>
   </div>
-  <div id="tool-list" style="flex:1;overflow-y:auto;padding:8px 0;"></div>
 </div>
 <div id="settings-panel">
       <div id="m-nav">
@@ -4626,21 +4632,17 @@
 
   function filterToolCat(cat) {
     _activeCat = cat;
-    document.querySelectorAll('.tool-cat-chip').forEach(el => {
-      const active = el.dataset.cat === cat;
-      el.style.background = active ? '#1565c0' : '#1a1a1a';
-      el.style.color = active ? '#e0e0e0' : '#666';
-      el.style.borderColor = active ? '#1976d2' : '#2a2a2a';
+    document.querySelectorAll('.tool-nav-btn').forEach(el => {
+      el.classList.toggle('active', el.dataset.cat === cat);
     });
     renderToolList(document.getElementById('tool-search').value.toLowerCase());
   }
 
   function renderCatChips() {
-    const chips = document.getElementById('tool-cat-chips');
-    chips.innerHTML = ['', ..._CAT_ORDER].map(cat =>
-      `<button class="tool-cat-chip" data-cat="${_esc(cat)}" onclick="filterToolCat('${_esc(cat)}')"
-        style="background:${cat === _activeCat ? '#1565c0' : '#1a1a1a'};color:${cat === _activeCat ? '#e0e0e0' : '#666'};border:1px solid ${cat === _activeCat ? '#1976d2' : '#2a2a2a'};border-radius:3px;padding:2px 7px;font-size:0.67rem;cursor:pointer;white-space:nowrap;"
-      >${_esc(_CAT_SHORT[cat] || cat)}</button>`
+    const nav = document.getElementById('tool-nav');
+    if (!nav) return;
+    nav.innerHTML = ['', ..._CAT_ORDER].map(cat =>
+      `<button class="tool-nav-btn${cat === _activeCat ? ' active' : ''}" data-cat="${_esc(cat)}" onclick="filterToolCat('${_esc(cat)}')">${_esc(_CAT_SHORT[cat] !== undefined ? _CAT_SHORT[cat] : cat) || 'All'}</button>`
     ).join('');
   }
 
