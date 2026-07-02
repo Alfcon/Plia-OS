@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import html as _html
+import re as _re
+import subprocess
+from datetime import date
+from pathlib import Path
+
 from core.registry import tool
 
 
@@ -85,11 +91,6 @@ def remove_site_credentials(site_slug: str) -> str:
     return f"No credentials found for '{site_slug}'."
 
 
-import re as _re
-import subprocess
-from datetime import date
-from pathlib import Path
-
 _RESEARCH_DIR = Path.home() / "research"
 
 
@@ -139,19 +140,19 @@ def _results_to_html(query: str, all_results: dict) -> str:
     idx = 1
     for site_name, results in all_results.items():
         if isinstance(results, str):
-            rows += f'<tr><td>{idx}</td><td>{site_name}</td><td colspan="2"><em>{results}</em></td></tr>'
+            rows += f'<tr><td>{idx}</td><td>{_html.escape(site_name)}</td><td colspan="2"><em>{_html.escape(results)}</em></td></tr>'
             idx += 1
             continue
         for r in results:
-            title_cell = f'<a href="{r["url"]}">{r["title"]}</a>'
-            rows += f"<tr><td>{idx}</td><td>{site_name}</td><td>{title_cell}</td><td>{r['snippet']}</td></tr>"
+            title_cell = f'<a href="{r["url"]}">{_html.escape(r["title"])}</a>'
+            rows += f"<tr><td>{idx}</td><td>{_html.escape(site_name)}</td><td>{title_cell}</td><td>{_html.escape(r['snippet'])}</td></tr>"
             idx += 1
     return (
-        f"<!DOCTYPE html><html><head><title>Research: {query}</title>"
+        f"<!DOCTYPE html><html><head><title>Research: {_html.escape(query)}</title>"
         "<style>body{font-family:sans-serif;max-width:1200px;margin:2em auto}"
         "table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:.5em;text-align:left}"
         "th{background:#eee}a{color:#0066cc}</style></head><body>"
-        f"<h1>Research: {query}</h1>"
+        f"<h1>Research: {_html.escape(query)}</h1>"
         "<table><tr><th>#</th><th>Site</th><th>Title</th><th>Snippet</th></tr>"
         f"{rows}</table></body></html>"
     )
@@ -229,10 +230,10 @@ async def research_search(
         all_results[site_name] = snippets if snippets else [{"title": "(no results parsed)", "url": url, "snippet": ""}]
 
     # Build chat output (always)
-    chat_lines = [f"## Research results for: {query}\n"]
+    chat_lines = []
     idx = 1
     for site_name, results in all_results.items():
-        chat_lines.append(f"### {site_name}")
+        chat_lines.append(f"## {site_name}")
         if isinstance(results, str):
             chat_lines.append(results)
             chat_lines.append("")
