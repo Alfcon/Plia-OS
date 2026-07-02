@@ -39,21 +39,21 @@ def _derive_key() -> bytes:
 
 
 def _load_file() -> dict:
-    path = _CRED_FILE
-    if not path.exists():
+    if not _CRED_FILE.exists():
         return {}
     try:
         from cryptography.fernet import Fernet
-        return json.loads(Fernet(_derive_key()).decrypt(path.read_bytes()))
-    except Exception:
+        return json.loads(Fernet(_derive_key()).decrypt(_CRED_FILE.read_bytes()))
+    except Exception as exc:
+        logger.warning("Failed to decrypt credential file: %s", exc)
         return {}
 
 
 def _save_file(data: dict) -> None:
     from cryptography.fernet import Fernet
-    path = _CRED_FILE
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(Fernet(_derive_key()).encrypt(json.dumps(data).encode()))
+    _CRED_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _CRED_FILE.write_bytes(Fernet(_derive_key()).encrypt(json.dumps(data).encode()))
+    _CRED_FILE.chmod(0o600)
 
 
 def _classify_keyring_error(exc: Exception) -> str:
@@ -68,7 +68,6 @@ def _classify_keyring_error(exc: Exception) -> str:
 
 def set_credentials(site_slug: str, username: str, password: str) -> str:
     cfg = get_config()
-    blob = json.dumps({"username": username, "password": password})
 
     if cfg.credential_backend == "file":
         data = _load_file()
@@ -78,6 +77,7 @@ def set_credentials(site_slug: str, username: str, password: str) -> str:
 
     try:
         import keyring
+        blob = json.dumps({"username": username, "password": password})
         keyring.set_password(_SERVICE, site_slug, blob)
         return f"Stored credentials for '{site_slug}' in system keyring."
     except Exception as exc:
@@ -103,7 +103,9 @@ def get_credentials(site_slug: str) -> dict | None:
         if blob is None:
             return None
         return json.loads(blob)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Keyring read failed (%s), using file backend", _classify_keyring_error(exc))
+        update_config(credential_backend="file")
         data = _load_file()
         return data.get(site_slug)
 
@@ -129,7 +131,9 @@ def remove_credentials(site_slug: str) -> bool:
             return False
         keyring.delete_password(_SERVICE, site_slug)
         return True
-    except Exception:
+    except Exception as exc:
+        logger.warning("Keyring remove failed (%s), using file backend", _classify_keyring_error(exc))
+        update_config(credential_backend="file")
         data = _load_file()
         if site_slug not in data:
             return False
