@@ -119,6 +119,15 @@
     .m-pane .apply-btn:hover { background: #1e3a5f; }
     .cron-preset { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:3px; color:#888; font-size:0.68rem; padding:2px 7px; cursor:pointer; }
     .cron-preset:hover { border-color:#555; color:#ccc; }
+    #tool-browse-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; }
+    #tool-browse-modal.open { display:flex; }
+    #tool-browse-box { background:#141414; border:1px solid #2a2a2a; border-radius:5px; width:460px; max-height:520px; display:flex; flex-direction:column; overflow:hidden; }
+    #tool-browse-header { padding:8px 12px; border-bottom:1px solid #1a1a1a; display:flex; align-items:center; gap:6px; }
+    #tool-browse-crumb { flex:1; font-size:0.7rem; color:#888; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; direction:rtl; text-align:left; }
+    #tool-browse-list { flex:1; overflow-y:auto; padding:4px 0; }
+    .tb-entry { padding:5px 12px; cursor:pointer; font-size:0.73rem; font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-bottom:1px solid #0d0d0d; }
+    .tb-entry:hover { background:#1a1a1a; }
+    #tool-browse-footer { padding:6px 10px; border-top:1px solid #1a1a1a; display:flex; gap:6px; justify-content:flex-end; }
   </style>
 </head>
 <body>
@@ -5051,7 +5060,11 @@
       } else {
         input = `<input id="${id}" type="text" placeholder="${_esc(def.description || def.type || 'string')}" style="${style}">`;
       }
-      return `<div style="margin-bottom:4px;">${label}${input}</div>`;
+      const isPath = /path|_file$|^file$|directory|^source$|^destination$/i.test(name);
+      const inputWrap = isPath
+        ? `<div style="display:flex;gap:4px;">${input.replace(style, style + 'flex:1;')}<button onclick="openToolBrowse('${id}')" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;color:#90caf9;font-size:0.68rem;padding:2px 7px;cursor:pointer;white-space:nowrap;flex-shrink:0;">Browse</button></div>`
+        : input;
+      return `<div style="margin-bottom:4px;">${label}${inputWrap}</div>`;
     }).join('');
   }
 
@@ -11702,7 +11715,72 @@
     </tr>`;
   }).join('');
 })();
+
+  // ── Tool Browse Modal ──────────────────────────────────────────────────
+  let _tbTarget = null;
+  let _tbCwd = '';
+
+  function openToolBrowse(inputId) {
+    _tbTarget = inputId;
+    const cur = document.getElementById(inputId)?.value || '';
+    toolBrowseNav(cur && cur.startsWith('/') ? cur.replace(/\/[^/]+$/, '') || '/' : '~');
+    document.getElementById('tool-browse-modal').classList.add('open');
+  }
+
+  function closeToolBrowse() {
+    document.getElementById('tool-browse-modal').classList.remove('open');
+  }
+
+  async function toolBrowseNav(path) {
+    _tbCwd = path;
+    document.getElementById('tool-browse-crumb').textContent = path;
+    const list = document.getElementById('tool-browse-list');
+    list.innerHTML = '<div style="padding:8px 12px;color:#555;font-size:0.72rem;">Loading…</div>';
+    try {
+      const r = await fetch('/api/files?' + new URLSearchParams({path}));
+      if (!r.ok) { list.innerHTML = '<div style="padding:8px 12px;color:#e57373;font-size:0.72rem;">Cannot read directory.</div>'; return; }
+      const data = await r.json();
+      _tbCwd = data.path;
+      document.getElementById('tool-browse-crumb').textContent = _tbCwd;
+      let html = '';
+      if (data.parent) html += `<div class="tb-entry" style="color:#4fc3f7;" onclick="toolBrowseNav(${JSON.stringify(data.parent)})">📁 ..</div>`;
+      for (const e of data.entries) {
+        const full = _tbCwd.replace(/\/$/, '') + '/' + e.name;
+        if (e.type === 'dir') {
+          html += `<div class="tb-entry" style="color:#90caf9;" onclick="toolBrowseNav(${JSON.stringify(full)})">📁 ${_esc(e.name)}</div>`;
+        } else {
+          html += `<div class="tb-entry" onclick="toolBrowsePick(${JSON.stringify(full)})">📄 ${_esc(e.name)}</div>`;
+        }
+      }
+      list.innerHTML = html || '<div style="padding:8px 12px;color:#555;font-size:0.72rem;">Empty directory.</div>';
+    } catch(e) { list.innerHTML = '<div style="padding:8px 12px;color:#e57373;font-size:0.72rem;">Error loading.</div>'; }
+  }
+
+  function toolBrowsePick(path) {
+    if (_tbTarget) { const el = document.getElementById(_tbTarget); if (el) el.value = path; }
+    closeToolBrowse();
+  }
+
+  function toolBrowsePickDir() {
+    if (_tbTarget) { const el = document.getElementById(_tbTarget); if (el) el.value = _tbCwd; }
+    closeToolBrowse();
+  }
 </script>
+
+<div id="tool-browse-modal" onclick="if(event.target===this)closeToolBrowse()">
+  <div id="tool-browse-box">
+    <div id="tool-browse-header">
+      <span style="color:#ffd54f;font-size:0.72rem;">Browse</span>
+      <span id="tool-browse-crumb"></span>
+      <button onclick="closeToolBrowse()" style="background:none;border:none;color:#555;font-size:0.9rem;cursor:pointer;padding:0;">✕</button>
+    </div>
+    <div id="tool-browse-list"></div>
+    <div id="tool-browse-footer">
+      <button onclick="toolBrowsePickDir()" style="background:#1a1a1a;border:1px solid #2a2a2a;color:#90caf9;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Use This Directory</button>
+      <button onclick="closeToolBrowse()" style="background:none;border:1px solid #2a2a2a;color:#555;font-size:0.72rem;padding:4px 10px;border-radius:3px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
