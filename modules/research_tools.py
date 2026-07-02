@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import html as _html
 import re as _re
 import subprocess
@@ -164,6 +165,14 @@ def _results_to_html(query: str, all_results: dict) -> str:
     )
 
 
+async def _fetch(url: str, **kwargs):
+    """Async HTTP GET. Isolated so research_search never blocks the event loop
+    and so tests have a single patch point."""
+    import httpx
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        return await client.get(url, **kwargs)
+
+
 @tool(
     "Search one or more research sites for a query. "
     "sites: comma-separated slugs (e.g. 'google-scholar,arxiv') or 'all' for all registered sites. "
@@ -189,25 +198,22 @@ async def research_search(
     else:
         site_slugs = [s.strip() for s in sites.split(",") if s.strip()]
 
-    all_results: dict = {}
     headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
 
-    for slug in site_slugs:
+    async def _search_one(slug: str) -> tuple[str, object]:
         site = get_site(slug)
         if site is None:
-            all_results[slug] = f"[Unknown site '{slug}']"
-            continue
+            return slug, f"[Unknown site '{slug}']"
 
         site_name = site["name"]
 
         if site["requires_login"] and not has_credentials(slug):
-            all_results[site_name] = (
+            return site_name, (
                 f"[LOGIN REQUIRED — use set_site_credentials('{slug}', username, password) to add credentials]"
             )
-            continue
 
         url = site["search_url"].replace("{query}", encoded)
-        request_kwargs: dict = {"headers": headers, "timeout": 15, "follow_redirects": True}
+        request_kwargs: dict = {"headers": headers, "timeout": 15}
 
         if site["requires_login"]:
             creds = get_credentials(slug)
@@ -215,25 +221,26 @@ async def research_search(
                 request_kwargs["auth"] = (creds["username"], creds["password"])
 
         try:
-            resp = httpx.get(url, **request_kwargs)
+            resp = await _fetch(url, **request_kwargs)
         except httpx.TimeoutException:
-            all_results[site_name] = "[Timeout after 15s]"
-            continue
+            return site_name, "[Timeout after 15s]"
         except Exception as exc:
-            all_results[site_name] = f"[Fetch error: {type(exc).__name__}]"
-            continue
+            return site_name, f"[Fetch error: {type(exc).__name__}]"
 
         if resp.status_code != 200:
             if resp.status_code == 401 and site["requires_login"]:
-                all_results[site_name] = (
-                    f"[HTTP 401 — credentials stored but site requires browser login (Phase 2)]"
-                )
-            else:
-                all_results[site_name] = f"[HTTP {resp.status_code}]"
-            continue
+                return site_name, "[HTTP 401 — credentials stored but site requires browser login (Phase 2)]"
+            return site_name, f"[HTTP {resp.status_code}]"
 
         snippets = _extract_snippets(resp.text)
-        all_results[site_name] = snippets if snippets else [{"title": "(no results parsed)", "url": url, "snippet": ""}]
+        return site_name, (snippets if snippets else [{"title": "(no results parsed)", "url": url, "snippet": ""}])
+
+    # Fetch all sites concurrently — one slow site no longer blocks the rest,
+    # and the event loop is never blocked by a synchronous request.
+    pairs = await asyncio.gather(*[_search_one(slug) for slug in site_slugs])
+    all_results: dict = {}
+    for name, result in pairs:
+        all_results[name] = result
 
     # Build chat output (always)
     chat_lines = []

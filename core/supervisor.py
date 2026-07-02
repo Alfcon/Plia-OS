@@ -177,7 +177,6 @@ _DIRECT_TOOL_KEYWORDS: dict[str, str] = {
     "list research sites": "list_research_sites",
     "show research sites": "list_research_sites",
     "my research sites": "list_research_sites",
-    "research sites": "list_research_sites",
 }
 
 _EMAIL_SEARCH_RE = re.compile(

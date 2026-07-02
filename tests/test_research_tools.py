@@ -165,13 +165,37 @@ async def test_research_search_returns_chat_results():
     with patch("core.research_site_store.list_sites", return_value=mock_sites), \
          patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
          patch("core.credential_store.has_credentials", return_value=False), \
-         patch("httpx.get", return_value=mock_response), \
+         patch("modules.research_tools._fetch", new_callable=AsyncMock, return_value=mock_response), \
          patch("core.events.emit", new_callable=AsyncMock):
         from modules.research_tools import research_search
         result = await research_search("MHD saltwater generators", sites="arxiv", output_formats="chat")
 
     assert "arXiv" in result
     assert "arxiv.org" in result
+
+
+@pytest.mark.asyncio
+async def test_research_search_multiple_sites_gathered():
+    mock_sites = [
+        {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?query={query}", "requires_login": False, "category": "academic", "credential_key": None},
+        {"slug": "loc", "name": "Library of Congress", "url": "https://www.loc.gov/", "search_url": "https://www.loc.gov/search/?q={query}", "requires_login": False, "category": "academic", "credential_key": None},
+    ]
+    by_slug = {s["slug"]: s for s in mock_sites}
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = '<a href="https://example.org/1">A Result Title Here</a> some context text.'
+
+    with patch("core.research_site_store.list_sites", return_value=mock_sites), \
+         patch("core.research_site_store.get_site", side_effect=lambda slug: by_slug.get(slug)), \
+         patch("core.credential_store.has_credentials", return_value=False), \
+         patch("modules.research_tools._fetch", new_callable=AsyncMock, return_value=mock_response) as mock_fetch, \
+         patch("core.events.emit", new_callable=AsyncMock):
+        from modules.research_tools import research_search
+        result = await research_search("q", sites="arxiv,loc", output_formats="chat")
+
+    assert mock_fetch.await_count == 2
+    assert "arXiv" in result
+    assert "Library of Congress" in result
 
 
 @pytest.mark.asyncio
@@ -199,7 +223,7 @@ async def test_research_search_timeout_handled():
     with patch("core.research_site_store.list_sites", return_value=mock_sites), \
          patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
          patch("core.credential_store.has_credentials", return_value=False), \
-         patch("httpx.get", side_effect=httpx.TimeoutException("timeout")), \
+         patch("modules.research_tools._fetch", new_callable=AsyncMock, side_effect=httpx.TimeoutException("timeout")), \
          patch("core.events.emit", new_callable=AsyncMock):
         from modules.research_tools import research_search
         result = await research_search("test", sites="arxiv", output_formats="chat")
@@ -220,7 +244,7 @@ async def test_research_search_http_error_handled():
     with patch("core.research_site_store.list_sites", return_value=mock_sites), \
          patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
          patch("core.credential_store.has_credentials", return_value=False), \
-         patch("httpx.get", return_value=mock_response), \
+         patch("modules.research_tools._fetch", new_callable=AsyncMock, return_value=mock_response), \
          patch("core.events.emit", new_callable=AsyncMock):
         from modules.research_tools import research_search
         result = await research_search("test", sites="arxiv", output_formats="chat")
@@ -243,7 +267,7 @@ async def test_research_search_tts_output_emits_speak():
     with patch("core.research_site_store.list_sites", return_value=mock_sites), \
          patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
          patch("core.credential_store.has_credentials", return_value=False), \
-         patch("httpx.get", return_value=mock_response), \
+         patch("modules.research_tools._fetch", new_callable=AsyncMock, return_value=mock_response), \
          patch("core.events.emit", mock_emit):
         from modules.research_tools import research_search
         await research_search("test query", sites="arxiv", output_formats="chat,tts")
@@ -266,7 +290,7 @@ async def test_research_search_file_output_writes_file(tmp_path):
     with patch("core.research_site_store.list_sites", return_value=mock_sites), \
          patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
          patch("core.credential_store.has_credentials", return_value=False), \
-         patch("httpx.get", return_value=mock_response), \
+         patch("modules.research_tools._fetch", new_callable=AsyncMock, return_value=mock_response), \
          patch("core.events.emit", new_callable=AsyncMock), \
          patch("modules.research_tools._RESEARCH_DIR", tmp_path):
         from modules.research_tools import research_search
@@ -290,7 +314,7 @@ async def test_research_search_browser_output_calls_xdg_open(tmp_path):
     with patch("core.research_site_store.list_sites", return_value=mock_sites), \
          patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
          patch("core.credential_store.has_credentials", return_value=False), \
-         patch("httpx.get", return_value=mock_response), \
+         patch("modules.research_tools._fetch", new_callable=AsyncMock, return_value=mock_response), \
          patch("core.events.emit", new_callable=AsyncMock), \
          patch("subprocess.Popen") as mock_popen, \
          patch("modules.research_tools._RESEARCH_DIR", tmp_path):

@@ -71,6 +71,42 @@ def test_get_credentials_from_keyring(tmp_path):
     assert creds == {"username": "alice", "password": "secret"}
 
 
+def test_get_credentials_transient_keyring_error_does_not_switch_backend(tmp_path):
+    # A transient keyring failure (locked/headless session) must not persist a
+    # backend downgrade — that would hide credentials still stored in the keyring.
+    import keyring.errors
+    cred_file = tmp_path / "credentials.enc"
+    mock_cfg = MagicMock()
+    mock_cfg.credential_backend = "keyring"
+
+    with patch("keyring.get_password", side_effect=keyring.errors.KeyringLocked()), \
+         patch("core.credential_store.get_config", return_value=mock_cfg), \
+         patch("core.credential_store.update_config") as mock_update, \
+         patch("core.credential_store._CRED_FILE", cred_file):
+        from core.credential_store import get_credentials
+        result = get_credentials("jstor")
+
+    mock_update.assert_not_called()
+    assert result is None
+
+
+def test_remove_credentials_transient_keyring_error_does_not_switch_backend(tmp_path):
+    import keyring.errors
+    cred_file = tmp_path / "credentials.enc"
+    mock_cfg = MagicMock()
+    mock_cfg.credential_backend = "keyring"
+
+    with patch("keyring.get_password", side_effect=keyring.errors.KeyringLocked()), \
+         patch("core.credential_store.get_config", return_value=mock_cfg), \
+         patch("core.credential_store.update_config") as mock_update, \
+         patch("core.credential_store._CRED_FILE", cred_file):
+        from core.credential_store import remove_credentials
+        result = remove_credentials("jstor")
+
+    mock_update.assert_not_called()
+    assert result is False
+
+
 def test_get_credentials_returns_none_when_not_found(tmp_path):
     cred_file = tmp_path / "credentials.enc"
     mock_cfg = MagicMock()
