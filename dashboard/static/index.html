@@ -5061,8 +5061,9 @@
         input = `<input id="${id}" type="text" placeholder="${_esc(def.description || def.type || 'string')}" style="${style}">`;
       }
       const isPath = /path|_file$|^file$|directory|^source$|^destination$/i.test(name);
+      const pathStyle = style.replace('width:100%;', 'flex:1;min-width:0;');
       const inputWrap = isPath
-        ? `<div style="display:flex;gap:4px;">${input.replace(style, style + 'flex:1;')}<button onclick="openToolBrowse('${id}')" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;color:#90caf9;font-size:0.6rem;padding:1px 5px;cursor:pointer;white-space:nowrap;flex-shrink:0;">…</button></div>`
+        ? `<div style="display:flex;gap:4px;">${input.replace(style, pathStyle)}<button onclick="openToolBrowse('${id}')" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;color:#90caf9;font-size:0.68rem;padding:3px 8px;cursor:pointer;white-space:nowrap;flex-shrink:0;"> Browse </button></div>`
         : input;
       return `<div style="margin-bottom:4px;">${label}${inputWrap}</div>`;
     }).join('');
