@@ -117,3 +117,100 @@ async def run_agent(name: str, message: str) -> str:
                 "content": str(result),
             })
     return "Agent reached tool call limit without a final response."
+
+
+@tool(
+    "Create a new custom agent. "
+    "name: slug (lowercase letters, digits, hyphens only — e.g. 'mhd-research'). "
+    "system_prompt: the agent's instructions. "
+    "display_name: friendly label shown in lists (defaults to name). "
+    "description: what this agent does, shown in list_custom_agents. "
+    "tool_names: comma-separated tool names the agent may call (e.g. 'research_search,scrape_url'). "
+    "keywords: comma-separated phrases that trigger this agent automatically (e.g. 'mhd,saltwater')."
+)
+def create_agent(
+    name: str,
+    system_prompt: str,
+    display_name: str = "",
+    description: str = "",
+    tool_names: str = "",
+    keywords: str = "",
+) -> str:
+    import re
+    from core.agent_store import AgentDef
+    from core.agent_store import save_agent as _save, get_agent as _get
+    from core.supervisor import _reload_custom_agents
+
+    if not re.match(r"^[a-z0-9-]+$", name):
+        return "Name must be lowercase letters, digits, and hyphens only."
+    if _get(name) is not None:
+        return f"Agent '{name}' already exists. Use edit_agent to update it."
+
+    tools_list = [t.strip() for t in tool_names.split(",") if t.strip()] if tool_names else []
+    kw_list = [k.strip() for k in keywords.split(",") if k.strip()] if keywords else []
+
+    defn = AgentDef(
+        name=name,
+        display_name=display_name or name,
+        system_prompt=system_prompt,
+        tool_names=tools_list,
+        keywords=kw_list,
+        llm_description=description,
+    )
+    try:
+        _save(defn)
+    except ValueError as exc:
+        return str(exc)
+    _reload_custom_agents()
+    return f"Agent '{name}' created."
+
+
+@tool(
+    "Edit an existing custom agent. Only non-empty fields are updated — omit a field to keep the current value. "
+    "name: the agent's slug (cannot be changed). "
+    "system_prompt: replace the agent's instructions. "
+    "display_name: replace the friendly label. "
+    "description: replace the description shown in list_custom_agents. "
+    "tool_names: comma-separated — replaces the full list. "
+    "keywords: comma-separated — replaces the full list."
+)
+def edit_agent(
+    name: str,
+    display_name: str = "",
+    description: str = "",
+    system_prompt: str = "",
+    tool_names: str = "",
+    keywords: str = "",
+) -> str:
+    from core.agent_store import get_agent as _get, save_agent as _save
+    from core.supervisor import _reload_custom_agents
+
+    defn = _get(name)
+    if defn is None:
+        return f"No agent named '{name}'."
+
+    if display_name:
+        defn.display_name = display_name
+    if description:
+        defn.llm_description = description
+    if system_prompt:
+        defn.system_prompt = system_prompt
+    if tool_names:
+        defn.tool_names = [t.strip() for t in tool_names.split(",") if t.strip()]
+    if keywords:
+        defn.keywords = [k.strip() for k in keywords.split(",") if k.strip()]
+
+    _save(defn)
+    _reload_custom_agents()
+    return f"Agent '{name}' updated."
+
+
+@tool("Delete a custom agent by its slug name.")
+def delete_agent(name: str) -> str:
+    from core.agent_store import delete_agent as _delete
+    from core.supervisor import _reload_custom_agents
+
+    if not _delete(name):
+        return f"No agent named '{name}'."
+    _reload_custom_agents()
+    return f"Agent '{name}' deleted."
