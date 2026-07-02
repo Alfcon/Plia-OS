@@ -5048,7 +5048,9 @@
     return params.map(([name, def]) => {
       const id = `tool-param-${_esc(t.name)}-${_esc(name)}`;
       const label = `<label style="color:#888;font-size:0.68rem;display:block;">${_esc(name)}${req.has(name) ? ' <span style="color:#ef9a9a">*</span>' : ''}</label>`;
-      const style = 'width:100%;background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:3px 5px;font-size:0.72rem;box-sizing:border-box;';
+      const isPath = /path|_file$|^file$|directory|^source$|^destination$/i.test(name);
+      const baseStyle = 'background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:3px 5px;font-size:0.72rem;box-sizing:border-box;';
+      const style = (isPath ? 'flex:1;min-width:0;' : 'width:100%;') + baseStyle;
       let input;
       if (def.type === 'boolean') {
         input = `<select id="${id}" style="${style}"><option value="">— (default)</option><option value="true">true</option><option value="false">false</option></select>`;
@@ -5060,10 +5062,8 @@
       } else {
         input = `<input id="${id}" type="text" placeholder="${_esc(def.description || def.type || 'string')}" style="${style}">`;
       }
-      const isPath = /path|_file$|^file$|directory|^source$|^destination$/i.test(name);
-      const pathStyle = style.replace('width:100%;', 'flex:1;min-width:0;');
       const inputWrap = isPath
-        ? `<div style="display:flex;gap:4px;">${input.replace(style, pathStyle)}<button onclick="openToolBrowse('${id}')" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;color:#90caf9;font-size:0.68rem;padding:3px 8px;cursor:pointer;white-space:nowrap;flex-shrink:0;"> Browse </button></div>`
+        ? `<div style="display:flex;gap:4px;align-items:center;">${input}<button onclick="openToolBrowse('${id}')" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;color:#90caf9;font-size:0.68rem;padding:3px 8px;cursor:pointer;white-space:nowrap;flex-shrink:0;"> Browse </button></div>`
         : input;
       return `<div style="margin-bottom:4px;">${label}${inputWrap}</div>`;
     }).join('');
