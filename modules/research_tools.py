@@ -75,7 +75,9 @@ def set_site_credentials(site_slug: str, username: str, password: str) -> str:
     if site is None:
         return f"No site with slug '{site_slug}' found. Run list_research_sites to see available sites."
     result = set_credentials(site_slug, username, password)
-    set_credential_key(site_slug, "plia-research")
+    # Record the key credentials are actually stored under (the slug), not the
+    # keyring service name — the store retrieves by slug.
+    set_credential_key(site_slug, site_slug)
     return f"{result} Credentials for '{site_slug}' ({site['name']}) are ready."
 
 
