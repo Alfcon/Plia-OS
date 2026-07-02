@@ -5012,7 +5012,7 @@
           </button>
           <div id="tool-form-${_esc(t.name)}" style="display:none;padding:6px 14px 10px 22px;background:#0d0d0d;">
             ${buildToolForm(t)}
-            <button onclick="runTool('${_esc(t.name)}')"
+            <button onclick="runPanelTool('${_esc(t.name)}')"
               style="margin-top:6px;background:#1565c0;border:none;color:#eee;padding:4px 12px;border-radius:3px;font-size:0.73rem;cursor:pointer;width:100%;">
               ▶ Run
             </button>
@@ -5075,7 +5075,7 @@
     ch.textContent = open ? '▶' : '▼';
   }
 
-  async function runTool(name) {
+  async function runPanelTool(name) {
     const t = _toolSchemas.find(t => t.name === name);
     const params = {};
     if (t && t.schema && t.schema.parameters && t.schema.parameters.properties) {
