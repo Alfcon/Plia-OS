@@ -5062,7 +5062,7 @@
       }
       const isPath = /path|_file$|^file$|directory|^source$|^destination$/i.test(name);
       const inputWrap = isPath
-        ? `<div style="display:flex;gap:4px;">${input.replace(style, style + 'flex:1;')}<button onclick="openToolBrowse('${id}')" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;color:#90caf9;font-size:0.68rem;padding:2px 7px;cursor:pointer;white-space:nowrap;flex-shrink:0;">Browse</button></div>`
+        ? `<div style="display:flex;gap:4px;">${input.replace(style, style + 'flex:1;')}<button onclick="openToolBrowse('${id}')" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;color:#90caf9;font-size:0.6rem;padding:1px 5px;cursor:pointer;white-space:nowrap;flex-shrink:0;">…</button></div>`
         : input;
       return `<div style="margin-bottom:4px;">${label}${inputWrap}</div>`;
     }).join('');
