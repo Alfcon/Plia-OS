@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -15,8 +16,6 @@ _SITES_FILE = Path(
         ),
     )
 )
-
-_SLUG_RE_STR = r"^[a-z0-9-]+$"
 
 
 def _default_sites() -> dict:
@@ -139,7 +138,8 @@ def _default_sites() -> dict:
 def _load() -> dict:
     try:
         return json.loads(_SITES_FILE.read_text())
-    except Exception:
+    except Exception as e:
+        logging.warning(f"Failed to load research sites from {_SITES_FILE}: {e}")
         return _default_sites()
 
 
@@ -189,8 +189,10 @@ def remove_site(slug: str) -> bool:
     return True
 
 
-def set_credential_key(slug: str, key: str) -> None:
+def set_credential_key(slug: str, key: str) -> bool:
     data = _load()
-    if slug in data:
-        data[slug]["credential_key"] = key
-        _save(data)
+    if slug not in data:
+        return False
+    data[slug]["credential_key"] = key
+    _save(data)
+    return True

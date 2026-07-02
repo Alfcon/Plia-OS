@@ -1,12 +1,6 @@
 import json
-import pytest
 from pathlib import Path
 from unittest.mock import patch
-
-
-def _make_store(tmp_path):
-    sites_file = tmp_path / "research_sites.json"
-    return sites_file
 
 
 def test_list_sites_returns_defaults(tmp_path):
@@ -78,9 +72,18 @@ def test_set_credential_key_updates_site(tmp_path):
     sites_file = tmp_path / "research_sites.json"
     with patch("core.research_site_store._SITES_FILE", sites_file):
         from core.research_site_store import set_credential_key, get_site
-        set_credential_key("jstor", "plia-research")
+        result = set_credential_key("jstor", "plia-research")
         site = get_site("jstor")
+    assert result is True
     assert site["credential_key"] == "plia-research"
+
+
+def test_set_credential_key_returns_false_for_missing_slug(tmp_path):
+    sites_file = tmp_path / "research_sites.json"
+    with patch("core.research_site_store._SITES_FILE", sites_file):
+        from core.research_site_store import set_credential_key
+        result = set_credential_key("no-such-site", "key")
+    assert result is False
 
 
 def test_list_sites_includes_slug_field(tmp_path):
