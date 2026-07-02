@@ -5034,7 +5034,7 @@
     const params = t.schema && t.schema.parameters && t.schema.parameters.properties
       ? Object.entries(t.schema.parameters.properties)
       : [];
-    if (!params.length) return '<div style="color:#555;font-size:0.7rem;margin-bottom:2px;">No parameters</div>';
+    if (!params.length) return '';
     const req = new Set((t.schema.parameters.required || []));
     return params.map(([name, def]) => {
       const id = `tool-param-${_esc(t.name)}-${_esc(name)}`;
@@ -5167,7 +5167,7 @@
             <span style="color:#555;">${_esc(typ)}</span>
             ${def.description ? `<span style="color:#888;">— ${_esc(def.description)}</span>` : ''}
           </div>`;
-        }).join('') : '<div style="color:#555;font-size:0.72rem;">No parameters</div>';
+        }).join('') : '';
         return `<div style="border-bottom:1px solid #111;">
           <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.tref-chv').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼';"
             style="width:100%;background:none;border:none;padding:6px 14px 6px 18px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
@@ -9040,7 +9040,7 @@
       container.appendChild(row);
     });
     if (!Object.keys(props).length) {
-      container.innerHTML = '<div style="font-size:0.68rem;color:#444;padding:4px 0;">No parameters</div>';
+      container.innerHTML = '';
     }
   }
 
