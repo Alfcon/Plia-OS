@@ -138,8 +138,10 @@ def _default_sites() -> dict:
 def _load() -> dict:
     try:
         return json.loads(_SITES_FILE.read_text())
+    except FileNotFoundError:
+        return _default_sites()
     except Exception as e:
-        logging.warning(f"Failed to load research sites from {_SITES_FILE}: {e}")
+        logging.warning("Failed to load research sites from %s: %s", _SITES_FILE, e)
         return _default_sites()
 
 
