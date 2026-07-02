@@ -312,9 +312,9 @@ async def test_research_search_tts_output_emits_speak():
 @pytest.mark.asyncio
 async def test_research_search_file_output_writes_file(tmp_path):
     mock_sites = [
-        {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?query={query}", "requires_login": False, "category": "academic", "credential_key": None},
+        {"slug": "google", "name": "Google", "url": "https://google.com/", "search_url": "https://google.com/search?q={query}", "requires_login": False, "category": "general", "credential_key": None},
     ]
-    fake_html = '<a href="https://arxiv.org/abs/001">Paper Title Extended</a> Abstract text here.'
+    fake_html = '<a href="https://example.com/abs/001">Paper Title Extended</a> Abstract text here.'
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.text = fake_html
@@ -326,7 +326,7 @@ async def test_research_search_file_output_writes_file(tmp_path):
          patch("core.events.emit", new_callable=AsyncMock), \
          patch("modules.research_tools._RESEARCH_DIR", tmp_path):
         from modules.research_tools import research_search
-        result = await research_search("paper topic", sites="arxiv", output_formats="chat,file")
+        result = await research_search("paper topic", sites="google", output_formats="chat,file")
 
     written = list(tmp_path.glob("*.md"))
     assert len(written) == 1
@@ -356,3 +356,52 @@ async def test_research_search_browser_output_calls_xdg_open(tmp_path):
     assert mock_popen.called
     args = mock_popen.call_args[0][0]
     assert args[0] == "xdg-open"
+
+
+def test_parse_arxiv_extracts_results():
+    from modules.research_tools import _parse_arxiv
+    html = (
+        '<li class="arxiv-result">'
+        '<p class="list-title is-inline-block"><a href="/abs/2301.00001">arXiv:2301.00001</a></p>'
+        '<p class="title is-5 mathjax">Magnetohydrodynamic Power from Seawater</p>'
+        '<span class="abstract-full">We study MHD generators driven by saltwater flow.</span>'
+        '</li>'
+    )
+    out = _parse_arxiv(html, "https://arxiv.org/search/?q=mhd")
+    assert len(out) == 1
+    assert out[0]["title"] == "Magnetohydrodynamic Power from Seawater"
+    assert out[0]["url"] == "https://arxiv.org/abs/2301.00001"
+    assert "saltwater" in out[0]["snippet"]
+
+
+def test_parse_arxiv_malformed_returns_empty():
+    from modules.research_tools import _parse_arxiv
+    assert _parse_arxiv("<html>no results here</html>", "https://arxiv.org/") == []
+
+
+@pytest.mark.asyncio
+async def test_research_search_uses_arxiv_parser():
+    mock_sites = [
+        {"slug": "arxiv", "name": "arXiv", "url": "https://arxiv.org/", "search_url": "https://arxiv.org/search/?query={query}", "requires_login": False, "category": "academic", "credential_key": None},
+    ]
+    html = (
+        '<li class="arxiv-result">'
+        '<p class="list-title"><a href="/abs/9.9">arXiv:9.9</a></p>'
+        '<p class="title is-5 mathjax">Deep Result From Arxiv Parser</p>'
+        '<span class="abstract-full">body text</span>'
+        '</li>'
+    )
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = html
+
+    with patch("core.research_site_store.list_sites", return_value=mock_sites), \
+         patch("core.research_site_store.get_site", return_value=mock_sites[0]), \
+         patch("core.credential_store.has_credentials", return_value=False), \
+         patch("modules.research_tools._fetch", new_callable=AsyncMock, return_value=mock_response), \
+         patch("core.events.emit", new_callable=AsyncMock):
+        from modules.research_tools import research_search
+        result = await research_search("q", sites="arxiv", output_formats="chat")
+
+    assert "Deep Result From Arxiv Parser" in result
+    assert "arxiv.org/abs/9.9" in result

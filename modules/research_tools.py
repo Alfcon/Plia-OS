@@ -146,6 +146,30 @@ def _extract_snippets(html: str, base_url: str, max_results: int = 10) -> list[d
     return results
 
 
+def _parse_arxiv(html: str, base_url: str) -> list[dict]:
+    from urllib.parse import urljoin
+    results: list[dict] = []
+    for block in _re.findall(r'<li class="arxiv-result">(.*?)</li>', html, _re.DOTALL | _re.IGNORECASE):
+        m_url = _re.search(r'<a href="([^"]*?/abs/[^"]*)"', block, _re.IGNORECASE)
+        m_title = _re.search(r'<p class="title[^"]*">(.*?)</p>', block, _re.DOTALL | _re.IGNORECASE)
+        if not m_url or not m_title:
+            continue
+        title = _re.sub(r"<[^>]+>", "", m_title.group(1))
+        title = _re.sub(r"\s+", " ", title).strip()
+        snippet = ""
+        m_abs = _re.search(r'<span class="abstract-full[^"]*">(.*?)</span>', block, _re.DOTALL | _re.IGNORECASE)
+        if m_abs:
+            snippet = _re.sub(r"<[^>]+>", " ", m_abs.group(1))
+            snippet = _re.sub(r"\s+", " ", snippet).strip()[:200]
+        results.append({"title": title, "url": urljoin(base_url, m_url.group(1)), "snippet": snippet})
+    return results
+
+
+_SITE_PARSERS = {
+    "arxiv": _parse_arxiv,
+}
+
+
 def _query_slug(query: str) -> str:
     return _re.sub(r"[^a-z0-9]+", "-", query.lower()).strip("-")[:50]
 
@@ -256,7 +280,8 @@ async def research_search(
                 return site_name, "[HTTP 401 — credentials stored but site requires browser login (Phase 2)]"
             return site_name, f"[HTTP {resp.status_code}]"
 
-        snippets = _extract_snippets(resp.text, url)
+        parser = _SITE_PARSERS.get(slug)
+        snippets = parser(resp.text, url) if parser else _extract_snippets(resp.text, url)
         return site_name, (snippets if snippets else [{"title": "(no results parsed)", "url": url, "snippet": ""}])
 
     # Fetch all sites concurrently — one slow site no longer blocks the rest,
