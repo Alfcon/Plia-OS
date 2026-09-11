@@ -12,9 +12,10 @@ A local AI voice assistant with a web dashboard and a multi-agent backend.
 
 ## Requirements
 
-- Python 3.11, 3.12, or 3.13 — **not 3.14.** The pinned `torch==2.6.0` / `torchaudio==2.6.0` /
-  `torchvision==0.21.0` wheels are only built for CPython 3.9–3.13, so `pip install -r
-  requirements.txt` cannot resolve on 3.14.
+- Python 3.11 or 3.12 — **not 3.13 or 3.14.** The pinned `numpy==1.26.4` ships wheels only for
+  CPython 3.9–3.12 (NumPy added 3.13 support in 2.1), and the pinned `torch==2.6.0` /
+  `torchaudio==2.6.0` / `torchvision==0.21.0` wheels only go up to CPython 3.13. So on 3.13
+  `pip install -r requirements.txt` fails at numpy, and on 3.14 it fails at both.
 - [Ollama](https://ollama.com) running locally with a model loaded (default: `llama3.2`)
 - A microphone
 

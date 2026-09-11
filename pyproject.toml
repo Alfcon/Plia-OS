@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "plia-os"
 version = "0.1.0"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<3.13"
 description = "A local-first AI voice assistant with a web dashboard and a multi-agent backend"
 license = "MIT"
 license-files = ["LICENSE"]
