@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+*.egg-info/
+.env
+*.wav
+*.mp3
+data/
+.superpowers/
+uploads/
+src/
+
+# Internal working notes — not published
+report.md
+CLAUDE.md
+docs/

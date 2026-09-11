@@ -1,0 +1,293 @@
+import pytest
+import asyncio
+import json
+import threading
+import numpy as np
+from unittest.mock import patch, MagicMock
+from httpx import AsyncClient, ASGITransport
+from fastapi import FastAPI
+from core.registry import tool
+from core import events
+from core.config import reset_config as _reset_config
+from dashboard.server import router
+from dashboard import server as dashboard_server
+
+
+@pytest.fixture
+def app():
+    a = FastAPI()
+    a.include_router(router)
+    return a
+
+
+@pytest.fixture(autouse=True)
+def reset_cfg():
+    yield
+    _reset_config()
+
+
+@pytest.fixture(autouse=True)
+def reset_recorder():
+    yield
+    dashboard_server._recorder._stop_event.set()
+    if dashboard_server._recorder.thread:
+        dashboard_server._recorder.thread.join(timeout=1.0)
+    dashboard_server._recorder.active = False
+    dashboard_server._recorder.thread = None
+    dashboard_server._recorder.chunks = []
+    dashboard_server._recorder._stop_event.clear()
+
+
+def _make_mock_sd():
+    """Return a mock sounddevice module whose InputStream is a no-op context manager."""
+    mock_sd = MagicMock()
+    cm = MagicMock()
+    cm.__enter__ = MagicMock(return_value=cm)
+    cm.__exit__ = MagicMock(return_value=False)
+    mock_sd.InputStream.return_value = cm
+    return mock_sd
+
+
+async def test_research_sites_endpoint(app):
+    fake = [{"slug": "arxiv", "name": "arXiv"}, {"slug": "acm", "name": "ACM"}]
+    with patch("core.research_site_store.list_sites", return_value=fake):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.get("/api/research/sites")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sites"] == fake
+
+
+async def test_model_tags_endpoint(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/models/tags")
+    assert resp.status_code == 200
+    tags = resp.json()["tags"]
+    assert isinstance(tags, list) and tags == sorted(set(tags))
+
+
+async def test_get_tools(app):
+    @tool(description="test tool")
+    def my_tool() -> str:
+        return "ok"
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/tools")
+    assert resp.status_code == 200
+    data = resp.json()
+    names = [t["name"] for t in data["tools"]]
+    assert "my_tool" in names
+    entry = next(t for t in data["tools"] if t["name"] == "my_tool")
+    assert entry["description"] == "test tool"
+
+
+async def test_get_config(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/config")
+    assert resp.status_code == 200
+    assert resp.json()["ollama_model"] == "llama3.2"
+
+
+async def test_post_config_updates_value(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/config", json={"ollama_model": "mistral"})
+    assert resp.status_code == 200
+    assert resp.json()["ollama_model"] == "mistral"
+
+
+async def test_post_config_unknown_key_returns_422(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/config", json={"nonexistent_key": "value"})
+    assert resp.status_code == 422
+
+
+async def test_post_config_invalid_literal_tts_engine_returns_422(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/config", json={"tts_engine": "invalid_engine"})
+    assert resp.status_code == 422
+
+
+async def test_post_config_valid_literal_tts_engine_accepted(app):
+    for engine in ("kokoro", "chatterbox", "dramabox"):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post("/api/config", json={"tts_engine": engine})
+        assert resp.status_code == 200, f"expected 200 for tts_engine={engine!r}"
+        assert resp.json()["tts_engine"] == engine
+
+
+async def test_post_config_invalid_stt_model_size_returns_422(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/config", json={"stt_model_size": "huge"})
+    assert resp.status_code == 422
+
+
+async def test_post_config_system_prompt_backup_silently_ignored(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/config", json={"system_prompt_backup": "injected"})
+    assert resp.status_code == 200
+    assert resp.json().get("system_prompt_backup", "") == ""
+
+
+async def test_start_recording_returns_200(app):
+    with patch("dashboard.server.sd", _make_mock_sd()):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post("/api/start-recording")
+    assert resp.status_code == 200
+    assert resp.json() == {"recording": True}
+    assert dashboard_server._recorder.active is True
+
+
+async def test_start_recording_while_active_returns_409(app):
+    dashboard_server._recorder.active = True
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/start-recording")
+    assert resp.status_code == 409
+
+
+async def test_stop_recording_saves_wav_and_updates_config(app, tmp_path):
+    chunk = np.zeros((1600, 1), dtype=np.int16)
+    dashboard_server._recorder.active = True
+    dashboard_server._recorder.chunks = [chunk, chunk]
+    dashboard_server._recorder.thread = None
+
+    with patch.object(dashboard_server, "UPLOADS_DIR", tmp_path):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post("/api/stop-recording")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["filename"].startswith("recording_")
+    assert data["filename"].endswith(".wav")
+    assert (tmp_path / data["filename"]).exists()
+    from core.config import get_config
+    assert get_config().chatterbox_reference_audio == data["path"]
+
+
+async def test_stop_recording_when_idle_returns_409(app):
+    dashboard_server._recorder.active = False
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/stop-recording")
+    assert resp.status_code == 409
+
+
+async def test_list_reminders_returns_pending(app):
+    mock_store = MagicMock()
+    mock_store.list_pending.return_value = [
+        {"id": 1, "message": "Buy milk", "fire_at": "2026-06-13T12:00:00+00:00"},
+    ]
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.get("/api/reminders")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["message"] == "Buy milk"
+
+
+async def test_list_reminders_empty(app):
+    mock_store = MagicMock()
+    mock_store.list_pending.return_value = []
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.get("/api/reminders")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+async def test_cancel_reminder_marks_done(app):
+    mock_store = MagicMock()
+    with patch("agents.memory_store.get_memory_store", return_value=mock_store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.delete("/api/reminders/42")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == 42
+    mock_store.mark_reminder_done.assert_called_once_with(42)
+
+
+@pytest.mark.asyncio
+async def test_rate_thumbs_up_creates_positive_exemplar(app):
+    store = MagicMock()
+    pair = ({"id": 1, "role": "user", "content": "what's the time"},
+            {"id": 2, "role": "assistant", "content": "3pm."})
+    with patch("agents.adaptation.get_adaptation_store", return_value=store), \
+         patch("agents.chat_history.get_message_pair", return_value=pair):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            r = await c.post("/api/adaptation/rate", json={"message_id": 2, "rating": 1})
+    assert r.status_code == 200
+    store.add_style_exemplar.assert_called_once_with("what's the time", "3pm.", 1, "thumb")
+
+
+@pytest.mark.asyncio
+async def test_rate_thumbs_down_stores_negative(app):
+    store = MagicMock()
+    pair = ({"id": 1, "role": "user", "content": "q"},
+            {"id": 2, "role": "assistant", "content": "bad answer"})
+    with patch("agents.adaptation.get_adaptation_store", return_value=store), \
+         patch("agents.chat_history.get_message_pair", return_value=pair):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            r = await c.post("/api/adaptation/rate", json={"message_id": 2, "rating": -1})
+    assert r.status_code == 200
+    store.add_style_exemplar.assert_called_once_with("q", "bad answer", -1, "thumb")
+
+
+@pytest.mark.asyncio
+async def test_rate_unknown_message_404(app):
+    store = MagicMock()
+    with patch("agents.adaptation.get_adaptation_store", return_value=store), \
+         patch("agents.chat_history.get_message_pair", return_value=None):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            r = await c.post("/api/adaptation/rate", json={"message_id": 999, "rating": 1})
+    assert r.status_code == 404
+    store.add_style_exemplar.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_rate_invalid_rating_422(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        r = await c.post("/api/adaptation/rate", json={"message_id": 1, "rating": 5})
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_list_exemplars_endpoint(app):
+    store = MagicMock()
+    store.list_exemplars.return_value = [
+        {"id": 1, "utterance": "u", "intent": "home", "response": None,
+         "rating": 1, "source": "chat", "ts": "2026-07-15T00:00:00+00:00"}
+    ]
+    with patch("agents.adaptation.get_adaptation_store", return_value=store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            r = await c.get("/api/adaptation/exemplars")
+    assert r.status_code == 200
+    assert r.json()["exemplars"][0]["intent"] == "home"
+
+
+@pytest.mark.asyncio
+async def test_delete_exemplar_endpoint(app):
+    store = MagicMock()
+    store.delete_exemplar.return_value = True
+    with patch("agents.adaptation.get_adaptation_store", return_value=store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            r = await c.delete("/api/adaptation/exemplars/7")
+    assert r.status_code == 200
+    store.delete_exemplar.assert_called_once_with(7)
+
+
+@pytest.mark.asyncio
+async def test_delete_missing_exemplar_404(app):
+    store = MagicMock()
+    store.delete_exemplar.return_value = False
+    with patch("agents.adaptation.get_adaptation_store", return_value=store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            r = await c.delete("/api/adaptation/exemplars/7")
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_clear_exemplars_endpoint(app):
+    store = MagicMock()
+    with patch("agents.adaptation.get_adaptation_store", return_value=store):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            r = await c.delete("/api/adaptation/exemplars")
+    assert r.status_code == 200
+    store.clear.assert_called_once()

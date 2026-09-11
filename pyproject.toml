@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "plia-os"
+version = "0.1.0"
+requires-python = ">=3.11,<3.14"
+description = "A local-first AI voice assistant with a web dashboard and a multi-agent backend"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "httpx>=0.27",
+    "sounddevice>=0.5",
+    "numpy>=1.26",
+    "openwakeword>=0.4",
+    "faster-whisper>=1.0",
+    "kokoro>=0.9",
+    "chatterbox-tts>=0.1",
+    "scipy>=1.13",
+    "langgraph>=0.2",
+    "chromadb>=0.4",
+    "ollama>=0.4",
+    "ddgs>=0.1",
+    "icalendar>=5.0",
+    "psutil>=5.9",
+    "keyring>=25.0",
+    "cryptography>=42.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+]
+dramabox = [
+    "accelerate>=0.25.0",
+    "bitsandbytes>=0.45.0",
+    "peft>=0.7.0",
+    "av>=12.0.0",
+    "einops>=0.7.0",
+    "sentencepiece>=0.1.99",
+    "resemble-perth @ git+https://github.com/resemble-ai/Perth.git@master",
+]
+fallback-openai = ["openai>=1.0"]
+fallback-anthropic = ["anthropic>=0.25"]
+playwright = ["playwright>=1.40"]
+airllm = ["airllm>=2.9", "torch>=2.0", "transformers>=4.40", "bitsandbytes>=0.43"]
+mcp = ["mcp>=1.0"]
+tor = ["stem>=1.8"]
+observer = ["pytesseract", "evdev", "mss"]
+tray = ["pystray>=0.19", "pillow>=10.0"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["core", "voice", "modules", "dashboard"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
