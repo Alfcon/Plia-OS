@@ -182,6 +182,44 @@ Background loop (configurable interval) that monitors memory, reminders, observe
 
 Layer-by-layer inference for large models (~4 GB VRAM for 70B+). Configure from ☰ Menu → LLM → AirLLM: pick a HuggingFace model ID (autocomplete with 15 popular models), select compression (4bit/8bit/none), see live VRAM estimate, and apply. Unload button frees VRAM on demand.
 
+## WiFi Dongle Switching
+
+Tools for switching between the internal WiFi card and a USB WiFi dongle — useful for isolating driver-related system freezes (run for days on the dongle with the internal driver disabled). Run them from 🔧 Tools → Network → WiFi, by voice/chat, or via `POST /api/tools/run`.
+
+| Tool | What it does | sudo grant |
+|------|--------------|------------|
+| `enable_wifi_dongle` | Marks the USB dongle managed, turns on autoconnect, brings it up | no |
+| `disable_wifi_dongle` | Disconnects the dongle and turns off autoconnect | no |
+| `internal_wifi_status` | Reports whether `iwlwifi` is blacklisted and currently loaded | no |
+| `disable_internal_wifi` | Blacklists the internal driver (`iwlwifi`/`iwlmvm`) and rebuilds the initramfs so it never loads — **takes effect on reboot** | yes |
+| `enable_internal_wifi` | Removes the blacklist, rebuilds the initramfs, and loads `iwlwifi` again | yes |
+
+The dongle is auto-detected as the USB WiFi interface (a `wlx…` device); pass an explicit `interface` only if you have more than one.
+
+**Two ways to disable the internal card:**
+
+- **Quick** — `disable_wifi_dongle` / `enable_wifi_dongle` toggle NetworkManager's use of a device without touching drivers. Instantly reversible, no reboot. Not sufficient for driver freeze testing (the driver stays loaded).
+- **Full** — `disable_internal_wifi` blacklists the driver so it never loads. Required for freeze testing. Needs a reboot to take effect; `enable_internal_wifi` reverses it.
+
+**Permission grant (full method only).** `disable_internal_wifi` / `enable_internal_wifi` run `sudo` (`tee`/`rm`/`update-initramfs`/`modprobe`), so they're gated behind the **Internal WiFi Blacklist** permission group. Enable it in ☰ Menu → Permissions (set both tools to Admin), then run the one-time grant command it shows to create `/etc/sudoers.d/plia-iwlwifi`. Revoke with `sudo rm /etc/sudoers.d/plia-iwlwifi`.
+
+**Make the dongle reboot-ready.** Give the dongle its own saved NetworkManager profile so it can connect once the internal card is blacklisted:
+
+```bash
+nmcli connection add type wifi ifname <dongle-iface> con-name "Dongle <SSID>" ssid "<SSID>" \
+  -- wifi-sec.key-mgmt wpa-psk wifi-sec.psk "<password>" connection.autoconnect yes
+```
+
+Use `connection.autoconnect no` for manual connect — this avoids the dongle and the internal card both joining the network on a normal reboot. Bring it up on demand with `nmcli connection up "Dongle <SSID>"` (the password is saved, so no prompt).
+
+**Full switch to the dongle:**
+
+1. Ensure the dongle has a saved profile (above) and is plugged in.
+2. Run `disable_internal_wifi`.
+3. Reboot. The internal `iwlwifi` won't load; the dongle connects (automatically if its profile autoconnects, otherwise `nmcli connection up "Dongle <SSID>"`).
+
+**Switch back:** run `enable_internal_wifi`, then reboot (or it loads on the next boot once the blacklist is gone).
+
 ## Configuration
 
 All config in `core/config.py` as a `PliaConfig` dataclass, persisted to `~/.plia/config.json`. Key settings:
@@ -402,4 +440,4 @@ pytest --tb=short -q          # terse output
 pytest tests/test_foo.py -v   # single file
 ```
 
-2421 tests, all passing.
+2437 tests, all passing.
