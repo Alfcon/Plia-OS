@@ -168,3 +168,72 @@ def test_restore_mac_no_original_returns_error_without_ip_call():
          patch("modules.network_tools.get_memory_store", return_value=mock_store):
         result = restore_mac("")
     assert "no original" in result.lower()
+
+
+# --- USB WiFi dongle enable/disable ---
+from modules.network_tools import (
+    enable_wifi_dongle,
+    disable_wifi_dongle,
+    _detect_dongle,
+)
+
+
+def test_detect_dongle_picks_usb_wifi():
+    with patch("modules.network_tools._wifi_device_names", return_value=["wlp0s20f3", "wlx8c882b000d0f"]), \
+         patch("modules.network_tools._is_usb_iface", side_effect=lambda n: n.startswith("wlx")):
+        assert _detect_dongle() == "wlx8c882b000d0f"
+
+
+def test_detect_dongle_explicit_interface_bypasses_detection():
+    # explicit name is returned without touching sysfs/nmcli
+    with patch("modules.network_tools._wifi_device_names") as m:
+        assert _detect_dongle("wlxABC") == "wlxABC"
+        m.assert_not_called()
+
+
+def test_detect_dongle_none_present_raises():
+    with patch("modules.network_tools._wifi_device_names", return_value=["wlp0s20f3"]), \
+         patch("modules.network_tools._is_usb_iface", return_value=False):
+        with pytest.raises(ValueError, match="No USB WiFi dongle"):
+            _detect_dongle()
+
+
+def test_detect_dongle_multiple_usb_raises():
+    with patch("modules.network_tools._wifi_device_names", return_value=["wlx111", "wlx222"]), \
+         patch("modules.network_tools._is_usb_iface", return_value=True):
+        with pytest.raises(ValueError, match="Multiple USB WiFi"):
+            _detect_dongle()
+
+
+def test_disable_wifi_dongle_disconnects_and_sets_autoconnect():
+    with patch("subprocess.run", side_effect=[_run_ok(), _run_ok()]) as mock_run:
+        out = disable_wifi_dongle("wlx8c882b000d0f")
+    assert "disabled" in out.lower()
+    assert mock_run.call_args_list[0].args[0] == ["nmcli", "device", "disconnect", "wlx8c882b000d0f"]
+    assert mock_run.call_args_list[1].args[0] == ["nmcli", "device", "set", "wlx8c882b000d0f", "autoconnect", "no"]
+
+
+def test_enable_wifi_dongle_manages_autoconnects_and_connects():
+    with patch("subprocess.run", side_effect=[_run_ok(), _run_ok(), _run_ok()]) as mock_run:
+        out = enable_wifi_dongle("wlx8c882b000d0f")
+    assert "enabled" in out.lower()
+    cmds = [c.args[0] for c in mock_run.call_args_list]
+    assert cmds[0] == ["nmcli", "device", "set", "wlx8c882b000d0f", "managed", "yes"]
+    assert cmds[1] == ["nmcli", "device", "set", "wlx8c882b000d0f", "autoconnect", "yes"]
+    assert cmds[2] == ["nmcli", "device", "connect", "wlx8c882b000d0f"]
+
+
+def test_enable_wifi_dongle_reports_warning_on_failure():
+    with patch("subprocess.run", side_effect=[_run_ok(), _run_ok(), _run_fail("device not ready")]):
+        out = enable_wifi_dongle("wlx8c882b000d0f")
+    assert "warning" in out.lower()
+    assert "device not ready" in out
+
+
+def test_disable_wifi_dongle_no_dongle_returns_friendly_message():
+    with patch("modules.network_tools._wifi_device_names", return_value=["wlp0s20f3"]), \
+         patch("modules.network_tools._is_usb_iface", return_value=False), \
+         patch("subprocess.run") as mock_run:
+        out = disable_wifi_dongle()
+    assert "No USB WiFi dongle" in out
+    mock_run.assert_not_called()

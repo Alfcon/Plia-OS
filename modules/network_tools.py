@@ -268,6 +268,88 @@ def wifi_status() -> str:
     )
 
 
+# ── USB WiFi dongle enable/disable ───────────────────────────────────────────
+def _wifi_device_names() -> list[str]:
+    result = subprocess.run(
+        ["nmcli", "-t", "-f", "DEVICE,TYPE", "--escape", "no", "dev", "status"],
+        capture_output=True, text=True, timeout=5,
+    )
+    names = []
+    for line in result.stdout.splitlines():
+        parts = line.split(":")
+        if len(parts) >= 2 and parts[1] == "wifi":
+            names.append(parts[0])
+    return names
+
+
+def _is_usb_iface(ifname: str) -> bool:
+    import os
+    try:
+        target = os.readlink(f"/sys/class/net/{ifname}")
+    except OSError:
+        return False
+    return "/usb" in target
+
+
+def _detect_dongle(interface: str = "") -> str:
+    """Return the USB WiFi dongle interface name. Raises ValueError if ambiguous."""
+    if interface:
+        return interface
+    wifi = _wifi_device_names()
+    usb = [d for d in wifi if _is_usb_iface(d)]
+    if len(usb) == 1:
+        return usb[0]
+    if len(usb) > 1:
+        raise ValueError(f"Multiple USB WiFi interfaces found: {', '.join(usb)}. Pass one explicitly.")
+    # Fall back to name-based detection (wlx<mac> is the predictable USB WiFi name).
+    wlx = [d for d in wifi if d.startswith("wlx")]
+    if len(wlx) == 1:
+        return wlx[0]
+    if len(wlx) > 1:
+        raise ValueError(f"Multiple USB WiFi interfaces found: {', '.join(wlx)}. Pass one explicitly.")
+    raise ValueError("No USB WiFi dongle detected. Plug it in, or pass the interface name explicitly.")
+
+
+@tool(description="Enable the USB WiFi dongle: mark it managed, turn on autoconnect, and bring it up so NetworkManager reconnects it. Leave interface empty to auto-detect the USB WiFi adapter.")
+def enable_wifi_dongle(interface: str = "") -> str:
+    try:
+        dev = _detect_dongle(interface)
+    except ValueError as exc:
+        return str(exc)
+    errors = []
+    for args in (
+        ["nmcli", "device", "set", dev, "managed", "yes"],
+        ["nmcli", "device", "set", dev, "autoconnect", "yes"],
+    ):
+        r = subprocess.run(args, capture_output=True, text=True, timeout=10)
+        if r.returncode != 0:
+            errors.append(r.stderr.strip() or "unknown error")
+    r = subprocess.run(["nmcli", "device", "connect", dev], capture_output=True, text=True, timeout=45)
+    if r.returncode != 0:
+        errors.append(r.stderr.strip() or "unknown error")
+    if errors:
+        return f"Enabled dongle {dev} with warnings: {'; '.join(errors)}"
+    return f"Dongle {dev} enabled: managed, autoconnect on, and connected."
+
+
+@tool(description="Disable the USB WiFi dongle: disconnect it and turn off autoconnect so it stays down until re-enabled. Leave interface empty to auto-detect the USB WiFi adapter.")
+def disable_wifi_dongle(interface: str = "") -> str:
+    try:
+        dev = _detect_dongle(interface)
+    except ValueError as exc:
+        return str(exc)
+    errors = []
+    r = subprocess.run(["nmcli", "device", "disconnect", dev], capture_output=True, text=True, timeout=15)
+    if r.returncode != 0:
+        errors.append(r.stderr.strip() or "unknown error")
+    r = subprocess.run(["nmcli", "device", "set", dev, "autoconnect", "no"], capture_output=True, text=True, timeout=10)
+    if r.returncode != 0:
+        errors.append(r.stderr.strip() or "unknown error")
+    if errors:
+        return f"Disabled dongle {dev} with warnings: {'; '.join(errors)}"
+    return f"Dongle {dev} disabled: disconnected and autoconnect off."
+
+
 # ── Local IP masking ─────────────────────────────────────────────────────────
 def _get_ipv4(ifname: str) -> str | None:
     try:
