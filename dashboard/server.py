@@ -1586,6 +1586,22 @@ _OS_PERMISSION_GROUPS = [
         ),
         "revoke_cmd": "sudo rm /etc/sudoers.d/plia-wireless",
     },
+    {
+        "id": "internal_wifi",
+        "name": "Internal WiFi Blacklist",
+        "description": "Allows blacklisting the internal WiFi driver (iwlwifi/iwlmvm): writes /etc/modprobe.d/disable-internal-wifi.conf, rebuilds the initramfs, and loads the module with sudo. A reboot is required to fully take effect.",
+        "tools": ["disable_internal_wifi", "enable_internal_wifi"],
+        "sudoers_file": "/etc/sudoers.d/plia-iwlwifi",
+        "grant_cmd": (
+            "echo 'alfcon ALL=(ALL) NOPASSWD:"
+            " /usr/bin/tee /etc/modprobe.d/disable-internal-wifi.conf,"
+            " /usr/bin/rm /etc/modprobe.d/disable-internal-wifi.conf,"
+            " /usr/sbin/update-initramfs -u,"
+            " /usr/sbin/modprobe iwlwifi'"
+            " | sudo tee /etc/sudoers.d/plia-iwlwifi && sudo chmod 440 /etc/sudoers.d/plia-iwlwifi"
+        ),
+        "revoke_cmd": "sudo rm /etc/sudoers.d/plia-iwlwifi",
+    },
 ]
 
 

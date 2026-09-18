@@ -350,6 +350,87 @@ def disable_wifi_dongle(interface: str = "") -> str:
     return f"Dongle {dev} disabled: disconnected and autoconnect off."
 
 
+# ── Internal WiFi driver blacklist (full disable) ────────────────────────────
+_BLACKLIST_CONF = "/etc/modprobe.d/disable-internal-wifi.conf"
+_BLACKLIST_CONTENT = "blacklist iwlmvm\nblacklist iwlwifi\ninstall iwlwifi /bin/false\n"
+_INTERNAL_WIFI_DENIED = (
+    "Permission denied. Enable 'Internal WiFi Blacklist' and set these tools to Admin "
+    "in Settings → Permissions, then run the grant command shown there."
+)
+
+
+def _has_internal_wifi_admin() -> bool:
+    import pathlib
+    from core.config import get_config
+    cfg = get_config()
+    sudoers_ok = pathlib.Path("/etc/sudoers.d/plia-iwlwifi").exists()
+    any_tool_admin = any(
+        cfg.tool_permissions.get(t) == "admin"
+        for t in ("disable_internal_wifi", "enable_internal_wifi")
+    )
+    return sudoers_ok and any_tool_admin
+
+
+def _iwl_loaded() -> bool:
+    r = subprocess.run(["lsmod"], capture_output=True, text=True, timeout=5)
+    return "iwlwifi" in r.stdout or "iwlmvm" in r.stdout
+
+
+@tool(description="Show whether the internal Intel WiFi driver (iwlwifi/iwlmvm) is blacklisted and currently loaded.")
+def internal_wifi_status() -> str:
+    import pathlib
+    blacklisted = pathlib.Path(_BLACKLIST_CONF).exists()
+    return (
+        f"Blacklist file  {'present' if blacklisted else 'absent'}  ({_BLACKLIST_CONF})\n"
+        f"iwlwifi loaded  {'yes' if _iwl_loaded() else 'no'}"
+    )
+
+
+@tool(description="Full-disable the internal Intel WiFi card by blacklisting its driver (iwlwifi/iwlmvm) so it never loads. Writes /etc/modprobe.d and rebuilds the initramfs; a reboot is required to take effect. Use this for freeze testing on the USB dongle. Requires Admin + the Internal WiFi Blacklist grant.")
+def disable_internal_wifi() -> str:
+    if not _has_internal_wifi_admin():
+        return _INTERNAL_WIFI_DENIED
+    r = subprocess.run(
+        ["sudo", "tee", _BLACKLIST_CONF],
+        input=_BLACKLIST_CONTENT, capture_output=True, text=True, timeout=15,
+    )
+    if r.returncode != 0:
+        return f"Failed to write blacklist file: {r.stderr.strip() or 'unknown error'}"
+    r = subprocess.run(
+        ["sudo", "update-initramfs", "-u"],
+        capture_output=True, text=True, timeout=180,
+    )
+    if r.returncode != 0:
+        return f"Blacklist written, but update-initramfs failed: {r.stderr.strip() or 'unknown error'}"
+    return (
+        "Internal WiFi driver blacklisted and initramfs rebuilt. Reboot to apply — after reboot "
+        "the internal card (iwlwifi) will not load, so use the USB dongle. Undo with enable_internal_wifi."
+    )
+
+
+@tool(description="Undo the internal WiFi blacklist: remove the blacklist file, rebuild the initramfs, and load the iwlwifi driver so the internal card works again. Requires Admin + the Internal WiFi Blacklist grant.")
+def enable_internal_wifi() -> str:
+    if not _has_internal_wifi_admin():
+        return _INTERNAL_WIFI_DENIED
+    import pathlib
+    existed = pathlib.Path(_BLACKLIST_CONF).exists()
+    if existed:
+        r = subprocess.run(["sudo", "rm", _BLACKLIST_CONF], capture_output=True, text=True, timeout=10)
+        if r.returncode != 0:
+            return f"Failed to remove blacklist file: {r.stderr.strip() or 'unknown error'}"
+        r = subprocess.run(["sudo", "update-initramfs", "-u"], capture_output=True, text=True, timeout=180)
+        if r.returncode != 0:
+            return f"Blacklist removed, but update-initramfs failed: {r.stderr.strip() or 'unknown error'}"
+    r = subprocess.run(["sudo", "modprobe", "iwlwifi"], capture_output=True, text=True, timeout=15)
+    load_note = (
+        "iwlwifi loaded — internal WiFi is back"
+        if r.returncode == 0
+        else f"could not load iwlwifi now ({r.stderr.strip() or 'unknown error'}); reboot to restore it"
+    )
+    prefix = "Blacklist removed and initramfs rebuilt. " if existed else "No blacklist file was present. "
+    return prefix + load_note + "."
+
+
 # ── Local IP masking ─────────────────────────────────────────────────────────
 def _get_ipv4(ifname: str) -> str | None:
     try:

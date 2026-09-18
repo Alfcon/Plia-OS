@@ -171,27 +171,23 @@ def test_restore_mac_no_original_returns_error_without_ip_call():
 
 
 # --- USB WiFi dongle enable/disable ---
-from modules.network_tools import (
-    enable_wifi_dongle,
-    disable_wifi_dongle,
-    _detect_dongle,
-)
-
 
 def test_detect_dongle_picks_usb_wifi():
+    from modules.network_tools import _detect_dongle
     with patch("modules.network_tools._wifi_device_names", return_value=["wlp0s20f3", "wlx8c882b000d0f"]), \
          patch("modules.network_tools._is_usb_iface", side_effect=lambda n: n.startswith("wlx")):
         assert _detect_dongle() == "wlx8c882b000d0f"
 
 
 def test_detect_dongle_explicit_interface_bypasses_detection():
-    # explicit name is returned without touching sysfs/nmcli
+    from modules.network_tools import _detect_dongle
     with patch("modules.network_tools._wifi_device_names") as m:
         assert _detect_dongle("wlxABC") == "wlxABC"
         m.assert_not_called()
 
 
 def test_detect_dongle_none_present_raises():
+    from modules.network_tools import _detect_dongle
     with patch("modules.network_tools._wifi_device_names", return_value=["wlp0s20f3"]), \
          patch("modules.network_tools._is_usb_iface", return_value=False):
         with pytest.raises(ValueError, match="No USB WiFi dongle"):
@@ -199,6 +195,7 @@ def test_detect_dongle_none_present_raises():
 
 
 def test_detect_dongle_multiple_usb_raises():
+    from modules.network_tools import _detect_dongle
     with patch("modules.network_tools._wifi_device_names", return_value=["wlx111", "wlx222"]), \
          patch("modules.network_tools._is_usb_iface", return_value=True):
         with pytest.raises(ValueError, match="Multiple USB WiFi"):
@@ -206,6 +203,7 @@ def test_detect_dongle_multiple_usb_raises():
 
 
 def test_disable_wifi_dongle_disconnects_and_sets_autoconnect():
+    from modules.network_tools import disable_wifi_dongle
     with patch("subprocess.run", side_effect=[_run_ok(), _run_ok()]) as mock_run:
         out = disable_wifi_dongle("wlx8c882b000d0f")
     assert "disabled" in out.lower()
@@ -214,6 +212,7 @@ def test_disable_wifi_dongle_disconnects_and_sets_autoconnect():
 
 
 def test_enable_wifi_dongle_manages_autoconnects_and_connects():
+    from modules.network_tools import enable_wifi_dongle
     with patch("subprocess.run", side_effect=[_run_ok(), _run_ok(), _run_ok()]) as mock_run:
         out = enable_wifi_dongle("wlx8c882b000d0f")
     assert "enabled" in out.lower()
@@ -224,6 +223,7 @@ def test_enable_wifi_dongle_manages_autoconnects_and_connects():
 
 
 def test_enable_wifi_dongle_reports_warning_on_failure():
+    from modules.network_tools import enable_wifi_dongle
     with patch("subprocess.run", side_effect=[_run_ok(), _run_ok(), _run_fail("device not ready")]):
         out = enable_wifi_dongle("wlx8c882b000d0f")
     assert "warning" in out.lower()
@@ -231,9 +231,95 @@ def test_enable_wifi_dongle_reports_warning_on_failure():
 
 
 def test_disable_wifi_dongle_no_dongle_returns_friendly_message():
+    from modules.network_tools import disable_wifi_dongle
     with patch("modules.network_tools._wifi_device_names", return_value=["wlp0s20f3"]), \
          patch("modules.network_tools._is_usb_iface", return_value=False), \
          patch("subprocess.run") as mock_run:
         out = disable_wifi_dongle()
     assert "No USB WiFi dongle" in out
     mock_run.assert_not_called()
+
+
+# --- Internal WiFi blacklist (full disable) ---
+
+def test_disable_internal_wifi_denied_without_grant():
+    from modules.network_tools import disable_internal_wifi
+    with patch("modules.network_tools._has_internal_wifi_admin", return_value=False), \
+         patch("subprocess.run") as mock_run:
+        out = disable_internal_wifi()
+    assert "Permission denied" in out
+    mock_run.assert_not_called()
+
+
+def test_disable_internal_wifi_writes_blacklist_and_rebuilds():
+    from modules.network_tools import disable_internal_wifi, _BLACKLIST_CONF, _BLACKLIST_CONTENT
+    with patch("modules.network_tools._has_internal_wifi_admin", return_value=True), \
+         patch("subprocess.run", side_effect=[_run_ok(), _run_ok()]) as mock_run:
+        out = disable_internal_wifi()
+    assert "blacklisted" in out.lower()
+    assert "reboot" in out.lower()
+    tee_call = mock_run.call_args_list[0]
+    assert tee_call.args[0] == ["sudo", "tee", _BLACKLIST_CONF]
+    assert tee_call.kwargs["input"] == _BLACKLIST_CONTENT
+    assert mock_run.call_args_list[1].args[0] == ["sudo", "update-initramfs", "-u"]
+
+
+def test_disable_internal_wifi_initramfs_failure_reported():
+    from modules.network_tools import disable_internal_wifi
+    with patch("modules.network_tools._has_internal_wifi_admin", return_value=True), \
+         patch("subprocess.run", side_effect=[_run_ok(), _run_fail("initramfs boom")]):
+        out = disable_internal_wifi()
+    assert "update-initramfs failed" in out
+    assert "initramfs boom" in out
+
+
+def test_enable_internal_wifi_removes_blacklist_and_loads():
+    from modules.network_tools import enable_internal_wifi, _BLACKLIST_CONF
+    with patch("modules.network_tools._has_internal_wifi_admin", return_value=True), \
+         patch("pathlib.Path.exists", return_value=True), \
+         patch("subprocess.run", side_effect=[_run_ok(), _run_ok(), _run_ok()]) as mock_run:
+        out = enable_internal_wifi()
+    cmds = [c.args[0] for c in mock_run.call_args_list]
+    assert cmds[0] == ["sudo", "rm", _BLACKLIST_CONF]
+    assert cmds[1] == ["sudo", "update-initramfs", "-u"]
+    assert cmds[2] == ["sudo", "modprobe", "iwlwifi"]
+    assert "iwlwifi loaded" in out.lower()
+
+
+def test_enable_internal_wifi_no_file_still_modprobes():
+    from modules.network_tools import enable_internal_wifi
+    with patch("modules.network_tools._has_internal_wifi_admin", return_value=True), \
+         patch("pathlib.Path.exists", return_value=False), \
+         patch("subprocess.run", side_effect=[_run_ok()]) as mock_run:
+        out = enable_internal_wifi()
+    assert [c.args[0] for c in mock_run.call_args_list] == [["sudo", "modprobe", "iwlwifi"]]
+    assert "No blacklist file was present" in out
+
+
+def test_enable_internal_wifi_denied_without_grant():
+    from modules.network_tools import enable_internal_wifi
+    with patch("modules.network_tools._has_internal_wifi_admin", return_value=False), \
+         patch("subprocess.run") as mock_run:
+        out = enable_internal_wifi()
+    assert "Permission denied" in out
+    mock_run.assert_not_called()
+
+
+def test_internal_wifi_status_reports_presence_and_load():
+    from modules.network_tools import internal_wifi_status
+    lsmod = MagicMock(); lsmod.stdout = "iwlmvm 12288 1\niwlwifi 65536 1 iwlmvm\n"; lsmod.returncode = 0
+    with patch("pathlib.Path.exists", return_value=True), \
+         patch("subprocess.run", return_value=lsmod):
+        out = internal_wifi_status()
+    assert "present" in out
+    assert "yes" in out
+
+
+def test_internal_wifi_status_not_loaded():
+    from modules.network_tools import internal_wifi_status
+    lsmod = MagicMock(); lsmod.stdout = "bluetooth 1048576 0\n"; lsmod.returncode = 0
+    with patch("pathlib.Path.exists", return_value=False), \
+         patch("subprocess.run", return_value=lsmod):
+        out = internal_wifi_status()
+    assert "absent" in out
+    assert "no" in out
