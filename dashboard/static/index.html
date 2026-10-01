@@ -1066,12 +1066,12 @@
       </ul>
 
       <h4>Network Check</h4>
-      <p>Defensive audits of a network you own — read-only, advisory, nothing is changed.</p>
+      <p>Defensive audits of a network you own — read-only, advisory, nothing is changed. These tools run the standalone <strong>netpass</strong> program (<code>/home/alfcon/Projects/Netpass/netpass.py</code> via its own virtualenv).</p>
       <ul>
-        <li><code>check_password(password)</code> — rate how strong a Wi-Fi/password string is (evaluated locally, never stored or sent).</li>
-        <li><code>check_wifi_password()</code> — check the saved password of the Wi-Fi this machine is on (read locally via nmcli; may need elevated access).</li>
-        <li><code>scan_local_network(target, deep)</code> — scan the LAN for devices and flag risky exposed services (telnet, SMB, exposed DBs, open proxies…) with fixes. Blank <code>target</code> auto-detects your /24; <code>deep</code> adds nmap CVE scripts. Needs <code>python-nmap</code> (<code>pip install -e ".[netcheck]"</code>) and the nmap binary.</li>
-        <li><code>external_exposure_check()</code> — what your network exposes to the public internet, via Shodan's free InternetDB.</li>
+        <li><code>check_password(password)</code> — rate how strong a Wi-Fi/password string is (<code>netpass --check-password</code>; evaluated locally).</li>
+        <li><code>check_wifi_password()</code> — check the saved password of the Wi-Fi this machine is on (<code>netpass --check-wifi</code>; may need elevated access to read the key).</li>
+        <li><code>scan_local_network(target, deep)</code> — scan the LAN for devices and flag risky exposed services (telnet, SMB, exposed DBs, open proxies…) with fixes (<code>netpass [target] --report</code>, run under <strong>sudo</strong> for full host/MAC/OS detection). Blank <code>target</code> auto-detects your /24; <code>deep</code> adds nmap CVE scripts (slower).</li>
+        <li><code>external_exposure_check()</code> — what your network exposes to the public internet (<code>netpass --external</code>, via Shodan's free InternetDB).</li>
       </ul>
 
       <h4>Wireless Security Tools</h4>

@@ -51,7 +51,6 @@ playwright = ["playwright>=1.40"]
 airllm = ["airllm>=2.9", "torch>=2.0", "transformers>=4.40", "bitsandbytes>=0.43"]
 mcp = ["mcp>=1.0"]
 tor = ["stem>=1.8"]
-netcheck = ["python-nmap>=0.7"]
 observer = ["pytesseract", "evdev", "mss"]
 tray = ["pystray>=0.19", "pillow>=10.0"]
 
