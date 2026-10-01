@@ -168,19 +168,45 @@ def restore_mac(interface: str = "") -> str:
     return f"{ifname}: restored to {original}"
 
 
-@tool(description="List all WiFi interfaces on this system with their current state and connection.")
-def list_wifi_interfaces() -> str:
-    result = subprocess.run(
-        ["nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "--escape", "no", "dev", "status"],
-        capture_output=True, text=True, timeout=5,
-    )
+def _run_timed(cmd: list[str], timeout: float, **kwargs) -> subprocess.CompletedProcess:
+    """subprocess.run that reports a timeout as a failed result instead of raising."""
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, **kwargs)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(cmd, returncode=-1, stdout="", stderr=f"timed out after {timeout}s")
+
+
+def _nmcli_devices() -> list[tuple[str, str, str, str]]:
+    """Return (device, type, state, connection) per nmcli device. Raises ValueError if nmcli fails."""
+    try:
+        result = subprocess.run(
+            ["nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "--escape", "no", "dev", "status"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        raise ValueError("nmcli not available.") from None
     if result.returncode != 0:
-        return "nmcli not available."
+        raise ValueError("nmcli not available.")
     rows = []
     for line in result.stdout.splitlines():
-        parts = line.split(":")
-        if len(parts) >= 4 and parts[1] in ("wifi", "wifi-p2p"):
-            rows.append((parts[0], parts[1], parts[2], parts[3] or "—"))
+        # CONNECTION is last so a connection name containing ':' stays intact.
+        parts = line.split(":", 3)
+        if len(parts) == 4:
+            rows.append((parts[0], parts[1], parts[2], parts[3]))
+    return rows
+
+
+@tool(description="List all WiFi interfaces on this system with their current state and connection.")
+def list_wifi_interfaces() -> str:
+    try:
+        devices = _nmcli_devices()
+    except ValueError as exc:
+        return str(exc)
+    rows = [
+        (dev, itype, state, conn or "—")
+        for dev, itype, state, conn in devices
+        if itype in ("wifi", "wifi-p2p")
+    ]
     if not rows:
         return "No WiFi interfaces found."
     w = max(len(r[0]) for r in rows)
@@ -270,16 +296,8 @@ def wifi_status() -> str:
 
 # ── USB WiFi dongle enable/disable ───────────────────────────────────────────
 def _wifi_device_names() -> list[str]:
-    result = subprocess.run(
-        ["nmcli", "-t", "-f", "DEVICE,TYPE", "--escape", "no", "dev", "status"],
-        capture_output=True, text=True, timeout=5,
-    )
-    names = []
-    for line in result.stdout.splitlines():
-        parts = line.split(":")
-        if len(parts) >= 2 and parts[1] == "wifi":
-            names.append(parts[0])
-    return names
+    """WiFi device names known to nmcli (including unmanaged ones). Raises ValueError if nmcli fails."""
+    return [dev for dev, itype, _, _ in _nmcli_devices() if itype == "wifi"]
 
 
 def _is_usb_iface(ifname: str) -> bool:
@@ -292,10 +310,12 @@ def _is_usb_iface(ifname: str) -> bool:
 
 
 def _detect_dongle(interface: str = "") -> str:
-    """Return the USB WiFi dongle interface name. Raises ValueError if ambiguous."""
-    if interface:
-        return interface
+    """Return the USB WiFi dongle interface name. Raises ValueError if missing, unknown, or ambiguous."""
     wifi = _wifi_device_names()
+    if interface:
+        if interface not in wifi:
+            raise ValueError(f"WiFi interface {interface!r} not found.")
+        return interface
     usb = [d for d in wifi if _is_usb_iface(d)]
     if len(usb) == 1:
         return usb[0]
@@ -321,10 +341,10 @@ def enable_wifi_dongle(interface: str = "") -> str:
         ["nmcli", "device", "set", dev, "managed", "yes"],
         ["nmcli", "device", "set", dev, "autoconnect", "yes"],
     ):
-        r = subprocess.run(args, capture_output=True, text=True, timeout=10)
+        r = _run_timed(args, timeout=10)
         if r.returncode != 0:
             errors.append(r.stderr.strip() or "unknown error")
-    r = subprocess.run(["nmcli", "device", "connect", dev], capture_output=True, text=True, timeout=45)
+    r = _run_timed(["nmcli", "device", "connect", dev], timeout=45)
     if r.returncode != 0:
         errors.append(r.stderr.strip() or "unknown error")
     if errors:
@@ -339,10 +359,10 @@ def disable_wifi_dongle(interface: str = "") -> str:
     except ValueError as exc:
         return str(exc)
     errors = []
-    r = subprocess.run(["nmcli", "device", "disconnect", dev], capture_output=True, text=True, timeout=15)
+    r = _run_timed(["nmcli", "device", "disconnect", dev], timeout=15)
     if r.returncode != 0:
         errors.append(r.stderr.strip() or "unknown error")
-    r = subprocess.run(["nmcli", "device", "set", dev, "autoconnect", "no"], capture_output=True, text=True, timeout=10)
+    r = _run_timed(["nmcli", "device", "set", dev, "autoconnect", "no"], timeout=10)
     if r.returncode != 0:
         errors.append(r.stderr.strip() or "unknown error")
     if errors:
@@ -390,16 +410,10 @@ def internal_wifi_status() -> str:
 def disable_internal_wifi() -> str:
     if not _has_internal_wifi_admin():
         return _INTERNAL_WIFI_DENIED
-    r = subprocess.run(
-        ["sudo", "tee", _BLACKLIST_CONF],
-        input=_BLACKLIST_CONTENT, capture_output=True, text=True, timeout=15,
-    )
+    r = _run_timed(["sudo", "tee", _BLACKLIST_CONF], timeout=15, input=_BLACKLIST_CONTENT)
     if r.returncode != 0:
         return f"Failed to write blacklist file: {r.stderr.strip() or 'unknown error'}"
-    r = subprocess.run(
-        ["sudo", "update-initramfs", "-u"],
-        capture_output=True, text=True, timeout=180,
-    )
+    r = _run_timed(["sudo", "update-initramfs", "-u"], timeout=180)
     if r.returncode != 0:
         return f"Blacklist written, but update-initramfs failed: {r.stderr.strip() or 'unknown error'}"
     return (
@@ -415,13 +429,13 @@ def enable_internal_wifi() -> str:
     import pathlib
     existed = pathlib.Path(_BLACKLIST_CONF).exists()
     if existed:
-        r = subprocess.run(["sudo", "rm", _BLACKLIST_CONF], capture_output=True, text=True, timeout=10)
+        r = _run_timed(["sudo", "rm", _BLACKLIST_CONF], timeout=10)
         if r.returncode != 0:
             return f"Failed to remove blacklist file: {r.stderr.strip() or 'unknown error'}"
-        r = subprocess.run(["sudo", "update-initramfs", "-u"], capture_output=True, text=True, timeout=180)
+        r = _run_timed(["sudo", "update-initramfs", "-u"], timeout=180)
         if r.returncode != 0:
             return f"Blacklist removed, but update-initramfs failed: {r.stderr.strip() or 'unknown error'}"
-    r = subprocess.run(["sudo", "modprobe", "iwlwifi"], capture_output=True, text=True, timeout=15)
+    r = _run_timed(["sudo", "modprobe", "iwlwifi"], timeout=15)
     load_note = (
         "iwlwifi loaded — internal WiFi is back"
         if r.returncode == 0

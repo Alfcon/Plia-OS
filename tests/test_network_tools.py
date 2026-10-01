@@ -172,6 +172,84 @@ def test_restore_mac_no_original_returns_error_without_ip_call():
 
 # --- USB WiFi dongle enable/disable ---
 
+def _dongle_present(name="wlx8c882b000d0f"):
+    return patch("modules.network_tools._wifi_device_names", return_value=["wlp0s20f3", name])
+
+
+def _nmcli_status(stdout):
+    m = MagicMock()
+    m.returncode = 0
+    m.stdout = stdout
+    m.stderr = ""
+    return m
+
+
+def test_list_wifi_interfaces_filters_wifi_and_keeps_colons_in_connection():
+    from modules.network_tools import list_wifi_interfaces
+    status = _nmcli_status(
+        "enp3s0:ethernet:connected:Wired 1\n"
+        "wlp0s20f3:wifi:connected:Cafe:5G\n"
+        "p2p-dev-wlp0s20f3:wifi-p2p:disconnected:\n"
+    )
+    with patch("subprocess.run", return_value=status):
+        out = list_wifi_interfaces()
+    assert "enp3s0" not in out
+    assert "Cafe:5G" in out
+    assert "p2p-dev-wlp0s20f3" in out
+    assert "—" in out
+
+
+def test_list_wifi_interfaces_nmcli_unavailable():
+    from modules.network_tools import list_wifi_interfaces
+    with patch("subprocess.run", side_effect=FileNotFoundError("nmcli")):
+        assert list_wifi_interfaces() == "nmcli not available."
+
+
+def test_wifi_device_names_excludes_p2p():
+    from modules.network_tools import _wifi_device_names
+    status = _nmcli_status(
+        "wlp0s20f3:wifi:connected:Home\n"
+        "wlx8c882b000d0f:wifi:unmanaged:\n"
+        "p2p-dev-wlp0s20f3:wifi-p2p:disconnected:\n"
+    )
+    with patch("subprocess.run", return_value=status):
+        assert _wifi_device_names() == ["wlp0s20f3", "wlx8c882b000d0f"]
+
+
+def test_wifi_device_names_nmcli_failure_raises():
+    from modules.network_tools import _wifi_device_names
+    with patch("subprocess.run", return_value=_run_fail("Error: NetworkManager is not running.")):
+        with pytest.raises(ValueError, match="nmcli not available"):
+            _wifi_device_names()
+
+
+def test_disable_wifi_dongle_reports_nmcli_unavailable_not_missing_dongle():
+    from modules.network_tools import disable_wifi_dongle
+    with patch("subprocess.run", return_value=_run_fail("Error: NetworkManager is not running.")) as mock_run:
+        out = disable_wifi_dongle()
+    assert out == "nmcli not available."
+    assert mock_run.call_count == 1
+
+
+def test_enable_wifi_dongle_unknown_interface_runs_no_nmcli_actions():
+    from modules.network_tools import enable_wifi_dongle
+    with _dongle_present(), patch("subprocess.run") as mock_run:
+        out = enable_wifi_dongle("wlan9")
+    assert out == "WiFi interface 'wlan9' not found."
+    mock_run.assert_not_called()
+
+
+def test_enable_wifi_dongle_connect_timeout_reported_as_warning():
+    import subprocess
+    from modules.network_tools import enable_wifi_dongle
+    timeout = subprocess.TimeoutExpired(["nmcli", "device", "connect", "wlx8c882b000d0f"], 45)
+    with _dongle_present(), \
+         patch("subprocess.run", side_effect=[_run_ok(), _run_ok(), timeout]):
+        out = enable_wifi_dongle("wlx8c882b000d0f")
+    assert "with warnings" in out
+    assert "timed out after 45s" in out
+
+
 def test_detect_dongle_picks_usb_wifi():
     from modules.network_tools import _detect_dongle
     with patch("modules.network_tools._wifi_device_names", return_value=["wlp0s20f3", "wlx8c882b000d0f"]), \
@@ -179,11 +257,19 @@ def test_detect_dongle_picks_usb_wifi():
         assert _detect_dongle() == "wlx8c882b000d0f"
 
 
-def test_detect_dongle_explicit_interface_bypasses_detection():
+def test_detect_dongle_explicit_interface_skips_usb_detection():
     from modules.network_tools import _detect_dongle
-    with patch("modules.network_tools._wifi_device_names") as m:
+    with patch("modules.network_tools._wifi_device_names", return_value=["wlp0s20f3", "wlxABC"]), \
+         patch("modules.network_tools._is_usb_iface") as usb:
         assert _detect_dongle("wlxABC") == "wlxABC"
-        m.assert_not_called()
+        usb.assert_not_called()
+
+
+def test_detect_dongle_explicit_unknown_interface_raises():
+    from modules.network_tools import _detect_dongle
+    with patch("modules.network_tools._wifi_device_names", return_value=["wlp0s20f3"]):
+        with pytest.raises(ValueError, match="'wlan9' not found"):
+            _detect_dongle("wlan9")
 
 
 def test_detect_dongle_none_present_raises():
@@ -204,7 +290,8 @@ def test_detect_dongle_multiple_usb_raises():
 
 def test_disable_wifi_dongle_disconnects_and_sets_autoconnect():
     from modules.network_tools import disable_wifi_dongle
-    with patch("subprocess.run", side_effect=[_run_ok(), _run_ok()]) as mock_run:
+    with _dongle_present(), \
+         patch("subprocess.run", side_effect=[_run_ok(), _run_ok()]) as mock_run:
         out = disable_wifi_dongle("wlx8c882b000d0f")
     assert "disabled" in out.lower()
     assert mock_run.call_args_list[0].args[0] == ["nmcli", "device", "disconnect", "wlx8c882b000d0f"]
@@ -213,7 +300,8 @@ def test_disable_wifi_dongle_disconnects_and_sets_autoconnect():
 
 def test_enable_wifi_dongle_manages_autoconnects_and_connects():
     from modules.network_tools import enable_wifi_dongle
-    with patch("subprocess.run", side_effect=[_run_ok(), _run_ok(), _run_ok()]) as mock_run:
+    with _dongle_present(), \
+         patch("subprocess.run", side_effect=[_run_ok(), _run_ok(), _run_ok()]) as mock_run:
         out = enable_wifi_dongle("wlx8c882b000d0f")
     assert "enabled" in out.lower()
     cmds = [c.args[0] for c in mock_run.call_args_list]
@@ -224,7 +312,8 @@ def test_enable_wifi_dongle_manages_autoconnects_and_connects():
 
 def test_enable_wifi_dongle_reports_warning_on_failure():
     from modules.network_tools import enable_wifi_dongle
-    with patch("subprocess.run", side_effect=[_run_ok(), _run_ok(), _run_fail("device not ready")]):
+    with _dongle_present(), \
+         patch("subprocess.run", side_effect=[_run_ok(), _run_ok(), _run_fail("device not ready")]):
         out = enable_wifi_dongle("wlx8c882b000d0f")
     assert "warning" in out.lower()
     assert "device not ready" in out
@@ -271,6 +360,30 @@ def test_disable_internal_wifi_initramfs_failure_reported():
         out = disable_internal_wifi()
     assert "update-initramfs failed" in out
     assert "initramfs boom" in out
+
+
+def test_disable_internal_wifi_initramfs_timeout_reported():
+    import subprocess
+    from modules.network_tools import disable_internal_wifi
+    timeout = subprocess.TimeoutExpired(["sudo", "update-initramfs", "-u"], 180)
+    with patch("modules.network_tools._has_internal_wifi_admin", return_value=True), \
+         patch("subprocess.run", side_effect=[_run_ok(), timeout]):
+        out = disable_internal_wifi()
+    assert out.startswith("Blacklist written, but update-initramfs failed")
+    assert "timed out after 180s" in out
+
+
+def test_enable_internal_wifi_initramfs_timeout_reported_and_skips_modprobe():
+    import subprocess
+    from modules.network_tools import enable_internal_wifi
+    timeout = subprocess.TimeoutExpired(["sudo", "update-initramfs", "-u"], 180)
+    with patch("modules.network_tools._has_internal_wifi_admin", return_value=True), \
+         patch("pathlib.Path.exists", return_value=True), \
+         patch("subprocess.run", side_effect=[_run_ok(), timeout]) as mock_run:
+        out = enable_internal_wifi()
+    assert out.startswith("Blacklist removed, but update-initramfs failed")
+    assert "timed out after 180s" in out
+    assert mock_run.call_count == 2
 
 
 def test_enable_internal_wifi_removes_blacklist_and_loads():
