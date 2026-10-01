@@ -1073,6 +1073,7 @@
         <li><code>scan_local_network(target, deep)</code> — scan the LAN for devices and flag risky exposed services (telnet, SMB, exposed DBs, open proxies…) with fixes (<code>netpass [target] --report</code>, run under <strong>sudo</strong> for full host/MAC/OS detection). Blank <code>target</code> auto-detects your /24; <code>deep</code> adds nmap CVE scripts (slower).</li>
         <li><code>external_exposure_check()</code> — what your network exposes to the public internet (<code>netpass --external</code>, via Shodan's free InternetDB).</li>
       </ul>
+      <p>For a full elevated scan (host/MAC/OS detection, which needs root), open <strong>Monitor/Developer → Network Check</strong> and enter your sudo password — it's used once to elevate and never stored. The voice/assistant <code>scan_local_network</code> tool runs literal <code>sudo</code>, so it only elevates where passwordless sudo is configured.</p>
 
       <h4>Wireless Security Tools</h4>
       <p style="color:#e57373;">Use only on networks you own or have explicit permission to test. Unauthorized use is illegal.</p>
@@ -1194,6 +1195,7 @@
           <button class="m-nav-btn m-nav-sub" data-section="pipelinerestart" onclick="showMenuSection('pipelinerestart')">Pipeline Ctrl</button>
           <button class="m-nav-btn m-nav-sub" data-section="netdiag" onclick="showMenuSection('netdiag')">Net Diagnostics</button>
           <button class="m-nav-btn m-nav-sub" data-section="netif" onclick="showMenuSection('netif');loadNetworkInterfaces()">Net Interfaces</button>
+          <button class="m-nav-btn m-nav-sub" data-section="netcheck" onclick="showMenuSection('netcheck')">Network Check</button>
           <button class="m-nav-btn m-nav-sub" data-section="httpprobe" onclick="showMenuSection('httpprobe');loadProbeHistory()">HTTP Probe</button>
           <button class="m-nav-btn m-nav-sub" data-section="logtail" onclick="showMenuSection('logtail');startLogTail()">Log Tail</button>
           <button class="m-nav-btn m-nav-sub" data-section="notiflog" onclick="showMenuSection('notiflog');loadNotifLog()">Notif Log</button>
@@ -3477,6 +3479,27 @@
             </div>
           </div>
           <div id="nd-results" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;font-size:0.73rem;font-family:monospace;"></div>
+        </div>
+
+        <!-- Network Check (netpass) -->
+        <div id="m-section-netcheck" class="m-pane" style="display:none;flex-direction:column;gap:8px;">
+          <div style="font-size:0.68rem;color:#555;flex-shrink:0;">Runs the <code style="font-size:0.66rem;">netpass</code> security scan of your network. A full scan (host, MAC/vendor, OS detection) needs root — enter your sudo password to elevate, or leave it blank to run without sudo. Use only on networks you own or are authorized to scan.</div>
+          <div style="display:flex;flex-direction:column;gap:6px;border:1px solid #1a1a1a;border-radius:3px;padding:8px;flex-shrink:0;">
+            <input id="nc-target" type="text" placeholder="target host or CIDR (blank = auto-detect your /24)"
+              style="background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 7px;font-size:0.73rem;font-family:monospace;"
+              onkeydown="if(event.key==='Enter')runNetcheckScan()">
+            <input id="nc-pass" type="password" placeholder="sudo password (optional — for an elevated scan)" autocomplete="off"
+              style="background:#111;border:1px solid #333;color:#e0e0e0;border-radius:3px;padding:4px 7px;font-size:0.73rem;font-family:monospace;"
+              onkeydown="if(event.key==='Enter')runNetcheckScan()">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <label style="font-size:0.7rem;color:#888;display:flex;gap:4px;align-items:center;cursor:pointer;"><input id="nc-deep" type="checkbox"> Deep (CVE scripts — slow)</label>
+              <button onclick="runNetcheckScan()" id="nc-run-btn"
+                style="background:#0d1b2a;border:1px solid #1b3a5e;color:#4fc3f7;font-size:0.73rem;padding:5px 14px;border-radius:3px;cursor:pointer;">▶ Run scan</button>
+              <span id="nc-status" style="font-size:0.7rem;color:#555;"></span>
+            </div>
+            <div style="font-size:0.62rem;color:#444;">The password is sent once to elevate the scan and is never stored, logged, or shared with the assistant.</div>
+          </div>
+          <pre id="nc-results" style="flex:1;min-height:0;overflow:auto;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;padding:8px;font-size:0.72rem;color:#cfcfcf;white-space:pre-wrap;margin:0;"></pre>
         </div>
 
         <!-- Notification Log -->
@@ -11256,6 +11279,35 @@
     _ndRender();
   }
   function ndRun() { ndCheck(document.querySelector('.nd-type-active')?.dataset?.type || 'ping'); }
+
+  // ── Network Check (netpass) ─────────────────────────────────────────────────
+  async function runNetcheckScan() {
+    const target = (document.getElementById('nc-target')?.value || '').trim();
+    const deep = document.getElementById('nc-deep')?.checked || false;
+    const passEl = document.getElementById('nc-pass');
+    const sudo_password = passEl?.value || '';
+    const btn = document.getElementById('nc-run-btn');
+    const status = document.getElementById('nc-status');
+    const out = document.getElementById('nc-results');
+    btn.disabled = true;
+    status.textContent = deep ? 'Scanning (deep — this can take several minutes)…' : 'Scanning…';
+    out.textContent = '';
+    try {
+      const body = {target, deep};
+      if (sudo_password) body.sudo_password = sudo_password;
+      const r = await fetch('/api/netcheck/scan', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
+      });
+      const d = await r.json().catch(() => ({}));
+      out.textContent = d.result || d.detail || `Scan failed (HTTP ${r.status}).`;
+    } catch(e) {
+      out.textContent = 'Network error: ' + e.message;
+    } finally {
+      if (passEl) passEl.value = '';   // clear the password field after use
+      btn.disabled = false;
+      status.textContent = '';
+    }
+  }
   function _ndRender() {
     const el = document.getElementById('nd-results');
     if (!_ndHistory.length) { el.innerHTML = '<div style="color:#333;font-size:0.68rem;">No checks yet.</div>'; return; }

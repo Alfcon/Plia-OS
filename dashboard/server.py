@@ -2074,6 +2074,26 @@ async def netdiag_port(body: dict):
         return {"ok": False, "host": host, "port": int(port) if port else None, "latency_ms": int((time.monotonic() - t0) * 1000), "detail": str(exc)}
 
 
+@router.post("/api/netcheck/scan")
+async def netcheck_scan(body: dict):
+    """Run the netpass local-network scan, optionally elevated with a sudo
+    password entered in the dashboard.
+
+    The password is used once (sudo -S via stdin) and is never stored, logged,
+    or broadcast. This endpoint is deliberately NOT a registered @tool, so the
+    LLM cannot invoke it and the password can never reach the chat transcript.
+    """
+    target = (body.get("target") or "").strip()
+    deep = bool(body.get("deep"))
+    sudo_password = body.get("sudo_password") or None
+    from modules.network_check_tools import run_scan
+    try:
+        result = await asyncio.to_thread(run_scan, target, deep, sudo_password)
+    except Exception:
+        raise HTTPException(status_code=500, detail="scan failed")
+    return {"result": result}
+
+
 # ── Notification log ──────────────────────────────────────────────────────────
 
 _NOTIF_LOG: _collections.deque = _collections.deque(maxlen=200)
