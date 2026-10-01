@@ -1065,6 +1065,15 @@
         <li><code>wifi_status()</code> — current connection: SSID, signal, IP.</li>
       </ul>
 
+      <h4>Network Check</h4>
+      <p>Defensive audits of a network you own — read-only, advisory, nothing is changed.</p>
+      <ul>
+        <li><code>check_password(password)</code> — rate how strong a Wi-Fi/password string is (evaluated locally, never stored or sent).</li>
+        <li><code>check_wifi_password()</code> — check the saved password of the Wi-Fi this machine is on (read locally via nmcli; may need elevated access).</li>
+        <li><code>scan_local_network(target, deep)</code> — scan the LAN for devices and flag risky exposed services (telnet, SMB, exposed DBs, open proxies…) with fixes. Blank <code>target</code> auto-detects your /24; <code>deep</code> adds nmap CVE scripts. Needs <code>python-nmap</code> (<code>pip install -e ".[netcheck]"</code>) and the nmap binary.</li>
+        <li><code>external_exposure_check()</code> — what your network exposes to the public internet, via Shodan's free InternetDB.</li>
+      </ul>
+
       <h4>Wireless Security Tools</h4>
       <p style="color:#e57373;">Use only on networks you own or have explicit permission to test. Unauthorized use is illegal.</p>
       <ul>
@@ -5251,6 +5260,7 @@
     home_tools: 'Smart Home',
     system_tools: 'System', observer_tools: 'System', proactive_tools: 'System',
     tor_tools: 'Privacy & Network', network_tools: 'Privacy & Network', wireless_tools: 'Privacy & Network', diagnostics_tools: 'Privacy & Network',
+    network_check_tools: 'Privacy & Network',
   };
 
   const _CAT_ORDER = [
@@ -5294,6 +5304,10 @@
         'crack_handshake_rockyou', 'crack_handshake_wordlist', 'crack_handshake_auto',
       ]),
       'IP': new Set(['show_ip', 'randomize_local_ip', 'set_local_ip', 'restore_ip']),
+      'Network Check': new Set([
+        'check_password', 'check_wifi_password',
+        'scan_local_network', 'external_exposure_check',
+      ]),
     },
   };
 
