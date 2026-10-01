@@ -26,6 +26,7 @@ def test_kokoro_synthesise_returns_array():
     mock_pipeline = MagicMock()
     mock_pipeline.return_value = iter([(None, None, fake_audio)])
 
+    update_config(tts_engine="kokoro")  # pin engine; default is now chatterbox
     with patch("voice.tts.KPipeline", return_value=mock_pipeline):
         svc = TTSService()
         svc.load()
