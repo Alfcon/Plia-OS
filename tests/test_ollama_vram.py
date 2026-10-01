@@ -88,6 +88,22 @@ def test_unload_posts_keep_alive_zero():
 
 
 @respx.mock
+def test_unload_logs_but_survives_http_error(caplog):
+    # A 404 (e.g. the configured model isn't pulled) means the model was NOT
+    # unloaded; it must be logged, not swallowed as success, and must not raise.
+    import logging
+    from agents.ollama_vram import register_ollama
+    update_config(ollama_url="http://ollama.test:11434", ollama_model="llama3.2")
+    respx.post("http://ollama.test:11434/api/generate").mock(
+        return_value=httpx.Response(404, json={"error": "model not found"})
+    )
+    register_ollama()
+    with caplog.at_level(logging.WARNING):
+        get_vram_broker()._models["ollama"].unload_fn()  # must not raise
+    assert any("refused to unload" in r.message or "404" in r.getMessage() for r in caplog.records)
+
+
+@respx.mock
 def test_unload_survives_ollama_down():
     from agents.ollama_vram import register_ollama
     update_config(ollama_url="http://ollama.test:11434")

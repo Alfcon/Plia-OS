@@ -113,6 +113,11 @@ class TTSService:
             except Exception:
                 logger.warning("Chatterbox failed to load; Kokoro will be used", exc_info=True)
                 update_config(tts_engine="kokoro")
+                # Re-raise so the broker does not record Chatterbox as resident
+                # (a swallowed failure logs a phantom "Loaded on GPU"). The
+                # broker restores any evicted model and the Kokoro fallback
+                # below in load() takes over.
+                raise
 
         def _do_unload():
             self._chatterbox = None
@@ -121,7 +126,12 @@ class TTSService:
             name="chatterbox", priority=3, vram_gb=2.0,
             load_fn=_do_load, unload_fn=_do_unload,
         ))
-        broker.request("chatterbox")
+        try:
+            broker.request("chatterbox")
+        except Exception:
+            # Failure already logged and config switched to Kokoro in _do_load;
+            # swallow here so startup/_ensure continues to the fallback.
+            self._chatterbox = None
 
     def _load_dramabox(self, config) -> None:
         if DramaboxTTS is None:

@@ -26,14 +26,24 @@ def _unload() -> None:
     from core.config import get_config
     config = get_config()
     try:
-        httpx.post(
+        resp = httpx.post(
             f"{config.ollama_url}/api/generate",
             json={"model": config.ollama_model, "keep_alive": 0},
             timeout=_UNLOAD_TIMEOUT,
         )
+        # A non-2xx (e.g. 404 for a model name that isn't pulled) means the
+        # unload did NOT happen — the model stays resident in VRAM. Surface it
+        # instead of treating the failed request as a successful eviction.
+        resp.raise_for_status()
     except httpx.ConnectError:
         # Server not running → model is not in VRAM; nothing to unload.
         logger.info("Ollama not reachable at %s — nothing to unload", config.ollama_url)
+    except httpx.HTTPStatusError as exc:
+        logger.warning(
+            "Ollama refused to unload %r (%s) — VRAM not freed; check that the "
+            "model is pulled (`ollama list`).",
+            config.ollama_model, exc.response.status_code,
+        )
     except Exception:
         logger.warning("Could not ask Ollama to unload %r", config.ollama_model, exc_info=True)
 

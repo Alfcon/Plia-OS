@@ -55,7 +55,25 @@ class VRAMBroker:
                     self._evicted.append(m.name)
 
             _empty_cuda_cache()
-            entry.load_fn()
+            try:
+                entry.load_fn()
+            except Exception:
+                # The load failed (e.g. CUDA OOM). Do NOT mark the model
+                # resident — that would log a phantom "Loaded on GPU" and make
+                # the broker believe it holds VRAM it doesn't. Restore anything
+                # we evicted to make room so the broker's view stays consistent,
+                # then propagate so the caller can fall back.
+                logger.warning("Load of %r failed; restoring evicted models", name, exc_info=True)
+                for evicted_name in reversed(self._evicted):
+                    ev = self._models.get(evicted_name)
+                    if ev is not None and ev.state == "unloaded":
+                        try:
+                            ev.load_fn()
+                            ev.state = "gpu"
+                        except Exception:
+                            logger.warning("Could not restore evicted model %r", evicted_name, exc_info=True)
+                self._evicted = []
+                raise
             entry.state = "gpu"
             logger.info("Loaded %r on GPU", name)
 

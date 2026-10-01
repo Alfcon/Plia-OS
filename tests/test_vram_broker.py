@@ -95,6 +95,35 @@ def test_release_unloads_and_restores_evicted():
     assert heavy.state == "unloaded"
 
 
+def test_request_load_failure_does_not_mark_gpu():
+    b = VRAMBroker()
+    heavy = _make_entry("chatterbox", 3)
+    heavy.load_fn.side_effect = RuntimeError("CUDA out of memory")
+    b.register(heavy)
+    with pytest.raises(RuntimeError):
+        b.request("chatterbox")
+    # A failed load must not leave the model looking resident.
+    assert heavy.state == "unloaded"
+    s = b.status()
+    assert s["active_heavy"] is None
+
+
+def test_request_load_failure_restores_evicted_models():
+    b = VRAMBroker()
+    light = _make_entry("ollama", 2)
+    heavy = _make_entry("chatterbox", 3)
+    heavy.load_fn.side_effect = RuntimeError("CUDA out of memory")
+    b.register(light)
+    b.register(heavy)
+    b.request("ollama")              # resident
+    with pytest.raises(RuntimeError):
+        b.request("chatterbox")      # evicts ollama, then fails to load
+    # The evicted model is restored so the broker's view stays consistent.
+    assert light.state == "gpu"
+    assert light.load_fn.call_count == 2   # initial load + restore
+    assert b._evicted == []
+
+
 def test_release_noop_if_unloaded():
     b = VRAMBroker()
     e = _make_entry("dramabox", 3)
