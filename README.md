@@ -21,24 +21,15 @@ A local AI voice assistant with a web dashboard and a multi-agent backend.
 
 ## Install
 
-Create an isolated environment first.
-
-With venv:
+Create an isolated environment first (with venv):
 
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
 ```
 
-With Miniconda:
-
-```bash
-conda create -n plia-os python=3.11
-conda activate plia-os
-```
-
-`plia-os` can be replaced with any environment name. Do **not** install into Conda's `base`
-environment — current Miniconda ships Python 3.14 there, which fails the requirement above.
+Make sure the interpreter is Python 3.11 or 3.12 (see the version requirement above); an
+environment built on 3.13 or 3.14 will fail to install the pinned dependencies.
 
 Then, with the environment active:
 
