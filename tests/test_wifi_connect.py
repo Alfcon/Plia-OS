@@ -77,14 +77,34 @@ def test_connect_wifi_no_saved_networks_reports():
     assert "No saved WiFi network" in out
 
 
-def test_connect_wifi_secrets_required_hints_password():
+def test_connect_wifi_secrets_required_escalates_to_recovery():
     with _scan([("Cafe", 80, "WPA2")]), \
          _profiles([]), \
          patch("modules.network_tools._run_timed",
-               return_value=_fail("Error: secrets were required, but not provided")) as run:
+               return_value=_fail("Error: secrets were required, but not provided")) as run, \
+         patch("modules.network_tools._try_gain_access",
+               return_value="Recovered the key for 'Cafe' via WPS.") as recover:
         out = connect_wifi("Cafe")
     assert "password" in out.lower()
     assert run.call_args.args[0] == ["nmcli", "device", "wifi", "connect", "Cafe"]
+    recover.assert_called_once_with("Cafe", "")
+    assert "Recovered the key" in out
+
+
+def test_try_gain_access_delegates_to_wireless_tools():
+    from modules.network_tools import _try_gain_access
+    with patch("modules.wireless_tools.gain_wifi_access", return_value="got it") as g:
+        out = _try_gain_access("Cafe", "wlan0")
+    g.assert_called_once_with("Cafe", "wlan0")
+    assert out == "got it"
+
+
+def test_try_gain_access_exception_returns_hint():
+    from modules.network_tools import _try_gain_access
+    with patch("modules.wireless_tools.gain_wifi_access", side_effect=RuntimeError("boom")):
+        out = _try_gain_access("Cafe", "")
+    assert "not available" in out
+    assert "password" in out.lower()
 
 
 def test_connect_wifi_prefers_saved_profile_on_ambiguous_name():

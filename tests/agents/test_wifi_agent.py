@@ -107,6 +107,17 @@ async def test_action_saved_calls_list_saved_wifi():
 
 
 @pytest.mark.asyncio
+async def test_action_gain_calls_gain_wifi_access():
+    with patch("agents.wifi.call_llm", new_callable=AsyncMock) as mock_llm, \
+         patch("agents.wifi.gain_wifi_access", return_value="Recovered the key via WPS.") as mock_fn:
+        mock_llm.return_value = {"content": '{"action":"gain","interface":"wlan0","ssid":"Home","password":null}'}
+        update = await wifi_node(_state("get access to Home wifi"))
+    mock_fn.assert_called_once_with("Home", "wlan0")
+    assert update["active_agent"] == "wifi"
+    assert "Recovered the key" in "\n".join(update["tool_results"])
+
+
+@pytest.mark.asyncio
 async def test_preserves_prior_tool_results():
     with patch("agents.wifi.call_llm", new_callable=AsyncMock) as mock_llm, \
          patch("agents.wifi.wifi_status", return_value="connected"):
