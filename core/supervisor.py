@@ -59,8 +59,8 @@ _CLASSIFY_SYSTEM_BASE = (
     "Use 'home' only for Home Assistant device control (lights, switches, sensors). "
     "Use 'network' for MAC address operations (show, change, randomize, spoof, restore MAC address). "
     "Use 'wifi' for WiFi status, scanning nearby networks, listing WiFi interfaces, "
-    "connecting to a WiFi network, listing saved WiFi networks, or getting access to a "
-    "network you don't have the password for. "
+    "connecting to a WiFi network, listing saved WiFi networks, getting access to a "
+    "network you don't have the password for, or revealing the names of hidden networks. "
     "Use 'file' for reading, writing, finding, searching, or running files and directories; also PDF, Word, Excel, PowerPoint documents. "
     "Use 'weather' for weather conditions, forecasts, temperature, rain, UV index, or climate queries. "
     "Use 'respond' for countdown timers, volume, system info, calculations, or anything answerable with tools directly."
@@ -130,7 +130,9 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
              "connect to the network", "connect to my wifi", "get online",
              "saved wifi", "saved networks", "list saved wifi", "wifi connect",
              "get access to", "get the password for", "hack the wifi", "hack wifi",
-             "crack the wifi", "crack wifi", "no password"],
+             "crack the wifi", "crack wifi", "no password",
+             "hidden network", "hidden wifi", "hidden ssid", "hidden networks",
+             "reveal hidden", "show hidden", "what's the hidden network", "unnamed network"],
     "respond": ["thank you", "thanks", "no thanks", "never mind", "nevermind",
                 "that's all", "that is all", "good night", "goodnight", "goodbye",
                 "set a timer", "set timer", "start a timer", "start timer", "timer for",

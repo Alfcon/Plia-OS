@@ -118,6 +118,17 @@ async def test_action_gain_calls_gain_wifi_access():
 
 
 @pytest.mark.asyncio
+async def test_action_reveal_calls_reveal_hidden_ssid():
+    with patch("agents.wifi.call_llm", new_callable=AsyncMock) as mock_llm, \
+         patch("agents.wifi.reveal_hidden_ssid", return_value="Found 1 hidden network(s): ...") as mock_fn:
+        mock_llm.return_value = {"content": '{"action":"reveal","interface":"wlan0","ssid":null,"password":null}'}
+        update = await wifi_node(_state("reveal hidden networks"))
+    mock_fn.assert_called_once_with("wlan0")
+    assert update["active_agent"] == "wifi"
+    assert "hidden network" in "\n".join(update["tool_results"])
+
+
+@pytest.mark.asyncio
 async def test_preserves_prior_tool_results():
     with patch("agents.wifi.call_llm", new_callable=AsyncMock) as mock_llm, \
          patch("agents.wifi.wifi_status", return_value="connected"):

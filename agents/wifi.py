@@ -7,7 +7,7 @@ from agents.llm import call_llm, parse_llm_json
 from modules.network_tools import (
     wifi_status, scan_wifi, list_wifi_interfaces, connect_wifi, list_saved_wifi,
 )
-from modules.wireless_tools import gain_wifi_access
+from modules.wireless_tools import gain_wifi_access, reveal_hidden_ssid
 
 if TYPE_CHECKING:
     from core.supervisor import AgentState
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 _PARSE_SYSTEM = (
     "Parse the WiFi request. "
     'Output JSON with exactly four keys: '
-    '"action" (one of: status, scan, interfaces, connect, saved, gain), '
+    '"action" (one of: status, scan, interfaces, connect, saved, gain, reveal), '
     '"interface" (interface name string or null for auto-detect), '
     '"ssid" (network name string or null), '
     '"password" (string or null). '
@@ -30,6 +30,7 @@ _PARSE_SYSTEM = (
     "Use 'saved' to list saved WiFi networks. "
     "Use 'gain' when the user wants to get access to a network they don't "
     "have the password for (recovers the key automatically). "
+    "Use 'reveal' to reveal the names of hidden WiFi networks. "
     "Output only valid JSON, no explanation."
 )
 
@@ -39,7 +40,7 @@ _FALLBACK_MSG = (
     "'connect to my wifi', 'connect to the Home network', 'list saved wifi'."
 )
 
-_ACTIONS = {"status", "scan", "interfaces", "connect", "saved", "gain"}
+_ACTIONS = {"status", "scan", "interfaces", "connect", "saved", "gain", "reveal"}
 
 
 async def wifi_node(state: "AgentState") -> dict:
@@ -78,6 +79,8 @@ async def wifi_node(state: "AgentState") -> dict:
             result = await asyncio.to_thread(list_saved_wifi)
         elif action == "gain":
             result = await asyncio.to_thread(gain_wifi_access, ssid, interface)
+        elif action == "reveal":
+            result = await asyncio.to_thread(reveal_hidden_ssid, interface)
         else:  # interfaces
             result = await asyncio.to_thread(list_wifi_interfaces)
     except Exception:
