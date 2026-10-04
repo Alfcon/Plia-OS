@@ -76,6 +76,37 @@ async def test_action_interfaces_calls_list():
 
 
 @pytest.mark.asyncio
+async def test_action_connect_calls_connect_wifi():
+    with patch("agents.wifi.call_llm", new_callable=AsyncMock) as mock_llm, \
+         patch("agents.wifi.connect_wifi", return_value="Connected to 'Home'.") as mock_fn:
+        mock_llm.return_value = {"content": '{"action":"connect","interface":"wlan0","ssid":"Home","password":null}'}
+        update = await wifi_node(_state("connect to Home"))
+    mock_fn.assert_called_once_with("Home", "wlan0", "")
+    assert update["active_agent"] == "wifi"
+    assert "Connected to 'Home'" in "\n".join(update["tool_results"])
+
+
+@pytest.mark.asyncio
+async def test_action_connect_auto_with_no_ssid():
+    with patch("agents.wifi.call_llm", new_callable=AsyncMock) as mock_llm, \
+         patch("agents.wifi.connect_wifi", return_value="Connected to 'Home'.") as mock_fn:
+        mock_llm.return_value = {"content": '{"action":"connect","interface":null,"ssid":null,"password":null}'}
+        update = await wifi_node(_state("connect to my wifi"))
+    mock_fn.assert_called_once_with("", "", "")
+    assert update["active_agent"] == "wifi"
+
+
+@pytest.mark.asyncio
+async def test_action_saved_calls_list_saved_wifi():
+    with patch("agents.wifi.call_llm", new_callable=AsyncMock) as mock_llm, \
+         patch("agents.wifi.list_saved_wifi", return_value="Saved WiFi networks:\n- Home") as mock_fn:
+        mock_llm.return_value = {"content": '{"action":"saved","interface":null,"ssid":null,"password":null}'}
+        update = await wifi_node(_state("list saved wifi"))
+    mock_fn.assert_called_once_with()
+    assert update["active_agent"] == "wifi"
+
+
+@pytest.mark.asyncio
 async def test_preserves_prior_tool_results():
     with patch("agents.wifi.call_llm", new_callable=AsyncMock) as mock_llm, \
          patch("agents.wifi.wifi_status", return_value="connected"):

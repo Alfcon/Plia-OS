@@ -58,7 +58,8 @@ _CLASSIFY_SYSTEM_BASE = (
     "Use 'cron' for recurring schedules ('every day at 8am', 'every weekday', 'every 30 minutes', cron job management). "
     "Use 'home' only for Home Assistant device control (lights, switches, sensors). "
     "Use 'network' for MAC address operations (show, change, randomize, spoof, restore MAC address). "
-    "Use 'wifi' for WiFi status, scanning nearby networks, or listing WiFi interfaces. "
+    "Use 'wifi' for WiFi status, scanning nearby networks, listing WiFi interfaces, "
+    "connecting to a WiFi network, or listing saved WiFi networks. "
     "Use 'file' for reading, writing, finding, searching, or running files and directories; also PDF, Word, Excel, PowerPoint documents. "
     "Use 'weather' for weather conditions, forecasts, temperature, rain, UV index, or climate queries. "
     "Use 'respond' for countdown timers, volume, system info, calculations, or anything answerable with tools directly."
@@ -122,7 +123,11 @@ _KEYWORD_ROUTES: dict[str, list[str]] = {
     "wifi": ["wifi status", "wi-fi status", "wifi network", "wi-fi network",
              "scan for wifi", "scan wifi", "nearby wifi", "nearby networks",
              "wifi interfaces", "wireless interfaces", "am i connected to wifi",
-             "wifi signal", "wifi strength", "wifi channel"],
+             "wifi signal", "wifi strength", "wifi channel",
+             "connect to wifi", "connect to the wifi", "connect wifi", "connect to wi-fi",
+             "join the wifi", "join wifi", "join the network", "connect to network",
+             "connect to the network", "connect to my wifi", "get online",
+             "saved wifi", "saved networks", "list saved wifi", "wifi connect"],
     "respond": ["thank you", "thanks", "no thanks", "never mind", "nevermind",
                 "that's all", "that is all", "good night", "goodnight", "goodbye",
                 "set a timer", "set timer", "start a timer", "start timer", "timer for",

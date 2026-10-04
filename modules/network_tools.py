@@ -294,6 +294,160 @@ def wifi_status() -> str:
     )
 
 
+# ── WiFi connect / saved networks ────────────────────────────────────────────
+
+def _nmcli_wifi_profiles() -> list[str]:
+    """Saved NetworkManager WiFi connection names (usually SSIDs). Empty on failure."""
+    r = subprocess.run(
+        ["nmcli", "-t", "-f", "NAME,TYPE", "--escape", "no", "connection", "show"],
+        capture_output=True, text=True, timeout=5,
+    )
+    if r.returncode != 0:
+        return []
+    names = []
+    for line in r.stdout.splitlines():
+        parts = line.split(":", 1)
+        if len(parts) == 2 and "wireless" in parts[1].lower():
+            names.append(parts[0])
+    return names
+
+
+def _scan_wifi_networks() -> list[tuple[str, int, str]]:
+    """Return [(ssid, signal, security)] sorted by signal (best first). Empty on failure."""
+    r = subprocess.run(
+        ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY", "--escape", "no", "dev", "wifi", "list"],
+        capture_output=True, text=True, timeout=15,
+    )
+    if r.returncode != 0:
+        return []
+    out: list[tuple[str, int, str]] = []
+    seen: set[str] = set()
+    for line in r.stdout.splitlines():
+        if not line:
+            continue
+        parts = line.rsplit(":", 2)
+        if len(parts) < 3:
+            continue
+        ssid, signal, security = parts
+        ssid = (ssid or "").strip() or "<hidden>"
+        if ssid == "<hidden>" or ssid in seen:
+            continue
+        seen.add(ssid)
+        try:
+            sig = int(signal)
+        except ValueError:
+            sig = 0
+        out.append((ssid, sig, security or "open"))
+    out.sort(key=lambda x: -x[1])
+    return out
+
+
+def _match_ssid(target: str, available: list[tuple[str, int, str]]) -> str | None:
+    """Best available SSID for a user-supplied name: exact → containment → strongest."""
+    t = target.strip().lower()
+    if not t:
+        return None
+    for ssid, _, _ in available:
+        if ssid.lower() == t:
+            return ssid
+    best: tuple[int, str] | None = None
+    for ssid, sig, _ in available:
+        sl = ssid.lower()
+        if t in sl or sl in t:
+            if best is None or sig > best[0]:
+                best = (sig, ssid)
+    return best[1] if best else None
+
+
+def _resolve_target(ssid: str, available: list[tuple[str, int, str]], profiles: list[str]) -> str:
+    """Resolve a user-supplied name to an SSID, preferring saved profiles on ambiguity
+    (e.g. 'home' → saved 'Home Network' rather than the stronger 'Home Network 5G')."""
+    t = ssid.strip().lower()
+    # 1. exact saved profile
+    for p in profiles:
+        if p.lower() == t:
+            return p
+    # 2. exact available SSID
+    for s, _, _ in available:
+        if s.lower() == t:
+            return s
+    # 3. saved profile containment
+    for p in profiles:
+        pl = p.lower()
+        if t in pl or pl in t:
+            return p
+    # 4. available containment (strongest signal)
+    matched = _match_ssid(ssid, available)
+    if matched:
+        return matched
+    # 5. literal fallback (e.g. a hidden network named exactly as typed)
+    return ssid.strip()
+
+
+def _saved_networks_in_range(available: list[tuple[str, int, str]], profiles: list[str]) -> list[str]:
+    """Available SSIDs (best signal first) that have a saved profile."""
+    pl = {p.lower() for p in profiles}
+    return [ssid for ssid, _, _ in available if ssid.lower() in pl]
+
+
+def _run_connect(cmd: list[str], ssid: str, has_password: bool) -> str:
+    r = _run_timed(cmd, timeout=45)
+    if r.returncode == 0:
+        return f"Connected to '{ssid}'."
+    err = (r.stderr or r.stdout or "unknown error").strip()
+    if not has_password and ("secret" in err.lower() or "password" in err.lower()):
+        return (
+            f"Could not connect to '{ssid}': this network needs a password and no saved "
+            f"profile was found for it. Pass the password, or save it first with "
+            f"'nmcli device wifi connect {ssid!r} password <your-password>'. ({err})"
+        )
+    return f"Could not connect to '{ssid}': {err}"
+
+
+@tool(description="Connect to a WiFi network, reusing saved credentials so no password is needed for networks you've joined before. Leave ssid empty to connect to the strongest in-range saved network. Pass password only for a brand-new network.")
+def connect_wifi(ssid: str = "", interface: str = "", password: str = "") -> str:
+    available = _scan_wifi_networks()
+    profiles = _nmcli_wifi_profiles()
+    has_password = bool(password.strip())
+
+    target: str
+    if ssid.strip():
+        target = _resolve_target(ssid, available, profiles)
+    else:
+        in_range = _saved_networks_in_range(available, profiles)
+        if in_range:
+            target = in_range[0]
+        elif len(profiles) == 1:
+            # Single saved profile (possibly hidden or an empty scan) — bring it up directly.
+            target = profiles[0]
+            cmd = ["nmcli", "connection", "up", target]
+            if interface.strip():
+                cmd += ["ifname", interface.strip()]
+            return _run_connect(cmd, target, has_password=False)
+        else:
+            saved = ", ".join(profiles) if profiles else "none"
+            return (
+                "No saved WiFi network is currently in range, so I don't know which network "
+                "to connect to. Saved networks: " + saved + ". "
+                "Tell me a network name to connect to it."
+            )
+
+    cmd = ["nmcli", "device", "wifi", "connect", target]
+    if has_password:
+        cmd += ["password", password.strip()]
+    if interface.strip():
+        cmd += ["ifname", interface.strip()]
+    return _run_connect(cmd, target, has_password)
+
+
+@tool(description="List WiFi networks this computer has saved (joined before) and can reconnect to without entering a password.")
+def list_saved_wifi() -> str:
+    profiles = _nmcli_wifi_profiles()
+    if not profiles:
+        return "No saved WiFi networks found."
+    return "Saved WiFi networks:\n" + "\n".join(f"- {p}" for p in profiles)
+
+
 # ── USB WiFi dongle enable/disable ───────────────────────────────────────────
 def _wifi_device_names() -> list[str]:
     """WiFi device names known to nmcli (including unmanaged ones). Raises ValueError if nmcli fails."""

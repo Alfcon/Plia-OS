@@ -124,7 +124,7 @@ Dashboard at `http://localhost:8000`. Voice pipeline starts automatically; dashb
 | reminder | Persists reminders to SQLite, fires as dashboard notifications via background polling |
 | home | Calls Home Assistant services and reads entity states |
 | file | Reads, writes, lists, and searches local files |
-| network | MAC randomisation, Tor routing, Wi-Fi scanning |
+| network | MAC randomisation, Tor routing, Wi-Fi scanning and connecting (reuses saved profiles) |
 | weather | Current conditions and forecast via Open-Meteo |
 
 ## TTS Engines
@@ -172,6 +172,18 @@ Background loop (configurable interval) that monitors memory, reminders, observe
 ## AirLLM
 
 Layer-by-layer inference for large models (~4 GB VRAM for 70B+). Configure from ☰ Menu → LLM → AirLLM: pick a HuggingFace model ID (autocomplete with 15 popular models), select compression (4bit/8bit/none), see live VRAM estimate, and apply. Unload button frees VRAM on demand.
+
+## Connect to WiFi
+
+Ask in chat or voice — no password needed for networks you've joined before:
+
+- *"Connect to my wifi"* — reconnects to the strongest in-range network you've saved (no extra data).
+- *"Connect to the `Home` network"* — joins a specific network, reusing its saved profile. Partial names work (`"connect to home"` matches `Home Network`).
+- *"What wifi networks have I saved?"* — lists saved networks.
+
+Under the hood this runs `nmcli device wifi connect <ssid>` so NetworkManager reuses the stored
+credentials from your existing saved connections; a brand-new network still needs its password
+once (`connect_wifi(ssid, password=...)`), after which it's saved and connects password-free.
 
 ## WiFi Dongle Switching
 
