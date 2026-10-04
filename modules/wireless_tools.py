@@ -30,11 +30,17 @@ def _has_wireless_admin() -> bool:
 
 
 def _run(*cmd: str, timeout: int = 30) -> subprocess.CompletedProcess:
-    return subprocess.run(list(cmd), capture_output=True, text=True, timeout=timeout)
+    try:
+        return subprocess.run(list(cmd), capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(list(cmd), -1, "", f"timed out after {timeout}s")
 
 
 def _sudo(*cmd: str, timeout: int = 30) -> subprocess.CompletedProcess:
-    return subprocess.run(["sudo"] + list(cmd), capture_output=True, text=True, timeout=timeout)
+    try:
+        return subprocess.run(["sudo"] + list(cmd), capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(["sudo"] + list(cmd), -1, "", f"timed out after {timeout}s")
 
 
 def _bin_missing(name: str) -> str | None:
@@ -563,6 +569,8 @@ def gain_wifi_access(ssid: str, interface: str = "") -> str:
                             f"Handshake captured at {cap} but the key was not in the default "
                             "wordlists. Run crack_handshake_wordlist with a better wordlist."
                         )
+    except Exception as exc:
+        failure = f"Access recovery failed: {exc}"
     finally:
         _stop_monitor(mon)
 
@@ -624,5 +632,7 @@ def reveal_hidden_ssid(interface: str = "") -> str:
                 else:
                     lines.append(f"{bssid} → not revealed (no client reconnected to deauth)")
         return "\n".join(lines)
+    except Exception as exc:
+        return f"Could not reveal hidden SSIDs: {exc}"
     finally:
         _stop_monitor(mon)
