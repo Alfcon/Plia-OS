@@ -87,7 +87,7 @@ Dashboard at `http://localhost:8000`. Voice pipeline starts automatically; dashb
 | ☰ Menu → Home | Home Assistant entity list and toggles |
 | ☰ Menu → Permissions | Per-tool execution approval, tool guard list |
 | ☰ Menu → News | DDG news search by topic, RSS feed reader |
-| ☰ Menu → Network | Tor toggle, WiFi scan (signal/security/channel), MAC randomise/restore |
+| ☰ Menu → Network | Tor toggle, WiFi scan/connect, MAC randomise/restore, wireless tools |
 | ☰ Menu → Cron | Scheduled tasks with presets, next-run display, `tool:` invocation |
 | ☰ Menu → Tokens | LLM token usage and cost tracking |
 | ☰ Menu → Briefing | Morning briefing config: section toggles, time, preview button |
@@ -124,7 +124,7 @@ Dashboard at `http://localhost:8000`. Voice pipeline starts automatically; dashb
 | reminder | Persists reminders to SQLite, fires as dashboard notifications via background polling |
 | home | Calls Home Assistant services and reads entity states |
 | file | Reads, writes, lists, and searches local files |
-| network | MAC randomisation, Tor routing, Wi-Fi scanning and connecting (reuses saved profiles) |
+| network | MAC randomisation, Tor routing, Wi-Fi scanning, connecting (reuses saved profiles), key recovery, and hidden-SSID reveal |
 | weather | Current conditions and forecast via Open-Meteo |
 
 ## TTS Engines
@@ -173,7 +173,9 @@ Background loop (configurable interval) that monitors memory, reminders, observe
 
 Layer-by-layer inference for large models (~4 GB VRAM for 70B+). Configure from ☰ Menu → LLM → AirLLM: pick a HuggingFace model ID (autocomplete with 15 popular models), select compression (4bit/8bit/none), see live VRAM estimate, and apply. Unload button frees VRAM on demand.
 
-## Connect to WiFi
+## WiFi
+
+### Connect — no password for saved networks
 
 Ask in chat or voice — no password needed for networks you've joined before:
 
@@ -184,6 +186,27 @@ Ask in chat or voice — no password needed for networks you've joined before:
 Under the hood this runs `nmcli device wifi connect <ssid>` so NetworkManager reuses the stored
 credentials from your existing saved connections; a brand-new network still needs its password
 once (`connect_wifi(ssid, password=...)`), after which it's saved and connects password-free.
+
+### Recover access without the password
+
+When a network needs a password you don't have, Plia tries to obtain it automatically with
+`gain_wifi_access(ssid)`:
+
+1. **WPS** first (fast) — `reaver` recovers the PSK if the router has WPS enabled.
+2. Falls back to **WPA handshake capture** (deauth a client) + **crack** with rockyou.txt and a generated digits wordlist.
+3. Connects automatically once a key is recovered.
+
+This runs automatically when `connect_wifi` finds a secured network with no saved profile and no
+password. It requires the **Wireless Tools** permission group (set the tools to Admin in
+☰ Menu → Permissions and run the grant command) and `install_wireless_tools`.
+
+> Only use on networks you own or have explicit permission to test.
+
+### Reveal hidden SSIDs
+
+Networks that don't broadcast their name show as `<hidden>` in a scan. `reveal_hidden_ssid()`
+puts the adapter in monitor mode, deauths clients on **every** hidden network, and reports each
+real SSID (via client reconnect + probe requests). Ask: *"Reveal the hidden networks."*
 
 ## WiFi Dongle Switching
 

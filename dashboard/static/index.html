@@ -307,6 +307,7 @@
         <li><strong>Workflows (Flows)</strong> — multi-step sequences built in <strong>Settings → Flows</strong>. Run via <code>run_workflow</code> or chat. See <strong>Docs → Flows</strong>.</li>
         <li><strong>Cron Jobs</strong> — repeating scheduled messages via cron expressions. See <strong>Docs → Cron</strong>.</li>
         <li><strong>Tor Routing</strong> — route all traffic through Tor with <code>enable_tor</code>. See <strong>Docs → Network</strong>.</li>
+        <li><strong>WiFi access</strong> — connect to saved networks without a password, recover a key automatically when you don't have it, and reveal hidden SSIDs. See <strong>Docs → Network</strong>.</li>
         <li><strong>Observer</strong> — screen/activity capture for context-aware suggestions. Enable in <strong>Settings → Observer</strong>.</li>
         <li><strong>Proactive Assistant</strong> — context-aware suggestions sent automatically. Enable in <strong>Settings → Proactive</strong>.</li>
       </ul>
@@ -1061,9 +1062,13 @@
       <h4>WiFi</h4>
       <ul>
         <li><code>list_wifi_interfaces()</code> — list WiFi adapters and their state.</li>
-        <li><code>scan_wifi(interface)</code> — scan for nearby networks (SSID, signal, security, channel).</li>
+        <li><code>scan_wifi(interface)</code> — scan for nearby networks (SSID, signal, security, channel). Networks that hide their name appear as <code>&lt;hidden&gt;</code>.</li>
         <li><code>wifi_status()</code> — current connection: SSID, signal, IP.</li>
+        <li><code>list_saved_wifi()</code> — list networks this machine has saved, reconnectable without a password.</li>
+        <li><code>connect_wifi(ssid, interface, password)</code> — connect to a network, reusing its saved profile so no password is needed for networks you've joined before. Leave <code>ssid</code> empty to auto-connect to the strongest saved network in range; pass <code>password</code> only for a brand-new network.</li>
+        <li><code>reveal_hidden_ssid(interface)</code> — reveal the SSID of every nearby hidden network (deauths clients so they re-announce the name).</li>
       </ul>
+      <p>Via chat: "Connect to my wifi" / "Connect to the Home network" / "Reveal the hidden networks" / "What wifi networks have I saved?".</p>
 
       <h4>Network Check</h4>
       <p>Defensive audits of a network you own — read-only, advisory, nothing is changed. These tools run the standalone <strong>netpass</strong> program (<code>/home/alfcon/Projects/Netpass/netpass.py</code> via its own virtualenv).</p>
@@ -1078,11 +1083,17 @@
       <h4>Wireless Security Tools</h4>
       <p style="color:#e57373;">Use only on networks you own or have explicit permission to test. Unauthorized use is illegal.</p>
       <ul>
+        <li><code>install_wireless_tools()</code> — install the aircrack-ng suite, reaver, wash, and crunch.</li>
+        <li><code>start_monitor_mode(interface)</code> / <code>stop_monitor_mode(interface)</code> — toggle monitor mode for packet capture.</li>
+        <li><code>monitor_scan_networks(interface, scan_seconds)</code> — detailed scan via airodump-ng (BSSID, channel, signal, encryption).</li>
+        <li><code>capture_handshake(interface, bssid, channel)</code> — capture a WPA handshake (deauths a client).</li>
+        <li><code>create_wordlist(min_len, max_len, charset, output_file)</code> — generate a wordlist with crunch.</li>
         <li><code>scan_wps_networks(interface, scan_seconds)</code> — scan for WPS-enabled networks. Requires monitor mode.</li>
         <li><code>attack_wps(interface, bssid, channel)</code> — WPS PIN attack via reaver.</li>
         <li><code>crack_handshake_rockyou(capture_file, bssid)</code> — crack a captured WPA handshake using rockyou.txt.</li>
         <li><code>crack_handshake_wordlist(capture_file, bssid, wordlist_file)</code> — crack using a custom wordlist.</li>
         <li><code>crack_handshake_auto(capture_file, bssid)</code> — crack by generating digit candidates on the fly.</li>
+        <li><code>gain_wifi_access(ssid, interface)</code> — recover the key automatically (WPS first, then handshake+crack) and connect. Requires Admin + the Wireless Tools grant.</li>
       </ul>
 
       <h4>Running via Tools Panel</h4>
