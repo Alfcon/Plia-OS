@@ -235,7 +235,7 @@ def monitor_scan_networks(interface: str = "", scan_seconds: int = 15) -> str:
     return "\n".join([header] + rows)
 
 
-@tool(description="Capture a WPA handshake. Sends deauth frames to force client reconnect. Use only on networks you own or have permission to test. Args: interface (monitor mode), bssid, channel, output_dir (default /tmp)")
+@tool(description="Capture a WPA handshake. Sends deauth frames to force a client reconnect and verifies a handshake was actually captured. Use only on networks you own or have permission to test. Args: interface (monitor mode), bssid, channel, output_dir (default /tmp)")
 def capture_handshake(interface: str, bssid: str, channel: str, output_dir: str = "/tmp") -> str:
     if not _has_wireless_admin():
         return "Permission denied. Set tool to Admin in Settings → Permissions."
@@ -244,25 +244,18 @@ def capture_handshake(interface: str, bssid: str, channel: str, output_dir: str 
     for b in ("airodump-ng", "aireplay-ng"):
         if _bin_missing(b):
             return f"{b} not found. Run: install_wireless_tools"
-    prefix = os.path.join(output_dir, f"plia_{bssid.replace(':', '')}")
-    dump_proc = subprocess.Popen(
-        ["sudo", "airodump-ng", "--bssid", bssid, "-c", channel, "-w", prefix, interface],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    cap_file = _capture_handshake_file(interface, bssid, channel, prefix_dir=output_dir)
+    if cap_file:
+        n = handshake_count(cap_file, bssid)
+        return (
+            f"Handshake captured ({n} handshake{'s' if n != 1 else ''}) at {cap_file}\n"
+            "Run crack_handshake_rockyou, crack_handshake_wordlist or crack_handshake_auto to test."
+        )
+    return (
+        f"No WPA handshake captured for {bssid} after {_CAPTURE_ATTEMPTS} attempts "
+        "(a capture file exists but aircrack-ng sees 0 handshakes).\n"
+        + _NO_HANDSHAKE_HELP
     )
-    try:
-        time.sleep(5)
-        _sudo("aireplay-ng", "-0", "5", "-a", bssid, interface, timeout=20)
-        time.sleep(10)
-    finally:
-        dump_proc.terminate()
-        try:
-            dump_proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            dump_proc.kill()
-    cap_file = prefix + "-01.cap"
-    if Path(cap_file).exists() and Path(cap_file).stat().st_size > 0:
-        return f"Capture saved to {cap_file}\nRun crack_handshake_rockyou or crack_handshake_wordlist to test."
-    return f"No handshake captured at {cap_file}. Try again — client must reconnect during capture window."
 
 
 @tool(description="Create a wordlist using crunch for password testing. Args: min_len, max_len (max 12), charset (default lowercase+digits), output_file")
@@ -431,6 +424,93 @@ def download_rockyou() -> str:
     return f"rockyou.txt ready at {out} ({size_mb:.0f} MB)."
 
 
+# ── Handshake verification ────────────────────────────────────────────────────
+# aircrack-ng lists each AP with its handshake count, e.g. "WPA (1 handshake)".
+# A capture file always exists after airodump-ng runs — even with zero EAPOL
+# frames — so its presence/size proves nothing. We ask aircrack-ng instead and
+# only treat a capture as usable when it reports at least one handshake.
+_HANDSHAKE_RE = re.compile(r"WPA\s*\(\s*(\d+)\s+handshakes?\b", re.I)
+_NO_HANDSHAKE_MARKERS = (
+    "no valid wpa handshakes found",
+    "packets contained no eapol",
+    "no eapol data",
+)
+
+_NO_HANDSHAKE_HELP = (
+    "  • a client must be associated with the AP and stay in range — a deauth\n"
+    "    only forces a reconnect when a client is connected;\n"
+    "  • check the BSSID and channel, and that the adapter is in monitor mode;\n"
+    "  • give it a longer capture window (clients can be slow to reconnect);\n"
+    "  • WPA3-only (SAE) networks can't be cracked from a 4-way handshake."
+)
+
+
+def parse_handshake_count(aircrack_output: str, bssid: str = "") -> int:
+    """Handshake count aircrack-ng reports in its output (0 = none).
+
+    Scoped to the target BSSID's row when a BSSID is given, so a handshake
+    belonging to a different AP is never credited to the target.
+    """
+    out = aircrack_output or ""
+    target = (bssid or "").lower()
+    if target:
+        for line in out.splitlines():
+            if target in line.lower():
+                m = _HANDSHAKE_RE.search(line)
+                return int(m.group(1)) if m else 0
+        return 0
+    return max((int(m.group(1)) for m in _HANDSHAKE_RE.finditer(out)), default=0)
+
+
+def handshake_count(cap_file: str, bssid: str = "") -> int:
+    """Count usable WPA handshakes in a capture by asking aircrack-ng.
+
+    With no wordlist aircrack-ng prints its AP table and exits by itself, so
+    this is a safe non-interactive probe (bounded by the runner's timeout).
+    """
+    if not cap_file or not Path(cap_file).exists():
+        return 0
+    r = _run("aircrack-ng", cap_file, timeout=60)
+    return parse_handshake_count((r.stdout or "") + (r.stderr or ""), bssid)
+
+
+def _count_handshakes_live(cap_file: str, bssid: str) -> int:
+    """Count handshakes in a capture airodump-ng may still be appending to."""
+    import shutil
+    import tempfile
+
+    src = Path(cap_file)
+    try:
+        if not src.exists() or src.stat().st_size == 0:
+            return 0
+        with tempfile.TemporaryDirectory() as td:
+            snap = Path(td) / "snap.cap"
+            shutil.copyfile(src, snap)
+            return handshake_count(str(snap), bssid)
+    except OSError:
+        return 0
+
+
+def _no_handshake_message(cap_file: str, bssid: str) -> str:
+    return (
+        f"No usable WPA handshake in {cap_file}: aircrack-ng found 0 handshakes "
+        '("Packets contained no EAPOL data").\n'
+        "Re-capture with capture_handshake(interface, bssid, channel) and check:\n"
+        + _NO_HANDSHAKE_HELP
+    )
+
+
+def _crack_reply(out: str, cap_file: str, bssid: str, fallback: str) -> str:
+    """Turn aircrack-ng output into a clear result message."""
+    for line in out.splitlines():
+        if "KEY FOUND" in line:
+            return line.strip()
+    low = out.lower()
+    if any(marker in low for marker in _NO_HANDSHAKE_MARKERS):
+        return _no_handshake_message(cap_file, bssid)
+    return out.strip()[-500:] or fallback
+
+
 @tool(description="Crack a WPA handshake capture file using rockyou.txt. Use only on networks you own or have permission to test. Args: capture_file, bssid")
 def crack_handshake_rockyou(capture_file: str, bssid: str) -> str:
     if not capture_file or not bssid:
@@ -443,11 +523,7 @@ def crack_handshake_rockyou(capture_file: str, bssid: str) -> str:
     if not wordlist:
         return error or _rockyou_help()
     r = _run("aircrack-ng", capture_file, "-b", bssid, "-w", wordlist, timeout=600)
-    out = (r.stdout + r.stderr)
-    for line in out.splitlines():
-        if "KEY FOUND" in line:
-            return line.strip()
-    return out.strip()[-500:] or "Key not found in rockyou.txt."
+    return _crack_reply(r.stdout + r.stderr, capture_file, bssid, "Key not found in rockyou.txt.")
 
 
 @tool(description="Crack a WPA handshake using a custom wordlist file. Use only on networks you own or have permission to test. Args: capture_file, bssid, wordlist_file")
@@ -460,11 +536,7 @@ def crack_handshake_wordlist(capture_file: str, bssid: str, wordlist_file: str) 
     if _bin_missing("aircrack-ng"):
         return "aircrack-ng not found. Run: install_wireless_tools"
     r = _run("aircrack-ng", capture_file, "-b", bssid, "-w", wordlist_file, timeout=600)
-    out = (r.stdout + r.stderr)
-    for line in out.splitlines():
-        if "KEY FOUND" in line:
-            return line.strip()
-    return out.strip()[-500:] or "Key not found in wordlist."
+    return _crack_reply(r.stdout + r.stderr, capture_file, bssid, "Key not found in wordlist.")
 
 
 @tool(description="Crack a WPA handshake without a prepared wordlist by generating candidates on the fly (digits only, 8-10 chars). Use only on networks you own or have permission to test. Args: capture_file, bssid")
@@ -482,11 +554,10 @@ def crack_handshake_auto(capture_file: str, bssid: str) -> str:
         return f"crunch failed: {gen.stderr.strip()}"
     try:
         crack = _run("aircrack-ng", capture_file, "-b", bssid, "-w", wordlist, timeout=600)
-        out = (crack.stdout + crack.stderr)
-        for line in out.splitlines():
-            if "KEY FOUND" in line:
-                return line.strip()
-        return out.strip()[-500:] or "Key not found with auto-generated wordlist."
+        return _crack_reply(
+            crack.stdout + crack.stderr, capture_file, bssid,
+            "Key not found with auto-generated wordlist.",
+        )
     finally:
         try:
             Path(wordlist).unlink()
@@ -602,26 +673,38 @@ def _wps_psk(mon_iface: str, bssid: str, channel: str) -> str | None:
     return m.group(1) if m else None
 
 
-def _capture_handshake_file(mon_iface: str, bssid: str, channel: str) -> str | None:
-    """Capture a WPA handshake; return the .cap path, or None on failure."""
-    prefix = os.path.join("/tmp", f"plia_{bssid.replace(':', '')}")
+_CAPTURE_ATTEMPTS = 3          # deauth + wait cycles per capture attempt
+_CAPTURE_SETTLE_S = 5          # let airodump-ng lock onto the channel first
+_CAPTURE_WAIT_S = 12           # time for a client to reconnect and complete the 4-way handshake
+
+
+def _capture_handshake_file(mon_iface: str, bssid: str, channel: str,
+                            prefix_dir: str = "/tmp",
+                            attempts: int = _CAPTURE_ATTEMPTS) -> str | None:
+    """Capture a WPA handshake; return the .cap path once aircrack-ng sees one.
+
+    Keeps a single airodump-ng running and retries the deauth, verifying after
+    each attempt so a handshake-less capture is never handed to the cracker.
+    """
+    prefix = os.path.join(prefix_dir, f"plia_{bssid.replace(':', '')}")
     dump_proc = subprocess.Popen(
         ["sudo", "airodump-ng", "--bssid", bssid, "-c", channel, "-w", prefix, mon_iface],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
+    cap_file = prefix + "-01.cap"
     try:
-        time.sleep(5)
-        _sudo("aireplay-ng", "-0", "5", "-a", bssid, mon_iface, timeout=20)
-        time.sleep(10)
+        for _ in range(max(1, attempts)):
+            time.sleep(_CAPTURE_SETTLE_S)
+            _sudo("aireplay-ng", "-0", "5", "-a", bssid, mon_iface, timeout=20)
+            time.sleep(_CAPTURE_WAIT_S)
+            if _count_handshakes_live(cap_file, bssid) > 0:
+                return cap_file
     finally:
         dump_proc.terminate()
         try:
             dump_proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             dump_proc.kill()
-    cap_file = prefix + "-01.cap"
-    if Path(cap_file).exists() and Path(cap_file).stat().st_size > 0:
-        return cap_file
     return None
 
 
@@ -705,7 +788,12 @@ def gain_wifi_access(ssid: str, interface: str = "") -> str:
             else:
                 cap = _capture_handshake_file(mon, bssid, channel)
                 if cap is None:
-                    failure = f"No handshake captured for '{ssid}'. A client must (re)connect during capture."
+                    failure = (
+                        f"No handshake captured for '{ssid}' after {_CAPTURE_ATTEMPTS} attempts. "
+                        "A client must be connected and (re)connect during the capture; check the "
+                        "channel and that the adapter is in monitor mode. WPA3-only networks "
+                        "can't be cracked this way."
+                    )
                 else:
                     recovered = _crack_with_wordlists(cap, bssid)
                     if recovered:
