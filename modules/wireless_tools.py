@@ -13,7 +13,45 @@ from core.registry import tool
 logger = logging.getLogger(__name__)
 
 _WIRELESS_SUDOERS = "/etc/sudoers.d/plia-wireless"
-_ROCKYOU = "/usr/share/wordlists/rockyou.txt"
+
+# rockyou.txt lives in different places depending on the distro and is often
+# shipped gzipped (Kali's `wordlists` package). We look in all the usual spots
+# and decompress a local .gz into our own cache on first use, so the cracking
+# tools work on Ubuntu/Mint/Debian where no `wordlists` package exists.
+_ROCKYOU_URL = (
+    "https://gitlab.com/kalilinux/packages/wordlists/-/raw/kali/master/rockyou.txt.gz"
+)
+_ROCKYOU_CANDIDATES = (
+    "/usr/share/wordlists/rockyou.txt",
+    "/usr/share/wordlists/rockyou/rockyou.txt",
+    "/usr/local/share/wordlists/rockyou.txt",
+    "/opt/wordlists/rockyou.txt",
+    str(Path.home() / "wordlists" / "rockyou.txt"),
+)
+_ROCKYOU_GZ_CANDIDATES = ("/usr/share/wordlists/rockyou.txt.gz",)
+# Kept for backwards compatibility with anything importing the old constant.
+_ROCKYOU = _ROCKYOU_CANDIDATES[0]
+
+
+def _wordlist_dir() -> Path:
+    """Where Plia caches wordlists — follows the configured memory_dir."""
+    from core.config import get_config
+    return Path(os.path.expanduser(get_config().memory_dir)) / "wordlists"
+
+
+def _rockyou_cache() -> Path:
+    return _wordlist_dir() / "rockyou.txt"
+
+
+def _rockyou_help() -> str:
+    cache = _rockyou_cache()
+    return (
+        "rockyou.txt not found. Get it once with any of these:\n"
+        f"  • Any distro: run the download_rockyou tool (≈51 MB, saved to {cache})\n"
+        "  • Kali: sudo apt install wordlists\n"
+        f"  • Manual: mkdir -p {cache.parent} && "
+        f"curl -fL {_ROCKYOU_URL} | gunzip > {cache}"
+    )
 
 
 def _has_wireless_admin() -> bool:
@@ -60,7 +98,20 @@ def install_wireless_tools() -> str:
     for b in ("airmon-ng", "airodump-ng", "aireplay-ng", "aircrack-ng", "reaver", "wash", "crunch"):
         if not _bin_missing(b):
             installed.append(b)
-    return f"Installed. Available: {', '.join(installed)}"
+    lines = [f"Installed. Available: {', '.join(installed)}"]
+    # The `wordlists` package is Kali-only. Try it, then fall back to a direct
+    # download so handshake cracking works on Ubuntu/Mint/Debian too.
+    if not _find_rockyou()[0]:
+        subprocess.run(
+            ["sudo", "apt-get", "install", "-y", "wordlists"],
+            capture_output=True, text=True, timeout=120,
+        )
+        if not _find_rockyou()[0]:
+            lines.append(
+                "No rockyou.txt found (the 'wordlists' package is Kali-only). "
+                "Run download_rockyou to fetch it (~51 MB)."
+            )
+    return "\n".join(lines)
 
 
 def _detect_wifi_interface() -> str | None:
@@ -283,6 +334,103 @@ def attack_wps(interface: str, bssid: str, channel: str) -> str:
     return output[-1000:] if output else "No output from reaver."
 
 
+def _decompress_rockyou(gz_path: Path) -> Path | None:
+    """Decompress a rockyou.txt.gz into the user cache. Returns the .txt path."""
+    import gzip
+    import shutil
+
+    cache = _rockyou_cache()
+    tmp = cache.with_name(cache.name + ".part")
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        with gzip.open(gz_path, "rb") as src, open(tmp, "wb") as dst:
+            shutil.copyfileobj(src, dst, length=1024 * 1024)
+        if tmp.stat().st_size == 0:
+            tmp.unlink(missing_ok=True)
+            return None
+        tmp.replace(cache)
+        return cache
+    except (OSError, EOFError):
+        logger.warning("Could not decompress rockyou wordlist from %s", gz_path, exc_info=True)
+        tmp.unlink(missing_ok=True)
+        return None
+
+
+def _find_rockyou() -> tuple[str | None, str | None]:
+    """Locate a usable rockyou.txt.
+
+    Returns ``(path, error)``: on success ``path`` is set and ``error`` is None;
+    when nothing usable exists ``path`` is None and ``error`` explains how to
+    obtain it.
+    """
+    for candidate in _ROCKYOU_CANDIDATES:
+        p = Path(candidate)
+        try:
+            if p.is_file() and p.stat().st_size > 0:
+                return str(p), None
+        except OSError:
+            continue
+
+    cache = _rockyou_cache()
+    if cache.is_file() and cache.stat().st_size > 0:
+        return str(cache), None
+
+    for gz_candidate in (*_ROCKYOU_GZ_CANDIDATES, str(cache) + ".gz"):
+        gz = Path(gz_candidate)
+        if not gz.is_file():
+            continue
+        decompressed = _decompress_rockyou(gz)
+        if decompressed:
+            return str(decompressed), None
+        return None, f"Found {gz} but could not decompress it — try download_rockyou."
+    return None, _rockyou_help()
+
+
+def _download_file(url: str, dest: Path, timeout: int = 600) -> str | None:
+    """Download ``url`` to ``dest`` with curl, wget or urllib. Returns an error."""
+    if _bin_missing("curl") is None:
+        r = _run("curl", "-fL", "--retry", "2", "--connect-timeout", "15",
+                 "-o", str(dest), url, timeout=timeout)
+        return None if r.returncode == 0 else (r.stderr or r.stdout).strip()[-300:]
+    if _bin_missing("wget") is None:
+        r = _run("wget", "-q", "-O", str(dest), url, timeout=timeout)
+        return None if r.returncode == 0 else (r.stderr or r.stdout).strip()[-300:]
+    try:
+        import urllib.request
+        urllib.request.urlretrieve(url, dest)
+        return None
+    except Exception as exc:
+        return str(exc)
+
+
+@tool(description="Download the rockyou.txt wordlist (~51 MB) so the WPA handshake "
+      "cracking tools can use it. Use when rockyou.txt is missing, e.g. on "
+      "Ubuntu/Mint where no 'wordlists' package exists.")
+def download_rockyou() -> str:
+    existing, _ = _find_rockyou()
+    if existing:
+        return f"rockyou.txt is already available at {existing}"
+    wordlist_dir = _wordlist_dir()
+    try:
+        wordlist_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return f"Could not create {wordlist_dir}: {exc}"
+
+    gz_tmp = wordlist_dir / "rockyou.txt.gz.part"
+    error = _download_file(_ROCKYOU_URL, gz_tmp)
+    if error:
+        gz_tmp.unlink(missing_ok=True)
+        return f"Download failed: {error}"
+    try:
+        out = _decompress_rockyou(gz_tmp)
+    finally:
+        gz_tmp.unlink(missing_ok=True)
+    if not out:
+        return "Downloaded file could not be decompressed — it may not be a gzip archive."
+    size_mb = out.stat().st_size / 1024 ** 2
+    return f"rockyou.txt ready at {out} ({size_mb:.0f} MB)."
+
+
 @tool(description="Crack a WPA handshake capture file using rockyou.txt. Use only on networks you own or have permission to test. Args: capture_file, bssid")
 def crack_handshake_rockyou(capture_file: str, bssid: str) -> str:
     if not capture_file or not bssid:
@@ -291,12 +439,9 @@ def crack_handshake_rockyou(capture_file: str, bssid: str) -> str:
         return f"File not found: {capture_file}"
     if _bin_missing("aircrack-ng"):
         return "aircrack-ng not found. Run: install_wireless_tools"
-    wordlist = _ROCKYOU
-    gz = wordlist + ".gz"
-    if not Path(wordlist).exists():
-        if Path(gz).exists():
-            return f"rockyou.txt is compressed. Run: sudo gunzip {gz}"
-        return "rockyou.txt not found. Run: sudo apt install wordlists && sudo gunzip /usr/share/wordlists/rockyou.txt.gz"
+    wordlist, error = _find_rockyou()
+    if not wordlist:
+        return error or _rockyou_help()
     r = _run("aircrack-ng", capture_file, "-b", bssid, "-w", wordlist, timeout=600)
     out = (r.stdout + r.stderr)
     for line in out.splitlines():
@@ -493,8 +638,9 @@ def _aircrack_psk(capture_file: str, bssid: str, wordlist: str) -> str | None:
 
 def _crack_with_wordlists(capture_file: str, bssid: str) -> str | None:
     """Try rockyou.txt, then an auto-generated digits-only wordlist."""
-    if Path(_ROCKYOU).exists():
-        psk = _aircrack_psk(capture_file, bssid, _ROCKYOU)
+    wordlist, _ = _find_rockyou()
+    if wordlist:
+        psk = _aircrack_psk(capture_file, bssid, wordlist)
         if psk:
             return psk
     if _bin_missing("crunch") is None:

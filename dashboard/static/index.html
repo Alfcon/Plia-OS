@@ -1062,7 +1062,7 @@
       <h4>WiFi</h4>
       <ul>
         <li><code>list_wifi_interfaces()</code> — list WiFi adapters and their state.</li>
-        <li><code>scan_wifi(interface)</code> — scan for nearby networks (SSID, signal, security, channel). Networks that hide their name appear as <code>&lt;hidden&gt;</code>.</li>
+        <li><code>scan_wifi(interface)</code> — scan for nearby networks (SSID, MAC/BSSID, signal, security, channel). Networks that hide their name appear as <code>&lt;hidden&gt;</code>.</li>
         <li><code>wifi_status()</code> — current connection: SSID, signal, IP.</li>
         <li><code>list_saved_wifi()</code> — list networks this machine has saved, reconnectable without a password.</li>
         <li><code>connect_wifi(ssid, interface, password)</code> — connect to a network, reusing its saved profile so no password is needed for networks you've joined before. Leave <code>ssid</code> empty to auto-connect to the strongest saved network in range; pass <code>password</code> only for a brand-new network.</li>
@@ -1166,6 +1166,14 @@
             <button class="m-nav-btn" data-section="services" onclick="showMenuSection('services');loadServices()">Services</button>
             <button class="m-nav-btn" data-section="docker" onclick="showMenuSection('docker');loadDocker()">Docker</button>
             <button class="m-nav-btn" data-section="proclist" onclick="showMenuSection('proclist');loadProcesses()">Processes</button>
+          </div>
+        </div>
+
+        <div class="m-nav-group">
+          <button id="m-nav-optimise-toggle" class="m-nav-group-toggle" onclick="toggleNavGroup('optimise')">Optimise <span class="group-chevron">▸</span></button>
+          <div id="m-nav-optimise-items" class="m-nav-group-items closed">
+            <button class="m-nav-btn m-nav-sub" data-section="optimise" onclick="runOptimise('memory', this)">Reduce Memory Usage</button>
+            <button class="m-nav-btn m-nav-sub" data-section="optimise" onclick="runOptimise('power', this)">Reduce Power Consumption</button>
           </div>
         </div>
 
@@ -1624,6 +1632,31 @@
               onchange="fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({desktop_notifications:this.checked})})">
             Desktop notifications for reminders
           </label>
+        </div>
+        <div id="m-section-optimise" class="m-pane" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-size:0.78rem;color:#aaa;">System snapshot</span>
+            <button onclick="loadOptimiseStats()" style="background:none;border:none;color:#4fc3f7;font-size:0.75rem;cursor:pointer;">↻ Refresh</button>
+          </div>
+          <div id="opt-stats" style="font-size:0.75rem;color:#888;">Loading…</div>
+          <div id="opt-perm" style="font-size:0.7rem;color:#666;margin-top:6px;"></div>
+          <hr style="border-color:#222;margin:10px 0;" />
+          <div style="font-size:0.78rem;color:#aaa;margin-bottom:4px;">Reduce Memory Usage</div>
+          <div style="font-size:0.7rem;color:#666;margin-bottom:6px;">Unloads resident GPU/Ollama models, clears the LLM and CUDA caches, runs garbage collection and drops the OS page cache.</div>
+          <button id="opt-run-memory" onclick="runOptimise('memory')"
+            style="background:#1e2e1e;border:1px solid #2e4d2e;border-radius:3px;color:#a5d6a7;font-size:0.75rem;padding:5px 10px;cursor:pointer;width:100%;">▶ Reduce Memory Usage</button>
+          <div id="opt-memory-out" style="font-size:0.72rem;color:#888;margin-top:6px;white-space:pre-wrap;"></div>
+          <hr style="border-color:#222;margin:10px 0;" />
+          <div style="font-size:0.78rem;color:#aaa;margin-bottom:4px;">Reduce Power Consumption</div>
+          <div style="font-size:0.7rem;color:#666;margin-bottom:6px;">Unloads resident GPU models and switches the CPU governor to powersave and the energy preference to “power”. Needs root for the CPU settings; skipped steps are reported.</div>
+          <button id="opt-run-power" onclick="runOptimise('power')"
+            style="background:#2e2a1e;border:1px solid #5f5a1e;border-radius:3px;color:#ffe082;font-size:0.75rem;padding:5px 10px;cursor:pointer;width:100%;">▶ Reduce Power Consumption</button>
+          <div id="opt-power-out" style="font-size:0.72rem;color:#888;margin-top:6px;white-space:pre-wrap;"></div>
+          <div style="margin-top:12px;">
+            <button onclick="restoreOptimise()"
+              style="background:#1e1e1e;border:1px solid #333;border-radius:3px;color:#aaa;font-size:0.72rem;padding:4px 10px;cursor:pointer;">↺ Restore performance settings</button>
+          </div>
+          <div id="opt-restore-out" style="font-size:0.72rem;color:#888;margin-top:6px;white-space:pre-wrap;"></div>
         </div>
         <div id="m-section-reminders" class="m-pane" style="display:none">
           <div style="margin-bottom:10px;">
@@ -4141,6 +4174,102 @@
     }
   }
 
+  // ---- Optimise (memory / power) ----
+  async function loadOptimiseStats() {
+    const el = document.getElementById('opt-stats');
+    if (!el) return;
+    try {
+      const [infoR, vramR] = await Promise.all([
+        fetch('/api/system/info'),
+        fetch('/api/vram/status'),
+      ]);
+      const info = infoR.ok ? await infoR.json() : {};
+      const vram = vramR.ok ? await vramR.json() : {};
+      const row = (label, val) =>
+        `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1a1a1a;">` +
+        `<span>${label}</span><span style="color:#e0e0e0;">${val}</span></div>`;
+      const rows = [];
+      if (info.cpu_percent != null) rows.push(row('CPU', `${info.cpu_percent}% &times; ${info.cpu_count}`));
+      if (info.ram_used_gb != null) rows.push(row('RAM', `${info.ram_used_gb} / ${info.ram_total_gb} GB`));
+      if (vram.vram_total_gb) rows.push(row('VRAM', `${vram.vram_used_gb} / ${vram.vram_total_gb} GB`));
+      const resident = Object.entries(vram.models || {}).filter(([, m]) => m.state === 'gpu').map(([n]) => n);
+      rows.push(row('Resident models', resident.length ? _esc(resident.join(', ')) : 'none'));
+      el.innerHTML = rows.join('') || '<span style="color:#555;">No data</span>';
+    } catch(e) {
+      el.textContent = 'Failed to load';
+    }
+    _loadOptimisePermission();
+  }
+
+  async function _loadOptimisePermission() {
+    const el = document.getElementById('opt-perm');
+    if (!el) return;
+    try {
+      const data = await fetch('/api/permissions').then(r => r.json());
+      const g = (data.os_groups || []).find(x => x.id === 'system_optimise');
+      if (!g) { el.textContent = ''; return; }
+      el.innerHTML = g.granted
+        ? '<span style="color:#81c784;">● CPU power controls granted</span>'
+        : `<span style="color:#ef9a9a;">● CPU power controls not granted</span> — <a href="#" onclick="showPermCmd('Grant','${_esc(g.grant_cmd)}');return false;" style="color:#4fc3f7;">how to grant</a>`;
+    } catch(e) { el.textContent = ''; }
+  }
+
+  async function runOptimise(kind, btn) {
+    const isMemory = kind === 'memory';
+    const tool = isMemory ? 'reduce_memory_usage' : 'reduce_power_consumption';
+    const runBtn = document.getElementById(isMemory ? 'opt-run-memory' : 'opt-run-power');
+    const out = document.getElementById(isMemory ? 'opt-memory-out' : 'opt-power-out');
+    if (!out) return;
+
+    // Clicking a sidebar sub-button opens the pane; pane buttons just run.
+    if (btn) {
+      document.querySelectorAll('.m-nav-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.m-pane').forEach(p => p.style.display = 'none');
+      document.getElementById('m-section-optimise').style.display = 'block';
+    }
+    loadOptimiseStats();
+
+    const label = runBtn ? runBtn.textContent : '';
+    if (runBtn) { runBtn.disabled = true; runBtn.textContent = '⏳ Working…'; }
+    out.innerHTML = '<span style="color:#888;">Running…</span>';
+    try {
+      const r = await fetch('/api/tools/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tool, params: {}}),
+      });
+      const data = await r.json();
+      out.innerHTML = r.ok
+        ? `<span style="color:#a5d6a7;">${_esc(data.result)}</span>`
+        : `<span style="color:#ef9a9a;">${_esc(data.detail || 'Error')}</span>`;
+    } catch(e) {
+      out.innerHTML = `<span style="color:#ef9a9a;">${_esc(e.message)}</span>`;
+    } finally {
+      if (runBtn) { runBtn.disabled = false; runBtn.textContent = label; }
+      loadOptimiseStats();
+    }
+  }
+
+  async function restoreOptimise() {
+    const out = document.getElementById('opt-restore-out');
+    if (!out) return;
+    out.innerHTML = '<span style="color:#888;">Restoring…</span>';
+    try {
+      const r = await fetch('/api/tools/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tool: 'restore_system_performance', params: {}}),
+      });
+      const data = await r.json();
+      out.innerHTML = r.ok
+        ? `<span style="color:#a5d6a7;">${_esc(data.result)}</span>`
+        : `<span style="color:#ef9a9a;">${_esc(data.detail || 'Error')}</span>`;
+    } catch(e) {
+      out.innerHTML = `<span style="color:#ef9a9a;">${_esc(e.message)}</span>`;
+    }
+  }
+
   async function loadPipelineStatus() {
     try {
       const r = await fetch('/api/pipeline/status');
@@ -5283,6 +5412,27 @@
   let _toolSchemas = [];
   let _ifaceCache = [];   // network interface names, for the `interface` param dropdown
 
+  // Interfaces created by container/VM runtimes (Docker/Podman bridges and their
+  // veth pairs, libvirt bridges…) — they can't be used by the network tools, so
+  // they're kept out of the `interface` dropdowns.
+  const _VIRTUAL_IFACE_RE = /^(?:veth|docker|br-|virbr|vmnet|vnet|dummy)/;
+  // WiFi-specific tools should only offer wireless adapters (incl. monitor ifaces).
+  const _WIFI_ONLY_TOOLS = new Set([
+    'scan_wifi', 'connect_wifi', 'enable_wifi_dongle', 'disable_wifi_dongle',
+  ]);
+
+  function _isWirelessIface(n) { return /^wl/.test(n) || /mon$/.test(n); }
+  function _isVirtualIface(n) { return _VIRTUAL_IFACE_RE.test(n); }
+
+  // WiFi tools get wireless adapters only; MAC/IP tools get any real (physical)
+  // adapter. Used by buildToolForm for the `interface` parameter.
+  function _ifaceOptionsFor(t) {
+    const wifiOnly = t.module === 'wireless_tools' || _WIFI_ONLY_TOOLS.has(t.name);
+    return wifiOnly
+      ? _ifaceCache.filter(_isWirelessIface)
+      : _ifaceCache.filter(n => !_isVirtualIface(n));
+  }
+
   const _MODULE_CATEGORY = {
     audio_tools: 'Voice & Media', media_tools: 'Voice & Media', pipeline_tools: 'Voice & Media', video_tools: 'Voice & Media',
     weather_tools: 'Information', news_tools: 'Information', web_tools: 'Information', briefing_tools: 'Information',
@@ -5292,7 +5442,7 @@
     memory_tools: 'Memory & Notes', agent_tools: 'Memory & Notes',
     email_tools: 'Email',
     home_tools: 'Smart Home',
-    system_tools: 'System', observer_tools: 'System', proactive_tools: 'System',
+    system_tools: 'System', observer_tools: 'System', proactive_tools: 'System', optimise_tools: 'System',
     tor_tools: 'Privacy & Network', network_tools: 'Privacy & Network', wireless_tools: 'Privacy & Network', diagnostics_tools: 'Privacy & Network',
     network_check_tools: 'Privacy & Network',
   };
@@ -5465,7 +5615,7 @@
 
   // Per-parameter hover help shown as a "?" badge next to the field label.
   const _PARAM_HELP = {
-    interface: 'Network-interface name — the OS identifier of a specific network adapter (e.g. <code>wlan0</code>, <code>eth0</code>, <code>wlp3s0</code>, or a monitor iface like <code>wlan0mon</code>). It tells the tool which adapter to act on. Leave it blank to auto-detect the active interface; only set it when you have more than one adapter.',
+    interface: 'Network-interface name — the OS identifier of a specific network adapter (e.g. <code>wlan0</code>, <code>eth0</code>, <code>wlp3s0</code>, or a monitor iface like <code>wlan0mon</code>). It tells the tool which adapter to act on. Leave it blank to auto-detect the active interface; only set it when you have more than one adapter. Container/VM interfaces (<code>veth*</code>, <code>docker*</code>, <code>br-*</code>, <code>virbr*</code>) are hidden here because they aren\'t real adapters.',
     scan_seconds: 'How long, in seconds, to capture WiFi traffic with the monitor-mode scanner (airodump-ng) before it stops and returns what it found. Longer scans catch more networks and clients (especially weak or busy ones) but take longer. Leave blank for the default (15s); values are capped at 30s.',
     mac_address: 'A MAC (hardware) address to assign to the interface, in the form <code>XX:XX:XX:XX:XX:XX</code> — six hex byte-pairs, e.g. <code>02:1a:3b:4c:5d:6e</code>. Used by Set Mac to force one specific address instead of a random one.',
     bssid: 'The target access point’s BSSID — the router’s MAC address, format <code>XX:XX:XX:XX:XX:XX</code>. It pinpoints the exact WiFi network to act on. Copy it from a Scan Wps Networks / Monitor Scan Networks result.',
@@ -5555,9 +5705,9 @@
       const style = 'width:100%;background:#181818;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:3px;padding:3px 5px;font-size:0.72rem;box-sizing:border-box;';
       let input;
       if (name === 'interface') {
-        // Wireless tools need a WiFi/monitor adapter; filter out Ethernet etc. for them.
-        const wifiOnly = t.module === 'wireless_tools';
-        const list = wifiOnly ? _ifaceCache.filter(n => /^wl/.test(n) || /mon$/.test(n)) : _ifaceCache;
+        // Wireless tools need a WiFi/monitor adapter; MAC/IP tools work on any
+        // real adapter. Container/VM interfaces are hidden in both cases.
+        const list = _ifaceOptionsFor(t);
         const opts = list.map(n => `<option value="${_esc(n)}">${_esc(n)}</option>`).join('');
         input = `<select id="${id}" style="${style}"><option value="">(auto-detect)</option>${opts}</select>`;
       } else if (_TOOL_PARAM_SOURCE[t.name + ':' + name]) {
@@ -7708,12 +7858,18 @@
     if (!networks.length) { list.innerHTML = '<div style="color:#555;">No networks found.</div>'; return; }
     list.innerHTML = networks.map(n => {
       const col = _sigColor(n.signal);
-      return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #111;">
-        <span style="color:${col};font-size:0.68rem;font-family:monospace;flex-shrink:0;">${_sigBars(n.signal)}</span>
-        <span style="color:${col};font-size:0.68rem;flex-shrink:0;min-width:28px;">${n.signal}%</span>
-        <span style="flex:1;color:#ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(n.ssid)}">${_esc(n.ssid)}</span>
-        <span style="color:#666;font-size:0.65rem;flex-shrink:0;">${_esc(n.security)}</span>
-        <span style="color:#555;font-size:0.65rem;flex-shrink:0;">ch${_esc(n.chan)}</span>
+      const mac = n.bssid
+        ? `<div style="font-size:0.65rem;color:#666;font-family:monospace;padding:0 0 3px 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(n.bssid)}">${_esc(n.bssid)}</div>`
+        : '';
+      return `<div style="padding:3px 0;border-bottom:1px solid #111;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:${col};font-size:0.68rem;font-family:monospace;flex-shrink:0;">${_sigBars(n.signal)}</span>
+          <span style="color:${col};font-size:0.68rem;flex-shrink:0;min-width:28px;">${n.signal}%</span>
+          <span style="flex:1;color:#ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(n.ssid)}">${_esc(n.ssid)}</span>
+          <span style="color:#666;font-size:0.65rem;flex-shrink:0;">${_esc(n.security)}</span>
+          <span style="color:#555;font-size:0.65rem;flex-shrink:0;">ch${_esc(n.chan)}</span>
+        </div>
+        ${mac}
       </div>`;
     }).join('');
   }

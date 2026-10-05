@@ -13,6 +13,15 @@ logger = logging.getLogger(__name__)
 
 _MAC_RE = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
 
+# Interfaces created by container/VM runtimes (Docker/Podman bridges and their
+# veth pairs, libvirt bridges…). They aren't real adapters, so auto-detection
+# skips them and the dashboard hides them from the interface dropdowns.
+_VIRTUAL_IFACE_RE = re.compile(r"^(?:veth|docker|br-|virbr|vmnet|vnet|dummy)")
+
+
+def _is_virtual_iface(name: str) -> bool:
+    return bool(name) and _VIRTUAL_IFACE_RE.match(name) is not None
+
 
 def _get_interfaces() -> list[dict]:
     result = subprocess.run(
@@ -33,6 +42,8 @@ def _resolve_and_get_mac(interface: str) -> tuple[str, str]:
         raise ValueError(f"Interface {interface!r} not found.")
     for iface in ifaces:
         if iface.get("link_type") == "ether" and "UP" in iface.get("flags", []):
+            if _is_virtual_iface(iface.get("ifname", "")):
+                continue
             return iface["ifname"], iface.get("address", "")
     raise ValueError("No active network interface found.")
 
@@ -99,6 +110,8 @@ def list_macs() -> str:
         if iface.get("link_type") != "ether":
             continue
         name = iface["ifname"]
+        if _is_virtual_iface(name):
+            continue
         mac = iface.get("address", "unknown")
         if name.startswith("wl"):
             itype = "WiFi"
@@ -213,10 +226,35 @@ def list_wifi_interfaces() -> str:
     return "\n".join(f"{dev:<{w}}  {itype:<10}  {state:<20}  {conn}" for dev, itype, state, conn in rows)
 
 
-@tool(description="Scan for nearby WiFi networks and show SSID, signal strength, security type, and channel.")
+_WIFI_ROW_RE = re.compile(
+    r"^(?P<ssid>.*?):(?P<bssid>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})"
+    r":(?P<signal>\d+):(?P<security>[^:]*):(?P<chan>\d+)$"
+)
+
+
+def parse_nmcli_wifi_row(line: str) -> dict | None:
+    """Parse one terse ``nmcli dev wifi list`` row: SSID,BSSID,SIGNAL,SECURITY,CHAN.
+
+    An SSID may itself contain colons and nmcli runs with ``--escape no``, so the
+    BSSID is located by its MAC shape instead of naive ``:``-splitting. Returns
+    None for a line that does not carry a BSSID.
+    """
+    m = _WIFI_ROW_RE.match((line or "").strip())
+    if not m:
+        return None
+    return {
+        "ssid": m.group("ssid") or "<hidden>",
+        "bssid": m.group("bssid").upper(),
+        "signal": int(m.group("signal")),
+        "security": m.group("security") or "open",
+        "chan": m.group("chan"),
+    }
+
+
+@tool(description="Scan for nearby WiFi networks and show SSID, MAC address (BSSID), signal strength, security type, and channel.")
 def scan_wifi(interface: str = "") -> str:
     result = subprocess.run(
-        ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY,CHAN", "--escape", "no", "dev", "wifi", "list"],
+        ["nmcli", "-t", "-f", "SSID,BSSID,SIGNAL,SECURITY,CHAN", "--escape", "no", "dev", "wifi", "list"],
         capture_output=True, text=True, timeout=15,
     )
     if result.returncode != 0:
@@ -224,23 +262,21 @@ def scan_wifi(interface: str = "") -> str:
     rows = []
     seen: set = set()
     for line in result.stdout.strip().splitlines():
-        if not line:
+        net = parse_nmcli_wifi_row(line)
+        if not net or net["bssid"] in seen:
             continue
-        parts = line.rsplit(":", 3)
-        if len(parts) < 4:
-            continue
-        ssid, signal, security, chan = parts
-        ssid = ssid or "<hidden>"
-        key = (ssid, chan)
-        if key in seen:
-            continue
-        seen.add(key)
-        rows.append((ssid, signal, security or "open", chan))
+        seen.add(net["bssid"])
+        rows.append(net)
     if not rows:
         return "No networks found."
-    rows.sort(key=lambda r: -int(r[1]) if r[1].isdigit() else 0)
-    w = max(len(r[0]) for r in rows)
-    return "\n".join(f"{ssid:<{w}}  {sig:>3}%  {sec:<12}  ch{chan}" for ssid, sig, sec, chan in rows)
+    rows.sort(key=lambda n: -n["signal"])
+    w = max([len(n["ssid"]) for n in rows] + [4])
+    header = f"{'SSID':<{w}}  {'BSSID':<17}  SIG  SECURITY      CH"
+    body = [
+        f"{n['ssid']:<{w}}  {n['bssid']}  {n['signal']:>3}%  {n['security']:<12}  ch{n['chan']}"
+        for n in rows
+    ]
+    return "\n".join([header] + body)
 
 
 @tool(description="Show current WiFi connection status including SSID, signal strength, interface, and IP address.")
@@ -649,13 +685,13 @@ def _resolve_ip_iface(interface: str) -> str:
             capture_output=True, text=True, timeout=5,
         )
         for rt in json.loads(r.stdout or "[]"):
-            if rt.get("dev"):
+            if rt.get("dev") and not _is_virtual_iface(rt["dev"]):
                 return rt["dev"]
     except Exception:
         pass
     for i in ifaces:
         name = i.get("ifname")
-        if name and name != "lo" and _get_ipv4(name):
+        if name and name != "lo" and not _is_virtual_iface(name) and _get_ipv4(name):
             return name
     raise ValueError("No active network interface with an IPv4 address found.")
 

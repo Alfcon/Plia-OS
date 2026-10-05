@@ -1602,6 +1602,21 @@ _OS_PERMISSION_GROUPS = [
         ),
         "revoke_cmd": "sudo rm /etc/sudoers.d/plia-iwlwifi",
     },
+    {
+        "id": "system_optimise",
+        "name": "System Optimisation",
+        "description": "Allows the Optimise tools to tune system power: writes the CPU scaling governor and energy-performance preference, and drops the page cache. Without this grant the Optimise actions still run their unprivileged steps (unloading models, clearing caches) and report the CPU settings as skipped.",
+        "tools": ["reduce_memory_usage", "reduce_power_consumption", "restore_system_performance"],
+        "sudoers_file": "/etc/sudoers.d/plia-optimise",
+        "grant_cmd": (
+            "echo 'alfcon ALL=(ALL) NOPASSWD:"
+            " /usr/bin/tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor,"
+            " /usr/bin/tee /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference,"
+            " /usr/bin/tee /proc/sys/vm/drop_caches'"
+            " | sudo tee /etc/sudoers.d/plia-optimise && sudo chmod 440 /etc/sudoers.d/plia-optimise"
+        ),
+        "revoke_cmd": "sudo rm /etc/sudoers.d/plia-optimise",
+    },
 ]
 
 
@@ -2288,26 +2303,17 @@ async def network_wifi():
     try:
         r = await asyncio.to_thread(
             subprocess.run,
-            ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY,CHAN", "--escape", "no", "dev", "wifi", "list"],
+            ["nmcli", "-t", "-f", "SSID,BSSID,SIGNAL,SECURITY,CHAN", "--escape", "no", "dev", "wifi", "list"],
             capture_output=True, text=True, timeout=15,
         )
+        from modules.network_tools import parse_nmcli_wifi_row
         seen: set = set()
         for line in r.stdout.strip().splitlines():
-            parts = line.rsplit(":", 3)
-            if len(parts) < 4:
+            net = parse_nmcli_wifi_row(line)
+            if not net or net["bssid"] in seen:
                 continue
-            ssid, signal, security, chan = parts
-            ssid = ssid or "<hidden>"
-            key = (ssid, chan)
-            if key in seen:
-                continue
-            seen.add(key)
-            networks.append({
-                "ssid": ssid,
-                "signal": int(signal) if signal.isdigit() else 0,
-                "security": security or "open",
-                "chan": chan,
-            })
+            seen.add(net["bssid"])
+            networks.append(net)
         networks.sort(key=lambda n: -n["signal"])
     except Exception:
         pass

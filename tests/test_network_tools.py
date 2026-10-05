@@ -436,3 +436,112 @@ def test_internal_wifi_status_not_loaded():
         out = internal_wifi_status()
     assert "absent" in out
     assert "no" in out
+
+
+# --- scan_wifi / parse_nmcli_wifi_row ---
+
+def _nmcli_scan(stdout: str):
+    m = MagicMock()
+    m.returncode = 0
+    m.stdout = stdout
+    m.stderr = ""
+    return m
+
+
+def test_parse_nmcli_wifi_row_handles_hidden_and_colon_ssid():
+    from modules.network_tools import parse_nmcli_wifi_row
+
+    hidden = parse_nmcli_wifi_row(":6A:CA:59:D9:11:6E:64:WPA2:1")
+    assert hidden["ssid"] == "<hidden>"
+    assert hidden["bssid"] == "6A:CA:59:D9:11:6E"
+
+    colon = parse_nmcli_wifi_row("My:Net:AA:BB:CC:DD:EE:FF:80:WPA2 WPA3:6")
+    assert colon["ssid"] == "My:Net"
+    assert colon["bssid"] == "AA:BB:CC:DD:EE:FF"
+    assert colon["signal"] == 80
+    assert colon["security"] == "WPA2 WPA3"
+    assert colon["chan"] == "6"
+
+
+def test_parse_nmcli_wifi_row_open_network_and_no_mac():
+    from modules.network_tools import parse_nmcli_wifi_row
+
+    assert parse_nmcli_wifi_row("OpenNet:12:34:56:78:9A:BC:50::11")["security"] == "open"
+    assert parse_nmcli_wifi_row("no mac on this line") is None
+    assert parse_nmcli_wifi_row("") is None
+
+
+def test_scan_wifi_shows_mac_address():
+    from modules.network_tools import scan_wifi
+    out = (
+        "Alf&Leisa50:F8:CA:59:D9:11:6C:74:WPA2:149\n"
+        ":6A:CA:59:D9:11:6E:64:WPA2:1\n"
+    )
+    with patch("subprocess.run", return_value=_nmcli_scan(out)):
+        result = scan_wifi()
+    assert "BSSID" in result
+    assert "F8:CA:59:D9:11:6C" in result
+    assert "6A:CA:59:D9:11:6E" in result  # hidden network still shows its MAC
+
+
+def test_scan_wifi_dedupes_by_bssid_and_sorts_by_signal():
+    from modules.network_tools import scan_wifi
+    out = (
+        "NetA:AA:BB:CC:DD:EE:01:20:WPA2:1\n"
+        "NetA:AA:BB:CC:DD:EE:01:20:WPA2:1\n"   # duplicate BSSID -> collapsed
+        "NetB:AA:BB:CC:DD:EE:02:90:WPA2:1\n"
+    )
+    with patch("subprocess.run", return_value=_nmcli_scan(out)):
+        result = scan_wifi()
+    assert result.count("AA:BB:CC:DD:EE:01") == 1
+    assert result.index("AA:BB:CC:DD:EE:02") < result.index("AA:BB:CC:DD:EE:01")
+
+
+# --- virtual / container interface filtering ---
+
+def test_is_virtual_iface_matches_container_prefixes():
+    from modules.network_tools import _is_virtual_iface
+    for name in ("vethc3e3dcc", "docker0", "br-c178647986e7", "virbr0", "vmnet1", "vnet0", "dummy0"):
+        assert _is_virtual_iface(name), name
+    for name in ("enp0s31f6", "wlp0s20f3", "wlx8c882b000d0f", "eth0", "wlan0mon", "br0", "lo", ""):
+        assert not _is_virtual_iface(name), name
+
+
+def _mixed_ifaces():
+    return json.dumps([
+        {"ifname": "lo",          "link_type": "loopback", "flags": ["UP"], "address": "00:00:00:00:00:00"},
+        {"ifname": "docker0",     "link_type": "ether",    "flags": ["UP"], "address": "02:42:aa:bb:cc:01"},
+        {"ifname": "vethc3e3dcc", "link_type": "ether",    "flags": ["UP"], "address": "02:42:aa:bb:cc:02"},
+        {"ifname": "br-c178647986e7", "link_type": "ether", "flags": ["UP"], "address": "02:42:aa:bb:cc:03"},
+        {"ifname": "enp0s31f6",   "link_type": "ether",    "flags": ["UP"], "address": "aa:bb:cc:dd:ee:03"},
+    ]).encode()
+
+
+def test_list_macs_hides_container_interfaces():
+    from modules.network_tools import list_macs
+    with patch("subprocess.run", return_value=_ifaces_mock(_mixed_ifaces())):
+        out = list_macs()
+    assert "enp0s31f6" in out
+    assert "vethc3e3dcc" not in out
+    assert "docker0" not in out
+    assert "br-abc" not in out and "br-c178647986e7" not in out
+
+
+def test_resolve_mac_auto_detect_skips_container_interfaces():
+    from modules.network_tools import _resolve_and_get_mac
+    with patch("subprocess.run", return_value=_ifaces_mock(_mixed_ifaces())):
+        name, mac = _resolve_and_get_mac("")
+    assert name == "enp0s31f6"
+    assert mac == "aa:bb:cc:dd:ee:03"
+
+
+def test_resolve_ip_iface_fallback_skips_container_interfaces():
+    from modules.network_tools import _resolve_ip_iface
+    route = MagicMock(); route.stdout = "[]"; route.returncode = 0
+
+    def fake_run(cmd, **kwargs):
+        return _ifaces_mock(_mixed_ifaces()) if "link" in cmd else route
+
+    with patch("subprocess.run", side_effect=fake_run), \
+         patch("modules.network_tools._get_ipv4", side_effect=lambda n: "10.0.0.5/24"):
+        assert _resolve_ip_iface("") == "enp0s31f6"

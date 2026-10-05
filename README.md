@@ -173,6 +173,17 @@ Background loop (configurable interval) that monitors memory, reminders, observe
 
 Layer-by-layer inference for large models (~4 GB VRAM for 70B+). Configure from ☰ Menu → LLM → AirLLM: pick a HuggingFace model ID (autocomplete with 15 popular models), select compression (4bit/8bit/none), see live VRAM estimate, and apply. Unload button frees VRAM on demand.
 
+## System Optimise
+
+☰ Menu → **Optimise** holds two one-click actions (each also runs straight from the sidebar sub-button):
+
+- **Reduce Memory Usage** — unloads every model resident on the GPU (including Ollama's, via `keep_alive: 0`), clears the LLM response and CUDA caches, runs garbage collection, and drops the OS page cache. Reports RAM before/after and exactly what was freed.
+- **Reduce Power Consumption** — unloads GPU models and switches every CPU to the `powersave` governor and the `power` energy-performance preference. **↺ Restore performance settings** puts back the values saved before the switch.
+
+Both are registered tools too (`reduce_memory_usage`, `reduce_power_consumption`, `restore_system_performance`), so you can ask in chat (*"reduce memory usage"*) or run them from 🔧 Tools → System.
+
+The CPU and page-cache steps need root. Grant them once from ☰ Menu → Permissions → **System Optimisation** (it only allows `tee` on the CPU governor, energy preference and `drop_caches`). Without the grant the unprivileged steps still run, and the output lists which steps were skipped.
+
 ## WiFi
 
 ### Connect — no password for saved networks
@@ -199,6 +210,11 @@ When a network needs a password you don't have, Plia tries to obtain it automati
 This runs automatically when `connect_wifi` finds a secured network with no saved profile and no
 password. It requires the **Wireless Tools** permission group (set the tools to Admin in
 ☰ Menu → Permissions and run the grant command) and `install_wireless_tools`.
+
+The crack step needs the **rockyou** wordlist. Plia looks in the usual locations
+(`/usr/share/wordlists/…`, `~/wordlists/…`) and auto-decompresses a `.gz` copy into
+`<memory_dir>/wordlists/`. On Ubuntu/Mint/Debian there is no `wordlists` package (it's Kali-only),
+so run the **`download_rockyou`** tool once (≈51 MB) — or let `install_wireless_tools` offer it.
 
 > Only use on networks you own or have explicit permission to test.
 

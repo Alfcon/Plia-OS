@@ -291,3 +291,26 @@ async def test_clear_exemplars_endpoint(app):
             r = await c.delete("/api/adaptation/exemplars")
     assert r.status_code == 200
     store.clear.assert_called_once()
+
+
+async def test_network_wifi_networks_include_bssid(app):
+    status = MagicMock(returncode=0, stdout="wifi:connected:Home:wlan0\n", stderr="")
+    scan = MagicMock(
+        returncode=0,
+        stdout="Home:AA:BB:CC:DD:EE:FF:88:WPA2:6\n:11:22:33:44:55:66:40:WPA2:11\n",
+        stderr="",
+    )
+
+    def fake_run(cmd, **kwargs):
+        return status if "status" in cmd else scan
+
+    with patch("subprocess.run", side_effect=fake_run):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            r = await c.get("/api/network/wifi")
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["status"]["ssid"] == "Home"
+    by_ssid = {n["ssid"]: n for n in data["networks"]}
+    assert by_ssid["Home"]["bssid"] == "AA:BB:CC:DD:EE:FF"
+    assert by_ssid["<hidden>"]["bssid"] == "11:22:33:44:55:66"
