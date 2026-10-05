@@ -203,6 +203,7 @@
     </div>
   </div>
   <span class="tb-chip"><span class="tb-label">Disk</span><span id="tb-disk">—</span></span>
+  <span class="tb-chip" id="batt-chip" style="display:none;"><span class="tb-label">Batt</span><span id="tb-batt">—</span></span>
   <span style="flex:1;"></span>
   <div id="media-widget" style="display:flex;align-items:center;gap:5px;padding:2px 8px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;flex-shrink:0;">
     <span id="media-track" style="font-size:0.72rem;color:#444;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="">♪ —</span>
@@ -477,7 +478,7 @@
       <p>Use the <strong>Stop / Start</strong> button to pause the pipeline without shutting down Plia-OS. Useful when you need silence without closing the app.</p>
 
       <h4>System Stats</h4>
-      <p>Shows live CPU, RAM, GPU, and disk usage. Click <strong>↻ Refresh</strong> to update. Stats also appear in the top bar and update automatically every few seconds.</p>
+      <p>Shows live CPU, RAM, GPU, and disk usage. Click <strong>↻ Refresh</strong> to update. Stats also appear in the top bar and update automatically every few seconds. On laptops the top bar also shows a <strong>Batt</strong> chip with the charge percentage and the time left (or the time to full while charging).</p>
 
       <h4>VRAM Bar (Top Bar)</h4>
       <p>The VRAM indicator shows GPU memory usage. Click it to expand and see which models are loaded. The <strong>Done</strong> button releases the studio model from VRAM when you're finished recording.</p>
@@ -5888,6 +5889,33 @@
   }
   // ---- End tool reference docs ----
 
+  function _fmtDuration(seconds) {
+    if (seconds == null || seconds < 0) return '';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.round((seconds % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+
+  function renderBattery(batt) {
+    const chip = document.getElementById('batt-chip');
+    const value = document.getElementById('tb-batt');
+    if (!chip || !value) return;
+    if (!batt || batt.percent == null) { chip.style.display = 'none'; return; }
+    const pct = Math.round(batt.percent);
+    let text = `${pct}%`;
+    if (batt.plugged) {
+      const toFull = _fmtDuration(batt.secs_to_full);
+      text += toFull ? ` · ${toFull} to full` : ' · charging';
+    } else {
+      const left = _fmtDuration(batt.secs_left);
+      if (left) text += ` · ${left} left`;
+    }
+    value.textContent = text;
+    value.style.color = pct <= 15 ? '#ef9a9a' : pct <= 30 ? '#ffb74d' : '';
+    chip.title = `Battery ${pct}% — ${batt.status || (batt.plugged ? 'plugged in' : 'on battery')}`;
+    chip.style.display = '';
+  }
+
   function loadSystemInfo() {
     fetch('/api/system/info').then(r => r.json()).then(info => {
       document.getElementById('tb-os').textContent = info.os || '—';
@@ -5897,6 +5925,7 @@
         ? `${info.ram_used_gb}/${info.ram_total_gb} GB` : '—';
       document.getElementById('tb-disk').textContent = info.disk_used_gb != null
         ? `${info.disk_used_gb}/${info.disk_total_gb} GB` : '—';
+      renderBattery(info.battery);
     }).catch(() => {});
   }
   loadSystemInfo();

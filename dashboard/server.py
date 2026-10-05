@@ -1532,6 +1532,7 @@ async def system_info():
     except ImportError:
         cpu_percent = cpu_count = ram_total_gb = ram_used_gb = disk_total_gb = disk_used_gb = None
     from core.system_fit import get_gpu_vram_gb, get_gpu_name
+    from core.battery import battery_status
     return {
         "os": platform.system(),
         "cpu_percent": cpu_percent,
@@ -1542,6 +1543,7 @@ async def system_info():
         "disk_used_gb": disk_used_gb,
         "vram_gb": get_gpu_vram_gb(),
         "gpu_name": get_gpu_name(),
+        "battery": battery_status(),
     }
 
 

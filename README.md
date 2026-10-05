@@ -71,7 +71,7 @@ Dashboard at `http://localhost:8000`. Voice pipeline starts automatically; dashb
 
 | Area | What's there |
 |------|-------------|
-| Top bar | Status badge, OS, CPU %, RAM, VRAM bar (clickable), Disk, **media player** (track, ⏮▶⏭, volume) |
+| Top bar | Status badge, OS, CPU %, RAM, VRAM bar (clickable), Disk, Battery (% + time left / time to full on laptops), **media player** (track, ⏮▶⏭, volume) |
 | Chat pane | Persistent conversation history, text input (Enter to send, Shift+Enter for newline) |
 | ☰ Menu → Voice | TTS engine, STT model, wake word, voice cloning, clip generation |
 | ☰ Menu → LLM | Ollama model, AirLLM model picker + VRAM estimate, compression, fallback cloud provider, system prompt |
