@@ -224,6 +224,16 @@ Networks that don't broadcast their name show as `<hidden>` in a scan. `reveal_h
 puts the adapter in monitor mode, deauths clients on **every** hidden network, and reports each
 real SSID (via client reconnect + probe requests). Ask: *"Reveal the hidden networks."*
 
+### Monitor mode
+
+`start_monitor_mode(interface)` puts an adapter into monitor mode (🔧 Tools → Network → WiFi →
+Start Monitor Mode). `airmon-ng` usually warns that NetworkManager/wpa_supplicant/avahi-daemon can
+interfere by changing channels or forcing the card back to managed mode. Because killing them drops
+the machine off the network, Plia does **not** do it automatically — instead the tool result shows a
+**⚔ Kill interfering processes** button that runs `kill_interfering_processes()`
+(`airmon-ng check kill`) only when you press it. Run `stop_monitor_mode` afterwards to restore
+managed mode and restart NetworkManager.
+
 ## WiFi Dongle Switching
 
 Tools for switching between the internal WiFi card and a USB WiFi dongle — useful for isolating driver-related system freezes (run for days on the dongle with the internal driver disabled). Run them from 🔧 Tools → Network → WiFi, by voice/chat, or via `POST /api/tools/run`.

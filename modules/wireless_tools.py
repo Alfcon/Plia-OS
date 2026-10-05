@@ -58,7 +58,7 @@ def _has_wireless_admin() -> bool:
     from core.config import get_config
     cfg = get_config()
     wireless_tools = (
-        "start_monitor_mode", "stop_monitor_mode",
+        "start_monitor_mode", "stop_monitor_mode", "kill_interfering_processes",
         "capture_handshake", "attack_wps", "scan_wps_networks",
     )
     return (
@@ -145,12 +145,43 @@ def start_monitor_mode(interface: str = "") -> str:
     existing = _detect_monitor_interface()
     if existing:
         return f"Already in monitor mode on {existing}"
-    # Skip 'airmon-ng check kill' — it would kill NetworkManager and crash this server
+    # 'airmon-ng check kill' is deliberately NOT run here: it stops NetworkManager
+    # and takes the machine off the network. It is exposed as an explicit,
+    # user-triggered action (kill_interfering_processes) instead.
     r = _sudo("airmon-ng", "start", iface, timeout=15)
     out = (r.stdout + r.stderr).strip()
     if r.returncode != 0:
         return f"Failed: {out}"
-    return f"Monitor mode started on {mon}\n{out}"
+    result = f"Monitor mode started on {mon}\n{out}"
+    if re.search(r"could cause trouble|check kill", out, re.I):
+        result += (
+            "\n\n⚠ Interfering processes detected — press 'Kill interfering processes' "
+            "to run 'airmon-ng check kill', or call kill_interfering_processes."
+        )
+    return result
+
+
+@tool(description="Kill processes that interfere with monitor mode by running 'airmon-ng check kill' "
+      "(NetworkManager, wpa_supplicant, avahi-daemon). This takes the machine off WiFi/network until "
+      "NetworkManager is restarted, so run it only when you intend to capture. "
+      "Requires Admin + the Wireless Tools grant.")
+def kill_interfering_processes() -> str:
+    if not _has_wireless_admin():
+        return "Permission denied. Set tool to Admin in Settings → Permissions and run the Wireless Tools grant command."
+    if _bin_missing("airmon-ng"):
+        return "airmon-ng not found. Run: install_wireless_tools"
+    r = _sudo("airmon-ng", "check", "kill", timeout=30)
+    out = (r.stdout + r.stderr).strip()
+    if r.returncode != 0:
+        return f"airmon-ng check kill failed: {out or 'unknown error'}"
+    return (
+        "Killed the processes that interfere with monitor mode.\n"
+        + (out + "\n" if out else "")
+        + "Next: run start_monitor_mode again so the adapter is put back in monitor "
+          "mode with those processes gone (if one is already up it will say so).\n"
+          "NetworkManager was stopped, so WiFi/network stays down until you run "
+          "stop_monitor_mode (or 'sudo systemctl restart NetworkManager')."
+    )
 
 
 def _detect_monitor_interface() -> str | None:

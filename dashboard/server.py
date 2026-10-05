@@ -1576,7 +1576,7 @@ _OS_PERMISSION_GROUPS = [
         "id": "wireless_tools",
         "name": "Wireless Tools",
         "description": "Allows airmon-ng, airodump-ng, aireplay-ng, reaver and wash to run with sudo for monitor mode and packet capture.",
-        "tools": ["start_monitor_mode", "stop_monitor_mode", "capture_handshake", "attack_wps", "scan_wps_networks"],
+        "tools": ["start_monitor_mode", "stop_monitor_mode", "kill_interfering_processes", "capture_handshake", "attack_wps", "scan_wps_networks"],
         "sudoers_file": "/etc/sudoers.d/plia-wireless",
         "grant_cmd": (
             "echo 'alfcon ALL=(ALL) NOPASSWD:"
