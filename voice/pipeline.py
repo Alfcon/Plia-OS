@@ -1,0 +1,303 @@
+import asyncio
+import logging
+import math
+import time
+import numpy as np
+from core.supervisor import run_turn
+from core.context_compactor import maybe_compact
+from core.config import get_config
+from core import events
+from core.watchdog import watchdog_gate
+from voice.wake import WakeWordDetector
+from voice.stt import get_stt_service
+from voice.tts import TTSService
+from voice.text_utils import strip_markdown
+
+try:
+    import sounddevice as sd
+except ImportError:
+    sd = None  # allows import in test environments without audio hardware
+
+logger = logging.getLogger(__name__)
+
+_SAMPLE_RATE = 16000
+_BLOCK_SIZE = 1280  # ~80ms per chunk at 16kHz
+_CHUNK_SECONDS = _BLOCK_SIZE / _SAMPLE_RATE  # 0.08 — was an implicit 80ms
+_ENERGY_FLOOR = 0.03  # RMS below this = silence (normalised to [-1,1])
+_INT16_MAX = 32768.0  # used to normalise int16 → float for RMS and STT
+from agents.chat_history import _HISTORY_PRELOAD  # canonical source; also used by /api/chat
+_CONVERSATION_CAP = 40  # max non-system messages kept in-memory (20 pairs)
+_TTS_SAMPLE_RATE = 24000
+_CURRENT_AUDIO_LEVEL: float = 0.0  # updated by _cb; read by /api/voice/level
+
+
+class VoicePipeline:
+    """
+    State machine: armed → listening → processing → speaking → armed.
+    Runs as an asyncio background task; never crashes — always returns to armed.
+    """
+
+    def __init__(self) -> None:
+        self._wake = WakeWordDetector()
+        self._tts = TTSService()
+        self._running = False
+        self._conversation: list[dict] = []
+        self._wake_muted_until: float = 0.0  # epoch time; wake ignored before this
+        self._announcement_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=50)
+
+    def load(self) -> None:
+        self._wake.load()
+        self._stt = get_stt_service()
+        self._tts.load()
+        config = get_config()
+        from agents.chat_history import get_recent
+        history = get_recent(_HISTORY_PRELOAD)
+        self._conversation = [{"role": "system", "content": config.system_prompt}] + [
+            {"role": m["role"], "content": m["content"]}
+            for m in history
+            if m["role"] != "system"
+        ]
+        if not events.is_subscribed(self._on_event):
+            events.subscribe(self._on_event)
+
+    async def _on_event(self, payload: dict) -> None:
+        if payload.get("type") == "clear_history":
+            config = get_config()
+            self._conversation = [{"role": "system", "content": config.system_prompt}]
+            logger.info("Pipeline conversation history cleared")
+        elif payload.get("type") == "reminder_fired":
+            message = payload.get("message") or "Reminder"
+            try:
+                self._announcement_queue.put_nowait(f"Reminder: {message}")
+                logger.info("Queued reminder announcement: %s", message)
+            except asyncio.QueueFull:
+                logger.warning("Announcement queue full; dropping reminder: %s", message)
+        elif payload.get("type") == "speak":
+            message = payload.get("message") or ""
+            if message:
+                try:
+                    self._announcement_queue.put_nowait(message)
+                    logger.info("Queued speak announcement: %s", message)
+                except asyncio.QueueFull:
+                    logger.warning("Announcement queue full; dropping speak: %s", message)
+        elif payload.get("type") == "proactive_message":
+            if payload.get("voice", True):
+                message = payload.get("text") or ""
+                if message:
+                    try:
+                        self._announcement_queue.put_nowait(message)
+                        logger.info("Queued proactive announcement: %s", message)
+                    except asyncio.QueueFull:
+                        logger.warning("Announcement queue full; dropping proactive: %s", message)
+
+    def _set_wake_mute(self, audio_out: np.ndarray) -> None:
+        self._wake_muted_until = time.monotonic() + len(audio_out) / _TTS_SAMPLE_RATE + 4.0
+
+    async def _speak_announcement(self, message: str) -> None:
+        logger.info("Announcing: %s", message)
+        self._wake_muted_until = time.monotonic() + 4.0  # minimum mute even if synthesis fails
+        try:
+            audio_out = self._tts.synthesise(strip_markdown(message))
+            self._set_wake_mute(audio_out)
+            from core.config import get_config as _gc
+            sd.play(audio_out, samplerate=24000, blocking=True, device=_gc().audio_output_device)
+        except Exception:
+            logger.exception("Reminder announcement failed")
+
+    async def start(self) -> None:
+        self._running = True
+        loop = asyncio.get_event_loop()
+        audio_q: asyncio.Queue[np.ndarray] = asyncio.Queue()
+
+        def _cb(indata, frames, time, status):
+            import voice.pipeline as _vp
+            _vp._CURRENT_AUDIO_LEVEL = float(np.sqrt(np.mean((indata[:, 0] / _INT16_MAX) ** 2)))
+            loop.call_soon_threadsafe(audio_q.put_nowait, indata[:, 0].copy())
+
+        await events.emit("status", {"state": "armed"})
+        from core.config import get_config as _gc
+        with sd.InputStream(
+            samplerate=_SAMPLE_RATE,
+            channels=1,
+            dtype="int16",
+            blocksize=_BLOCK_SIZE,
+            callback=_cb,
+            device=_gc().audio_input_device,
+        ):
+            while self._running:
+                try:
+                    await self._process_loop(audio_q)
+                except Exception:
+                    logger.exception("Pipeline error; resetting to armed")
+                    await events.emit("status", {"state": "armed"})
+
+    async def stop(self) -> None:
+        self._running = False
+
+    async def _process_loop(
+        self,
+        audio_q: asyncio.Queue,
+        max_iterations: int | None = None,
+    ) -> None:
+        """One full armed→speaking cycle. max_iterations limits loops for tests."""
+        config = get_config()
+        iterations = 0
+
+        while max_iterations is None or iterations < max_iterations:
+            await watchdog_gate("voice_pipeline")
+            iterations += 1
+
+            # --- Phase 0: speak any queued reminder announcements ---
+            while not self._announcement_queue.empty():
+                try:
+                    message = self._announcement_queue.get_nowait()
+                    await self._speak_announcement(message)
+                except asyncio.QueueEmpty:
+                    break
+
+            # --- Phase 0.5: studio pause mode ---
+            # Re-read config each iteration so toggling in the dashboard takes effect immediately.
+            config = get_config()
+            if config.studio_pipeline_mode == "pause":
+                from voice.vram_broker import get_vram_broker
+                if get_vram_broker().status().get("studio_mode"):
+                    logger.debug("Studio pause: heavy model active, skipping wake word")
+                    while not audio_q.empty():
+                        audio_q.get_nowait()
+                    await asyncio.sleep(0.5)
+                    continue
+
+            # --- Phase 1: wait for wake word ---
+            await events.emit("status", {"state": "armed"})
+            remaining = self._wake_muted_until - time.monotonic()
+            if remaining > 0:
+                logger.info("Echo mute: sleeping %.2fs to clear hardware echo", remaining)
+                while not audio_q.empty():
+                    audio_q.get_nowait()
+                await asyncio.sleep(remaining)
+                while not audio_q.empty():
+                    audio_q.get_nowait()
+                self._wake.reset()
+            while True:
+                try:
+                    chunk = await asyncio.wait_for(audio_q.get(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    if max_iterations is not None:
+                        return
+                    while not self._announcement_queue.empty():
+                        try:
+                            msg = self._announcement_queue.get_nowait()
+                            await self._speak_announcement(msg)
+                        except asyncio.QueueEmpty:
+                            break
+                    continue
+                if self._wake.detect(chunk):  # chunk is already int16
+                    self._wake.reset()
+                    logger.info("Wake word detected")
+                    await events.emit("wake", {"detected": True})
+                    break
+
+            # --- Phase 2: collect speech until silence ---
+            await events.emit("status", {"state": "listening"})
+            logger.info("Listening for speech...")
+            speech_chunks: list[np.ndarray] = []
+            silence_count = 0
+            speech_detected = False
+            # Two independent stopping conditions: silence_timeout_seconds ends
+            # the turn when the speaker stops; max_utterance_seconds is a
+            # runaway guard on how much audio is collected. The guard checks
+            # both a wall-clock deadline (protects against a stalled/empty
+            # queue — audio never arrives) and a chunk count derived the same
+            # way as silence_needed (caps the audio content itself). Either
+            # one expiring ends the turn the same way.
+            # Previously one deadline did both jobs, so the "silence timeout"
+            # silently truncated any utterance longer than its value.
+            hard_deadline = asyncio.get_event_loop().time() + config.max_utterance_seconds
+            max_chunks = math.ceil(config.max_utterance_seconds / _CHUNK_SECONDS)
+            silence_needed = math.ceil(config.silence_timeout_seconds / _CHUNK_SECONDS)
+            bail_chunks = math.ceil(config.prespeech_bail_seconds / _CHUNK_SECONDS)
+
+            while (asyncio.get_event_loop().time() < hard_deadline
+                   and len(speech_chunks) < max_chunks):
+                try:
+                    chunk = await asyncio.wait_for(audio_q.get(), timeout=0.5)
+                except asyncio.TimeoutError:
+                    continue
+                speech_chunks.append(chunk)
+                rms = float(np.sqrt(np.mean((chunk / _INT16_MAX) ** 2)))
+                if rms >= _ENERGY_FLOOR:
+                    speech_detected = True
+                    silence_count = 0
+                elif speech_detected:
+                    silence_count += 1
+                    if silence_count >= silence_needed:
+                        logger.info("Silence detected — collected %d chunks", len(speech_chunks))
+                        break
+                elif len(speech_chunks) >= bail_chunks:
+                    # A false wake in a quiet room never sets speech_detected, so
+                    # the silence branch above can never fire and the loop would
+                    # otherwise hold the mic for the full max_utterance_seconds,
+                    # deaf to a new wake word.
+                    logger.info("No speech after wake — re-arming")
+                    # Everything collected is known silence; dropping it here
+                    # keeps Phase 3 from running Whisper on it.
+                    speech_chunks.clear()
+                    break
+            else:
+                logger.info("Max utterance reached (%.0fs) — speech may be truncated",
+                            config.max_utterance_seconds)
+
+            if not speech_chunks:
+                logger.info("No speech captured, returning to armed")
+                continue
+
+            # --- Phase 3: transcribe ---
+            await events.emit("status", {"state": "processing"})
+            audio_int16 = np.concatenate(speech_chunks)
+            audio = audio_int16.astype(np.float32) / _INT16_MAX
+            logger.info("Transcribing %.1f seconds of audio (rms=%.3f)...",
+                        len(audio) / _SAMPLE_RATE,
+                        float(np.sqrt(np.mean(audio ** 2))))
+            text = self._stt.transcribe(audio)
+            logger.info("Transcript: %r", text)
+            if not text:
+                logger.info("Empty transcript, returning to armed")
+                await events.emit("status", {"state": "armed"})
+                continue
+
+            await events.emit("transcript", {"role": "user", "text": text})
+            self._conversation.append({"role": "user", "content": text})
+
+            # --- Phase 4: LLM + tool calls ---
+            logger.info("Calling LLM...")
+            try:
+                self._conversation = await maybe_compact(self._conversation)
+                response, self._conversation = await run_turn(self._conversation)
+            except Exception as exc:
+                logger.error("Agent error: %s", exc)
+                response = "I encountered an error. Please try again."
+            logger.info("LLM response: %r", response)
+
+            await events.emit("transcript", {"role": "assistant", "text": response})
+
+            # --- Phase 5: speak ---
+            await events.emit("status", {"state": "speaking"})
+            logger.info("Synthesising speech...")
+            try:
+                from voice.text_utils import truncate_for_tts
+                tts_text = strip_markdown(response)
+                tts_text = truncate_for_tts(tts_text, get_config().tts_max_words)
+                audio_out = self._tts.synthesise(tts_text)
+                logger.info("Playing audio (%d samples)...", len(audio_out))
+                # Mute before playback: audio duration + 4s tail covers hardware buffer echo
+                self._set_wake_mute(audio_out)
+                while not audio_q.empty():
+                    audio_q.get_nowait()
+                sd.play(audio_out, samplerate=24000, blocking=True, device=get_config().audio_output_device)
+                logger.info("Playback complete")
+                while not audio_q.empty():
+                    audio_q.get_nowait()
+                self._wake.reset()
+            except Exception:
+                logger.exception("TTS playback error")
+                await events.emit("status", {"state": "armed"})

@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" class="no-js">
+<head>
+    <meta charset="utf-8" />
+    <title>airodump-ng [Aircrack-ng]</title>
+    <meta name="generator" content="DokuWiki"/>
+<meta name="theme-color" content="#008800"/>
+<meta name="robots" content="index,follow"/>
+<meta name="keywords" content="airodump-ng"/>
+<link rel="search" type="application/opensearchdescription+xml" href="/lib/exe/opensearch.php" title="Aircrack-ng"/>
+<link rel="start" href="/"/>
+<link rel="contents" href="/doku.php?id=airodump-ng&amp;do=index" title="Sitemap"/>
+<link rel="manifest" href="/lib/exe/manifest.php" crossorigin="use-credentials"/>
+<link rel="alternate" type="application/rss+xml" title="Recent Changes" href="/feed.php"/>
+<link rel="alternate" type="application/rss+xml" title="Current namespace" href="/feed.php?mode=list&amp;ns="/>
+<link rel="alternate" type="text/html" title="Plain HTML" href="/doku.php?do=export_xhtml&amp;id=airodump-ng"/>
+<link rel="alternate" type="text/plain" title="Wiki Markup" href="/doku.php?do=export_raw&amp;id=airodump-ng"/>
+<link rel="canonical" href="https://www.aircrack-ng.org/doku.php?id=airodump-ng"/>
+<link rel="stylesheet" href="/lib/exe/css.php?t=dokuwiki&amp;tseed=d7ec344873382a35ef3a71ea6be03ff0"/>
+<link rel="alternate" hreflang="es" href="https://www.aircrack-ng.org/doku.php?id=es:airodump-ng"/>
+<link rel="alternate" hreflang="pt-br" href="https://www.aircrack-ng.org/doku.php?id=pt-br:airodump-ng"/>
+<link rel="alternate" hreflang="x-default" href="https://www.aircrack-ng.org/doku.php?id=airodump-ng"/>
+<script >var NS='';var JSINFO = {"plugin_enforcesummary":{"enforce_summary":1,"default_minoredit":0,"enforce_preview":1},"id":"airodump-ng","namespace":"","ACT":"show","useHeadingNavigation":0,"useHeadingContent":0};(function(H){H.className=H.className.replace(/\bno-js\b/,'js')})(document.documentElement);</script>
+<script src="/lib/exe/jquery.php?tseed=8faf3dc90234d51a499f4f428a0eae43" defer="defer"></script>
+<script src="/lib/exe/js.php?t=dokuwiki&amp;tseed=d7ec344873382a35ef3a71ea6be03ff0&amp;lang=en" defer="defer"></script>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="shortcut icon" href="/lib/tpl/dokuwiki/images/favicon.ico" />
+<link rel="apple-touch-icon" href="/lib/tpl/dokuwiki/images/apple-touch-icon.png" />
+    </head>
+
+<body>
+    <div id="dokuwiki__site"><div id="dokuwiki__top" class="site dokuwiki mode_show tpl_dokuwiki     ">
+
+        
+<!-- ********** HEADER ********** -->
+<header id="dokuwiki__header"><div class="pad group">
+
+    
+    <div class="headings group">
+        <ul class="a11y skip">
+            <li><a href="#dokuwiki__content">skip to content</a></li>
+        </ul>
+
+        <h1 class="logo"><a href="/doku.php?id=Main"  accesskey="h" title="Home [h]"><img src="/lib/tpl/dokuwiki/images/logo.png" width="64" height="64" alt="" /><span>Aircrack-ng</span></a></h1>
+            </div>
+
+    <div class="tools group">
+        <!-- USER TOOLS -->
+                    <div id="dokuwiki__usertools">
+                <h3 class="a11y">User Tools</h3>
+                <ul>
+                    <li class="action login"><a href="/doku.php?id=airodump-ng&amp;do=login&amp;sectok=" title="Log In" rel="nofollow"><span>Log In</span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M10 17.25V14H3v-4h7V6.75L15.25 12 10 17.25M8 2h9a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-4h2v4h9V4H8v4H6V4a2 2 0 0 1 2-2z"/></svg></a></li>                </ul>
+            </div>
+        
+        <!-- SITE TOOLS -->
+        <div id="dokuwiki__sitetools">
+            <h3 class="a11y">Site Tools</h3>
+            <form action="/doku.php?id=Main" method="get" role="search" class="search doku_form" id="dw__search" accept-charset="utf-8"><input type="hidden" name="do" value="search" /><input type="hidden" name="id" value="airodump-ng" /><div class="no"><input name="q" type="text" class="edit" title="[F]" accesskey="f" placeholder="Search" autocomplete="on" id="qsearch__in" value="" /><button value="1" type="submit" title="Search">Search</button><div id="qsearch__out" class="ajax_qsearch JSpopup"></div></div></form>            <div class="mobileTools">
+                <form action="/doku.php" method="get" accept-charset="utf-8"><div class="no"><input type="hidden" name="id" value="airodump-ng" /><select name="do" class="edit quickselect" title="Tools"><option value="">Tools</option><optgroup label="Page Tools"><option value="edit">Show pagesource</option><option value="backlink">Backlinks</option></optgroup><optgroup label="Site Tools"><option value="media">Media Manager</option><option value="index">Sitemap</option></optgroup><optgroup label="User Tools"><option value="login">Log In</option></optgroup></select><button type="submit">&gt;</button></div></form>            </div>
+            <ul>
+                <li class="action media"><a href="/doku.php?id=airodump-ng&amp;do=media&amp;ns=0" title="Media Manager" rel="nofollow">Media Manager</a></li><li class="action index"><a href="/doku.php?id=airodump-ng&amp;do=index" title="Sitemap [x]" rel="nofollow" accesskey="x">Sitemap</a></li>            </ul>
+        </div>
+
+    </div>
+
+    <!-- BREADCRUMBS -->
+            <div class="breadcrumbs">
+                                        <div class="trace"><span class="bchead">Trace:</span> <span class="bcsep">•</span> <span class="curid"><bdi><a href="/doku.php?id=airodump-ng"  class="breadcrumbs" title="airodump-ng">airodump-ng</a></bdi></span></div>
+                    </div>
+    
+    <hr class="a11y" />
+</div></header><!-- /header -->
+
+        <div class="wrapper group">
+
+            
+            <!-- ********** CONTENT ********** -->
+            <main id="dokuwiki__content"><div class="pad group">
+                
+                <div class="pageId"><span>airodump-ng</span></div>
+
+                <div class="page group">
+                                                            <!-- wikipage start -->
+                    <!-- TOC START -->
+<div id="dw__toc" class="dw__toc">
+<h3 class="toggle">Table of Contents</h3>
+<div>
+
+<ul class="toc">
+<li class="level1"><div class="li"><a href="#airodump-ng">Airodump-ng</a></div>
+<ul class="toc">
+<li class="level2"><div class="li"><a href="#description">Description</a></div></li>
+<li class="level2"><div class="li"><a href="#usage">Usage</a></div></li>
+<li class="level2"><div class="li"><a href="#usage_tips">Usage Tips</a></div>
+<ul class="toc">
+<li class="level3"><div class="li"><a href="#what_s_the_meaning_of_the_fields_displayed_by_airodump-ng">What&#039;s the meaning of the fields displayed by airodump-ng ?</a></div></li>
+<li class="level3"><div class="li"><a href="#run_aircrack-ng_while_capturing_data">Run aircrack-ng while capturing data</a></div></li>
+<li class="level3"><div class="li"><a href="#limiting_data_capture_to_a_single_ap">Limiting Data Capture to a Single AP</a></div></li>
+<li class="level3"><div class="li"><a href="#how_to_minimize_disk_space_for_captures">How to Minimize Disk Space for Captures</a></div></li>
+<li class="level3"><div class="li"><a href="#how_to_select_all_aps_starting_with_similar_bssids">How to Select All APs Starting With Similar BSSIDs</a></div></li>
+<li class="level3"><div class="li"><a href="#how_to_select_specific_channels_or_a_single_channel">How to Select Specific Channels or a Single Channel</a></div></li>
+<li class="level3"><div class="li"><a href="#text_files_containing_access_points_and_clients">Text Files Containing Access Points and Clients</a></div></li>
+</ul>
+</li>
+<li class="level2"><div class="li"><a href="#usage_troubleshooting">Usage Troubleshooting</a></div>
+<ul class="toc">
+<li class="level3"><div class="li"><a href="#i_am_getting_no_aps_or_clients_shown">I am getting no APs or clients shown</a></div></li>
+<li class="level3"><div class="li"><a href="#i_am_getting_little_or_no_data">I am getting little or no data</a></div></li>
+<li class="level3"><div class="li"><a href="#airodump-ng_keeps_switching_between_wep_and_wpa">Airodump-ng keeps switching between WEP and WPA</a></div></li>
+<li class="level3"><div class="li"><a href="#airodump-ng_stops_capturing_data_after_a_short_period_of_time">Airodump-ng stops capturing data after a short period of time</a></div></li>
+<li class="level3"><div class="li"><a href="#hidden_ssids_length">Hidden SSIDs &quot;&lt;length:  ?&gt;&quot;</a></div></li>
+<li class="level3"><div class="li"><a href="#airodump-ng_freezes_when_i_change_injecting_rate">Airodump-ng freezes when I change injecting rate</a></div></li>
+<li class="level3"><div class="li"><a href="#fixed_channel_error_message">&quot;fixed channel&quot; error message</a></div></li>
+<li class="level3"><div class="li"><a href="#where_did_my_output_files_go">Where did my output files go?</a></div></li>
+<li class="level3"><div class="li"><a href="#windows_specific">Windows specific</a></div></li>
+</ul>
+</li>
+<li class="level2"><div class="li"><a href="#interaction">Interaction</a></div></li>
+</ul></li>
+</ul>
+</div>
+</div>
+<!-- TOC END -->
+
+<h1 class="sectionedit1" id="airodump-ng">Airodump-ng</h1>
+<div class="level1">
+
+</div>
+
+<h2 class="sectionedit2" id="description">Description</h2>
+<div class="level2">
+
+<p>
+Airodump-ng is used for packet capture, capturing raw 802.11 frames. It is particularly suitable for collecting WEP <a href="http://en.wikipedia.org/wiki/Initialization_vector" class="urlextern" title="http://en.wikipedia.org/wiki/Initialization_vector" rel="ugc nofollow">IVs</a> (Initialization Vector) or <a href="/doku.php?id=wpa_capture" class="wikilink1" title="wpa_capture" data-wiki-id="wpa_capture">WPA handshakes</a> for the intent of using them with <a href="/doku.php?id=aircrack-ng" class="wikilink1" title="aircrack-ng" data-wiki-id="aircrack-ng">aircrack-ng</a>. If you have a GPS receiver connected to the computer, airodump-ng is capable of logging the coordinates of the found access points.
+</p>
+
+<p>
+Additionally, airodump-ng writes out several files containing the details of all access points and clients seen, which can be used for scripting, or creating custom tools
+</p>
+
+</div>
+
+<h2 class="sectionedit3" id="usage">Usage</h2>
+<div class="level2">
+
+<p>
+Before running airodump-ng, you may start the <a href="/doku.php?id=airmon-ng" class="wikilink1" title="airmon-ng" data-wiki-id="airmon-ng">airmon-ng</a> script to list the detected wireless interfaces. It is possible, but not recommended, to run <a href="http://www.kismetwireless.net" class="urlextern" title="http://www.kismetwireless.net" rel="ugc nofollow">Kismet</a> and airodump-ng at the same time.
+</p>
+<pre class="code">usage: airodump-ng &lt;options&gt; &lt;interface&gt;[,&lt;interface&gt;,...]
+
+Options:
+    --ivs                 : Save only captured IVs
+    --gpsd                : Use GPSd
+    --write      &lt;prefix&gt; : Dump file prefix
+    -w                    : same as --write 
+    --beacons             : Record all beacons in dump file
+    --update       &lt;secs&gt; : Display update delay in seconds
+    --showack             : Prints ack/cts/rts statistics
+    -h                    : Hides known stations for --showack
+    -f            &lt;msecs&gt; : Time in ms between hopping channels
+    --berlin       &lt;secs&gt; : Time before removing the AP/client
+                            from the screen when no more packets
+                            are received (Default: 120 seconds)
+    -r             &lt;file&gt; : Read packets from that file
+    -T                    : While reading packets from a file,
+                            simulate the arrival rate of them
+                            as if they were &quot;live&quot;.
+    -x            &lt;msecs&gt; : Active Scanning Simulation
+    --manufacturer        : Display manufacturer from IEEE OUI list
+    --uptime              : Display AP Uptime from Beacon Timestamp
+    --wps                 : Display WPS information (if any)
+    --output-format
+                &lt;formats&gt; : Output format. Possible values:
+                            pcap, ivs, csv, gps, kismet, netxml, logcsv
+    --ignore-negative-one : Removes the message that says
+                            fixed channel &lt;interface&gt;: -1
+    --write-interval
+                &lt;seconds&gt; : Output file(s) write interval in seconds
+    --background &lt;enable&gt; : Override background detection.
+    -n              &lt;int&gt; : Minimum AP packets recv&#039;d before
+                            for displaying it</pre>
+<pre class="code">Filter options:
+    --encrypt   &lt;suite&gt;   : Filter APs by cipher suite
+    --netmask &lt;netmask&gt;   : Filter APs by mask
+    --bssid     &lt;bssid&gt;   : Filter APs by BSSID
+    --essid     &lt;essid&gt;   : Filter APs by ESSID
+    --essid-regex &lt;regex&gt; : Filter APs by ESSID using a regular
+                            expression
+    -a                    : Filter unassociated clients
+
+By default, airodump-ng hop on 2.4GHz channels.
+You can make it capture on other/specific channel(s) by using:
+    --ht20                : Set channel to HT20 (802.11n)
+    --ht40-               : Set channel to HT40- (802.11n)
+    --ht40+               : Set channel to HT40+ (802.11n)
+    --channel &lt;channels&gt;  : Capture on specific channels
+    --band &lt;abg&gt;          : Band on which airodump-ng should hop
+    -C    &lt;frequencies&gt;   : Uses these frequencies in MHz to hop
+    --cswitch  &lt;method&gt;   : Set channel switching method
+                  0       : FIFO (default)
+                  1       : Round Robin
+                  2       : Hop on last
+    -s                    : same as --cswitch
+
+    --help                : Displays this usage screen</pre>
+
+<p>
+You can <a href="/doku.php?id=faq#can_i_convert_cap_files_to_ivs_files" class="wikilink1" title="faq" data-wiki-id="faq">convert</a> .cap / .dump file to .ivs format or <a href="/doku.php?id=faq#how_do_i_merge_multiple_capture_files" class="wikilink1" title="faq" data-wiki-id="faq">merge</a> them.
+</p>
+
+</div>
+
+<h2 class="sectionedit4" id="usage_tips">Usage Tips</h2>
+<div class="level2">
+
+</div>
+
+<h3 class="sectionedit5" id="what_s_the_meaning_of_the_fields_displayed_by_airodump-ng">What&#039;s the meaning of the fields displayed by airodump-ng ?</h3>
+<div class="level3">
+
+<p>
+airodump-ng will display a list of detected access points, and also a list of connected clients (“stations”). Here&#039;s an example screenshot:
+</p>
+<pre class="code"> CH  9 ][ Elapsed: 1 min ][ 2007-04-26 17:41 ][ WPA handshake: 00:14:6C:7E:40:80
+                                                                                                            
+ BSSID              PWR RXQ  Beacons    #Data, #/s  CH  MB   ENC  CIPHER AUTH ESSID
+                                                                                                            
+ 00:09:5B:1C:AA:1D   11  16       10        0    0  11  54.  OPN              NETGEAR                         
+ 00:14:6C:7A:41:81   34 100       57       14    1   9  11e  WEP  WEP         bigbear 
+ 00:14:6C:7E:40:80   32 100      752       73    2   9  54   WPA  TKIP   PSK  teddy                             
+                                                                                                            
+ BSSID              STATION            PWR   Rate   Lost  Packets  Notes  Probes
+                                
+ 00:14:6C:7A:41:81  00:0F:B5:32:31:31   51   36-24    2       14
+ (not associated)   00:14:A4:3F:8D:13   19    0-0     0        4           mossy 
+ 00:14:6C:7A:41:81  00:0C:41:52:D1:D1   -1   36-36    0        5
+ 00:14:6C:7E:40:80  00:0F:B5:FD:FB:C2   35   54-54    0       99           teddy</pre>
+
+<p>
+The first line shows the current channel, elapsed running time, current date and optionally if a WPA/WPA2 handshake was detected.  In the example above, “WPA handshake: 00:14:6C:7E:40:80” indicates that a WPA/WPA2 handshake was successfully captured for the BSSID.
+</p>
+
+<p>
+In the example above the client rate of “36-24” means:
+</p>
+<ul>
+<li class="level1"><div class="li"> The first number is the last data rate from the AP (BSSID) to the Client (STATION).  In this case 36 megabits per second.</div>
+</li>
+<li class="level1"><div class="li"> The second number is the last data rate from Client (STATION) to the  AP (BSSID).  In this case 24 megabits per second.</div>
+</li>
+<li class="level1"><div class="li"> These rates may potentially change on each packet transmission.  It is simply the last speed seen.</div>
+</li>
+<li class="level1"><div class="li"> These rates are only displayed when locked to a single channel, the AP/client transmission speeds are displayed as part of the clients listed at the bottom. </div>
+</li>
+<li class="level1"><div class="li"> NOTE: APs need more then one packet to appear on the screen.  APs with a single packet are not displayed.</div>
+</li>
+</ul>
+<div class="table sectionedit6"><table class="inline">
+	<thead>
+	<tr class="row0">
+		<th class="col0">Field</th><th class="col1">Description</th>
+	</tr>
+	</thead>
+	<tr class="row1">
+		<td class="col0">BSSID</td><td class="col1">MAC address of the access point. In the Client section, a BSSID of “(not associated)” means that the client is not associated with any AP.  In this unassociated state, it is searching for an AP to connect with.</td>
+	</tr>
+	<tr class="row2">
+		<td class="col0">PWR</td><td class="col1">Signal level reported by the Wi-Fi adapter. Its signification depends on the driver, but as you get closer to the AP or the station, the signal gets higher. It usually is the <a href="https://en.wikipedia.org/wiki/Received_signal_strength_indication" class="urlextern" title="https://en.wikipedia.org/wiki/Received_signal_strength_indication" rel="ugc nofollow">RSSI</a>. If the BSSID PWR is -1, then the driver doesn&#039;t support signal level reporting. If PWR is -1 for some access points, it means the access point is out of range, however airodump-ng got at least a frame sent to it. If the PWR is -1 for a limited number of stations then this is for a packet which came from the AP to the client but the client transmissions are out of range for your Wi-Fi adapter. Meaning you are hearing only 1/2 of the communication. If all clients have PWR as -1 then it is likely that the driver doesn&#039;t support signal level reporting. A strong signal is around -40. An average one is around -55, and a weak one starts around -70. Wi-Fi adapters lower limit (aka receive sensitivity) is often around -80/-90.</td>
+	</tr>
+	<tr class="row3">
+		<td class="col0">RXQ</td><td class="col1">Receive Quality as measured by the percentage of packets (management and data frames) successfully received over the last 10 seconds.  See note below for a more detailed explanation.</td>
+	</tr>
+	<tr class="row4">
+		<td class="col0">Beacons</td><td class="col1">Number of announcements packets sent by the AP. Each access point sends about ten beacons per second at the lowest rate (1M), so they can usually be picked up from very far.</td>
+	</tr>
+	<tr class="row5">
+		<td class="col0"># Data</td><td class="col1">Number of captured data packets (if WEP, unique IV count), including data broadcast packets.</td>
+	</tr>
+	<tr class="row6">
+		<td class="col0">#/s</td><td class="col1">Number of data packets per second measure over the last 10 seconds.</td>
+	</tr>
+	<tr class="row7">
+		<td class="col0">CH</td><td class="col1">Channel number (taken from beacon packets).<br/>
+Note: sometimes packets from other channels are captured even if airodump-ng is not hopping, because of radio interference or overlapping channels.</td>
+	</tr>
+	<tr class="row8">
+		<td class="col0"><abbr title="Megabyte">MB</abbr></td><td class="col1">Maximum speed supported by the AP. If <abbr title="Megabyte">MB</abbr> = 11, it&#039;s 802.11b, if <abbr title="Megabyte">MB</abbr> = 22 it&#039;s 802.11b+ and up to 54 are 802.11g. Anything higher is 802.11n or 802.11ac. The dot (after 54 above) indicates short preamble is supported.  Displays “e” following the <abbr title="Megabyte">MB</abbr> speed value if the network has QoS enabled.</td>
+	</tr>
+	<tr class="row9">
+		<td class="col0">ENC</td><td class="col1">Encryption algorithm in use. OPN = no encryption,“WEP?” = WEP or higher (not enough data to choose between WEP and WPA/WPA2), WEP (without the question mark) indicates static or dynamic WEP, and WPA, WPA2 or WPA3 if TKIP or CCMP is present (WPA3 with TKIP allows WPA or WPA2 association, pure WPA3 only allows CCMP). OWE is for Opportunistic Wireless Encryption, aka Enhanced Open.</td>
+	</tr>
+	<tr class="row10">
+		<td class="col0">CIPHER</td><td class="col1">The cipher detected. One of CCMP, WRAP, TKIP, WEP, WEP40, or WEP104.  Not mandatory, but TKIP is typically used with WPA and CCMP is typically used with WPA2.  WEP40 is displayed when the key index is greater then 0.  The standard states that the index can be 0-3 for 40bit and should be 0 for 104 bit.</td>
+	</tr>
+	<tr class="row11">
+		<td class="col0">AUTH</td><td class="col1">The authentication protocol used. One of MGT (WPA/WPA2 using a separate authentication server), SKA (shared key for WEP), PSK (pre-shared key for WPA/WPA2), or OPN (open for WEP).</td>
+	</tr>
+	<tr class="row12">
+		<td class="col0">ESSID</td><td class="col1">Shows the wireless network name.  The so-called “SSID”, which can be empty if SSID hiding is activated. In this case, airodump-ng will try to recover the SSID from probe responses and association requests.  See <a href="/doku.php?id=airodump-ng#hidden_ssids_length" class="wikilink1" title="airodump-ng" data-wiki-id="airodump-ng">this section</a> for more information concerning hidden ESSIDs.</td>
+	</tr>
+	<tr class="row13">
+		<td class="col0">STATION</td><td class="col1">MAC address of each associated station or stations searching for an AP to connect with. Clients not currently associated with an AP have a BSSID of “(not associated)”.</td>
+	</tr>
+	<tr class="row14">
+		<td class="col0">Rate</td><td class="col1"> Station&#039;s receive rate, followed by transmit rate. Displays “e” following each rate if the network has QoS enabled.</td>
+	</tr>
+	<tr class="row15">
+		<td class="col0">Lost</td><td class="col1">The number of data packets lost over the last 10 seconds based on the sequence number.  See note below for a more detailed explanation.</td>
+	</tr>
+	<tr class="row16">
+		<td class="col0">Packets</td><td class="col1">The number of data packets sent by the client.</td>
+	</tr>
+	<tr class="row17">
+		<td class="col0">Notes</td><td class="col1">Additional information about the client, such as captured EAPOL or PMKID.</td>
+	</tr>
+	<tr class="row18">
+		<td class="col0">Probes</td><td class="col1 leftalign">The ESSIDs probed by the client.  These are the networks the client is trying to connect to if it is not currently connected.  </td>
+	</tr>
+</table></div>
+
+<p>
+NOTES:
+</p>
+
+<p>
+RXQ expanded:<br/>
+
+Its measured over all management and data frames.  The received frames contain a sequence number which is added by the sending access point.  RXQ = 100 means that all packets were received from the access point in numerical sequence and none were missing.  That&#039;s the clue, this allows you to read more things out of this value.  Lets say you got 100 percent RXQ and all 10 (or whatever the rate) beacons per second coming in.  Now all of a sudden the RXQ drops below 90, but you still capture all sent beacons.  Thus you know that the AP is sending frames to a client but you can&#039;t hear the client nor the AP sending to the client (need to get closer).  Another thing would be, that you got a 11MB card to monitor and capture frames (say a prism2.5) and you have a very good position to the AP. The AP is set to 54MBit and then again the RXQ drops, so you know that there is at least one 54MBit client connected to the AP.
+</p>
+
+<p>
+N.B.: RXQ column will only be shown if you are locked on a single channel, not channel hopping.
+</p>
+
+<p>
+Lost expanded:<br/>
+
+It means lost packets coming from the client.  To determine the number of packets lost, there is a sequence field on every non-control frame, so you can subtract the second last sequence number from the last sequence number and you know how many packets you have lost.
+</p>
+
+<p>
+Possible reasons for lost packets:
+</p>
+<ol>
+<li class="level1"><div class="li"> You cannot send (in case you are sending) and listen at the same time, so every time you send something you can&#039;t hear the packets being transmitted in that interval.</div>
+</li>
+<li class="level1"><div class="li"> You are maybe losing packets due too high transmit power (you may be too close to the AP).</div>
+</li>
+<li class="level1"><div class="li"> There is too much noise on the current channel (other APs, microwave oven, bluetooth…)</div>
+</li>
+</ol>
+
+<p>
+To minimize the number of lost packets, vary your physical position, type of antenna used,  channel, data rate and/or injection rate.
+</p>
+
+</div>
+
+<h3 class="sectionedit7" id="run_aircrack-ng_while_capturing_data">Run aircrack-ng while capturing data</h3>
+<div class="level3">
+
+<p>
+To speed up the cracking process, run aircrack-ng while you are running <a href="/doku.php?id=airodump-ng" class="wikilink1" title="airodump-ng" data-wiki-id="airodump-ng">airodump-ng</a>.  You can capture and crack at the same time.  Aircrack-ng will periodically reread the captured data so it is always working with all the available IVs.
+</p>
+
+</div>
+
+<h3 class="sectionedit8" id="limiting_data_capture_to_a_single_ap">Limiting Data Capture to a Single AP</h3>
+<div class="level3">
+
+<p>
+To limit the data capture to a single AP you are interested in, include the “- -bssid” option and specify the AP MAC address.  For example: “airodump-ng -c 8 - -bssid 00:14:6C:7A:41:20 -w capture ath0”.
+</p>
+
+</div>
+
+<h3 class="sectionedit9" id="how_to_minimize_disk_space_for_captures">How to Minimize Disk Space for Captures</h3>
+<div class="level3">
+
+<p>
+To minimize disk space used by the capture, include the “- -ivs” option.  For example: “airodump-ng -c 8 - -bssid 00:14:6C:7A:41:20 -w capture - -ivs ath0”.  This only stores the initialization vectors and not the full packet. This cannot be used if you are trying to capture the WPA/WPA2 handshake or if you want to use PTW attack on WEP.
+</p>
+
+</div>
+
+<h3 class="sectionedit10" id="how_to_select_all_aps_starting_with_similar_bssids">How to Select All APs Starting With Similar BSSIDs</h3>
+<div class="level3">
+
+<p>
+Lets say, for example, you wish to capture packets for all Cisco-Linksys APs where the BSSID starts with “00:1C:10”.
+</p>
+
+<p>
+You specify that starting bytes you wish to match with the “-d” / “–bssid” option and pad with zeroes to a full MAC.  Then use  “-m” / “–netmask” option to specify which part of the BSSID you wish to match via “F”s and pad with zeroes to a full MAC.
+</p>
+
+<p>
+So since you want to match “00:1C:10”, you use “FF:FF:FF”.
+</p>
+<pre class="code"> airodump-ng -d 00:1C:10:00:00:00 -m FF:FF:FF:00:00:00 wlan0</pre>
+
+</div>
+
+<h3 class="sectionedit11" id="how_to_select_specific_channels_or_a_single_channel">How to Select Specific Channels or a Single Channel</h3>
+<div class="level3">
+
+<p>
+The “–channel” (-c) option allows a single or specific channels to be selected.
+</p>
+
+<p>
+Example of a single channel:
+</p>
+<pre class="code"> airodump-ng -c 11 wlan0</pre>
+
+<p>
+For cards which needs to be reset when on a single channel:
+</p>
+<pre class="code"> airodump-ng -c 11,11 wlan0</pre>
+
+<p>
+Example of selected channels:
+</p>
+<pre class="code"> airodump-ng -c 1,6,11 wlan0</pre>
+
+</div>
+
+<h3 class="sectionedit12" id="text_files_containing_access_points_and_clients">Text Files Containing Access Points and Clients</h3>
+<div class="level3">
+
+<p>
+Each time airodump-ng is run with the option to write IVs or full packets, a few text files are also generated and written to disk. They have the same name and a suffix of “.csv” (CSV file), “.kismet.csv” (Kismet CSV file) and “.kismet.netxml” (Kismet newcore netxml file).
+</p>
+
+<p>
+The CSV file contains the details of all access points and clients seen. See kismet documentation for more details about the kismet CSV and netxml.
+</p>
+
+<p>
+Here is an example:
+</p>
+<pre class="code"> BSSID, First time seen, Last time seen, channel, Speed, Privacy, Cipher, Authentication, Power, # beacons, # IV , LAN IP, ID-length, ESSID, Key
+ 00:1C:10:26:22:41, 2007-10-07 12:48:58, 2007-10-07 12:49:44,  6,  48, WEP , WEP,   , 171,      301,        0, 0.  0.  0.  0,   5, zwang,
+ 00:1A:70:51:B5:71, 2007-10-07 12:48:58, 2007-10-07 12:49:44,  6,  48, WEP , WEP,   , 175,      257,        1, 0.  0.  0.  0,   9, brucey123,
+ 00:09:5B:7C:AA:CA, 2007-10-07 12:48:58, 2007-10-07 12:49:44, 11,  54, OPN ,    ,   , 189,      212,        0,   0.  0.  0.  0,   7, NETGEAR,
+ 
+ Station MAC, First time seen, Last time seen, Power, # packets, BSSID, Probed ESSIDs
+ 00:1B:77:7F:67:94, 2007-10-07 12:49:43, 2007-10-07 12:49:43, 178,        3, (not associated) ,</pre>
+
+</div>
+
+<h2 class="sectionedit13" id="usage_troubleshooting">Usage Troubleshooting</h2>
+<div class="level2">
+
+</div>
+
+<h3 class="sectionedit14" id="i_am_getting_no_aps_or_clients_shown">I am getting no APs or clients shown</h3>
+<div class="level3">
+
+<p>
+If you have a laptop with a builtin wireless card, ensure it is “turned on / enabled” in the bios
+</p>
+
+<p>
+Does your card works in managed mode?  If not, the problem is not with airodump-ng.  You need to get this working first.
+</p>
+
+<p>
+See if this <a href="http://madwifi-project.org/wiki/UserDocs/MiniPCI" class="urlextern" title="http://madwifi-project.org/wiki/UserDocs/MiniPCI" rel="ugc nofollow">madwifi-ng web page</a> has information that may be helpful.
+</p>
+
+<p>
+Although it is not very “scientific”, sometimes simply unloading then reloading the driver will get it working. This is done with the rmmod and modprobe commands.
+</p>
+
+<p>
+Also see the next troubleshooting tip.
+</p>
+
+</div>
+
+<h3 class="sectionedit15" id="i_am_getting_little_or_no_data">I am getting little or no data</h3>
+<div class="level3">
+<ul>
+<li class="level1"><div class="li"> Make sure you used the “-c” or “- -channel” option to specify a single channel. Otherwise, by default, airodump-ng will hop between channels.</div>
+</li>
+<li class="level1"><div class="li"> You might need to be physically closer to the AP to get a quality signal.</div>
+</li>
+<li class="level1"><div class="li"> Make sure you have started your card in monitor mode with <a href="/doku.php?id=airmon-ng" class="wikilink1" title="airmon-ng" data-wiki-id="airmon-ng">airmon-ng</a> (Linux only).</div>
+</li>
+</ul>
+
+</div>
+
+<h4 id="note_for_madwifi-ng">Note for madwifi-ng</h4>
+<div class="level4">
+
+<p>
+Make sure there are no other VAPs running. There can be issues when creating a new VAP in monitor mode and there was an existing VAP in managed mode.
+</p>
+
+<p>
+You should first stop ath0 then start wifi0:
+</p>
+<pre class="code"> airmon-ng stop ath0
+ airmon-ng start wifi0</pre>
+
+<p>
+or
+</p>
+<pre class="code"> wlanconfig ath0 destroy
+ wlanconfig ath create wlandev wifi0 wlanmode monitor</pre>
+
+</div>
+
+<h3 class="sectionedit16" id="airodump-ng_keeps_switching_between_wep_and_wpa">Airodump-ng keeps switching between WEP and WPA</h3>
+<div class="level3">
+
+<p>
+This is happening because your driver doesn&#039;t discard corrupted packets (that have an invalid CRC). If it&#039;s a ipw2100 (Centrino b), it just can&#039;t be helped; go buy a better card. If it&#039;s a Prism2, <a href="/doku.php?id=prism2_flashing" class="wikilink1" title="prism2_flashing" data-wiki-id="prism2_flashing">try upgrading the firmware</a>.
+</p>
+
+</div>
+
+<h3 class="sectionedit17" id="airodump-ng_stops_capturing_data_after_a_short_period_of_time">Airodump-ng stops capturing data after a short period of time</h3>
+<div class="level3">
+
+<p>
+The most common cause is that a connection manager is running on your system and takes the card out of monitor mode. Be sure to stop all connection managers prior to using the aircrack-ng suite. In general, disabling “Wireless” in your network manager should be enough but sometimes you have to stop them completely. It can be done with <a href="/doku.php?id=airmon-ng" class="wikilink1" title="airmon-ng" data-wiki-id="airmon-ng">airmon-ng</a>:
+</p>
+<pre class="code">airmon-ng check kill</pre>
+
+<p>
+Recent linux distributions use <em>upstart</em>; it automatically restarts the network manager. In order to stop it, see the following <a href="/doku.php?id=airmon-ng#check_kill_fails" class="wikilink1" title="airmon-ng" data-wiki-id="airmon-ng">entry</a>.
+</p>
+
+<p>
+As well, make sure that <a href="http://hostap.epitest.fi/wpa_supplicant/" class="urlextern" title="http://hostap.epitest.fi/wpa_supplicant/" rel="ugc nofollow">wpa_supplicant</a> is not running.  Another potential cause is the PC going to sleep due to power saving options.  Check your power saving options.
+</p>
+
+<p>
+The madwifi-ng driver for the atheros chipset contains a bug in releases up to r2830 which causes airodump-ng in channel hopping mode to stop capturing data after a few minutes.  The fix is to use r2834 or above of the madwifi-ng drivers.
+</p>
+
+<p>
+See also <a href="/doku.php?id=airmon-ng#check_kill_fails" class="wikilink1" title="airmon-ng" data-wiki-id="airmon-ng">this entry</a> for recent 
+</p>
+
+</div>
+
+<h3 class="sectionedit18" id="hidden_ssids_length">Hidden SSIDs &quot;&lt;length:  ?&gt;&quot;</h3>
+<div class="level3">
+
+<p>
+You will sometimes see “&lt;length:  ?&gt;” as the SSID on the <a href="/doku.php?id=airodump-ng" class="wikilink1" title="airodump-ng" data-wiki-id="airodump-ng">airodump-ng</a> display.  This means the SSID is hidden.  The “?” is normally the length of the SSID.  For example, if the SSID was “test123” then it would show up as “&lt;length:  7&gt;” where 7 is the number of characters.  When the length is 0 or 1, it means the AP does not reveal the actual length and the real length could be any value.
+</p>
+
+<p>
+To obtain the hidden SSID there are a few options:
+</p>
+<ul>
+<li class="level1"><div class="li"> Wait for a wireless client to associate with the AP.  When this happens, airodump-ng will capture and display the SSID.</div>
+</li>
+<li class="level1"><div class="li"> Deauthenticate an existing wireless client to force it to associate again.  The point above will apply.</div>
+</li>
+<li class="level1"><div class="li"> Use a tool like <a href="http://homepages.tu-darmstadt.de/~p_larbig/wlan" class="urlextern" title="http://homepages.tu-darmstadt.de/~p_larbig/wlan" rel="ugc nofollow">mdk3</a> to bruteforce the SSID.</div>
+</li>
+<li class="level1"><div class="li"> You can use Wireshark combined with one or more of these filters to review data capture files.  The SSID is included within these packets for the AP.</div>
+</li>
+</ul>
+<pre class="code"> wlan.fc.type_subtype == 0 (association request)
+ wlan.fc.type_subtype == 4 (probe request)
+ wlan.fc.type_subtype == 5 (probe response)</pre>
+
+</div>
+
+<h3 class="sectionedit19" id="airodump-ng_freezes_when_i_change_injecting_rate">Airodump-ng freezes when I change injecting rate</h3>
+<div class="level3">
+
+<p>
+There are two workarounds: 
+</p>
+<ul>
+<li class="level1"><div class="li"> Change the rate before using airodump-ng </div>
+</li>
+<li class="level1"><div class="li"> Restart airodump-ng </div>
+</li>
+</ul>
+
+</div>
+
+<h3 class="sectionedit20" id="fixed_channel_error_message">&quot;fixed channel&quot; error message</h3>
+<div class="level3">
+
+<p>
+If the top of your airodump screen looks something like:
+</p>
+<pre class="code"> CH  6 ][ Elapsed: 28 s ][ 2008-09-21 10:39 ][ fixed channel ath0: 1</pre>
+
+<p>
+Then this means you started started airodump-ng with a fixed channel parameter (-c / –channel) but some other process is changing the channel.  “CH 6” on the left is the channel that was specified when airodump-ng was started.  “fixed channel ath0: 1” on the right indicates that ath0 was used when airodump-ng was started but the interface is currently on channel 1 (instead of channel 6).  You might also see this channel number changing indicating that channel scanning is taking place.
+</p>
+
+<p>
+It is critical that the root cause of the problem be eliminated and then airodump-ng restarted again.  Here are some possible reasons and how to correct them:
+</p>
+<ul>
+<li class="level1"><div class="li"> There is one or more interfaces in “managed mode” and these are are scanning for an AP to connect to.  Do not use any command, process or program to connect to APs at the same time as you use the aircrack-ng suite. </div>
+</li>
+<li class="level1"><div class="li"> Other processes are changing the channel. A common problem are network managers.  You can also use “airmon-ng check” on current versions of the aircrack-ng suite to identify problem processes.  Then use “kill” or “killall” to destroy the problem processes.  For example, use “killall NetworkManager &amp;&amp; killall NetworkManagerDispatcher” to eliminate network managers.</div>
+</li>
+<li class="level1"><div class="li"> If you are using the madwifi-ng driver and have more then the ath0 interface created, the driver may be automatically scanning on the other interfaces.  To resolve this, stop all interfaces except ath0.</div>
+</li>
+<li class="level1"><div class="li"> You have wpa_supplicant running at the same time.  Stop wpa_supplicant.</div>
+</li>
+<li class="level1"><div class="li"> You run airmon-ng to set the channel while airodump-ng is running.  Do not do this.</div>
+</li>
+<li class="level1"><div class="li"> You run another instance of airodump-ng in scanning mode or set to another channel.  Stop airodump-ng and do not do this.</div>
+</li>
+</ul>
+
+<p>
+<br/>
+
+<br/>
+
+It can also means that you cannot use this channel (and airodump-ng failed to set the channel). Eg: using channel 13 with a card that only supports channels from 1 to 11.
+</p>
+
+</div>
+
+<h3 class="sectionedit21" id="where_did_my_output_files_go">Where did my output files go?</h3>
+<div class="level3">
+
+<p>
+You ran airodump-ng and now cannot find the output files.
+</p>
+
+<p>
+First, make sure you ran airodump-ng with the option to create output files.  You must include -w or –write plus the file name prefix.  If you fail to do this then no output files are created.
+</p>
+
+<p>
+By default, the output files are placed in the directory where you start airodump-ng.  Before starting airodump-ng, use “pwd” to display the current directory.  Make a note of this directory so your return to it a later time.  To return to this directory, simply type “cd &lt;full directory name including the full path&gt;”.
+</p>
+
+<p>
+To output the files to a specific directly, add the full path to the file prefix name.  For example, lets say you want to output all your files to “/aircrack-ng/captures”.  First, create /aircrack-ng/captures if it does not already exist.  Then include “-w /aircrack-ng/captures/&lt;file prefix&gt;” on your airodump-ng command line.
+</p>
+
+<p>
+To access your files later when running aircrack-ng, either change to the directory where the files are located or prefix the file name with the full path.
+</p>
+
+</div>
+
+<h3 class="sectionedit22" id="windows_specific">Windows specific</h3>
+<div class="level3">
+
+</div>
+
+<h4 id="the_adapter_is_not_detected">The adapter is not detected</h4>
+<div class="level4">
+<ol>
+<li class="level1"><div class="li"> Make sure the special driver is installed. Read Driver installing <a href="/doku.php?id=install_drivers" class="wikilink1" title="install_drivers" data-wiki-id="install_drivers">page</a> for a guide on installing such driver.</div>
+</li>
+<li class="level1"><div class="li"> If the special driver is installed but it still isn&#039;t detected, try another version of the driver (older or newer).</div>
+</li>
+</ol>
+
+</div>
+
+<h4 id="the_application_has_failed_to_start_because_msvcr70dll_was_not_found">The application has failed to start because MSVCR70.dll was not found</h4>
+<div class="level4">
+
+<p>
+Obtain the file from <a href="http://www.dll-files.com/dllindex/dll-files.shtml?msvcr70" class="urlextern" title="http://www.dll-files.com/dllindex/dll-files.shtml?msvcr70" rel="ugc nofollow">http://www.dll-files.com/dllindex/dll-files.shtml?msvcr70</a> or it is also located in the bin directory of the zip file of the Windows version of aircrack-ng suite.  Typically, it should be located in <strong>C:\&lt;windows root directory&gt;\system32</strong>.
+</p>
+
+</div>
+
+<h4 id="the_application_freezes_under_microsoft_windows">The application freezes under Microsoft Windows</h4>
+<div class="level4">
+
+<p>
+Ensure you are using the correct drivers for your particular wireless card.  Plus the correct Wildpackets driver.  Failure to do so may result in your PC freezing when running airodump-ng.
+</p>
+
+<p>
+The powersaver option on the card can also cause the application to freeze or crash.  Try disabling this option via the “Properties” section of your card.  Another kludge is to keep moving your mouse every few minutes to eliminate the powersaver option from kicking in.
+</p>
+
+</div>
+
+<h4 id="how_to_get_airodump-ng_to_work_under_windows_vista">How to get airodump-ng to work under Windows Vista?</h4>
+<div class="level4">
+
+<p>
+The following fix has reportedly worked for some people:  What you have to do is right click on airodump-ng.exe, select properties, compatibility, and check run in compatibility mode for Windows XP.  Also, check the box at the bottom that says to run as administrator.
+</p>
+
+</div>
+
+<h4 id="peeksys_file_is_zero_bytes">peek.sys file is zero bytes!</h4>
+<div class="level4">
+
+<p>
+Peek.sys being zero bytes is normal.  You can proceed to use airodump-ng.
+</p>
+
+<p>
+This file is created by airodump-ng to prevent the driver dialog box from being shown each time the program is run.
+</p>
+
+</div>
+
+<h4 id="errorfailed_to_download_peek_files">error: &quot;Failed to download Peek files&quot;</h4>
+<div class="level4">
+
+<p>
+You may have a <abbr title="Domain Name System">DNS</abbr> problem or there is an Internet connectivity problem.  Manually download the following files and place them in the same directory as the airodump-ng.exe file. <br/>
+
+</p>
+<ul>
+<li class="level1"><div class="li"> <a href="http://www.tuto-fr.com/tutoriaux/crack-wep/fichiers/wlan/winxp/Peek.zip" class="urlextern" title="http://www.tuto-fr.com/tutoriaux/crack-wep/fichiers/wlan/winxp/Peek.zip" rel="ugc nofollow">Peek.dll and Peek5.sys</a></div>
+</li>
+</ul>
+
+</div>
+
+<h4 id="various_errors_referencing_peekdll">Various errors referencing peek.dll</h4>
+<div class="level4">
+
+<p>
+If you receive one or more of these errors:
+</p>
+<ul>
+<li class="level1"><div class="li"> Dialog Box Error: “The application or DLL C:\????\bin\Peek.dll is not a valid Windows image.  Please check this against your installation diskette.”</div>
+</li>
+</ul>
+<ul>
+<li class="level1"><div class="li"> <abbr title="Graphical User Interface">GUI</abbr> Screen Error: “LoadLibrary (Peek.dll) failed, make sure this file is present in the current directory.  Press Ctrl-c to exit.”</div>
+</li>
+</ul>
+
+<p>
+This means the peek.dll and/or peek5.sys file are missing from the directory which contains the airodump-ng.exe file or are corrupted.  See the previous troubleshooting entry for instructions on how to download the files.
+</p>
+
+</div>
+
+<h4 id="no_data_is_captured_under_windows">No data is captured under Windows</h4>
+<div class="level4">
+<ul>
+<li class="level1"><div class="li"> Using the Windows network connections manager, ensure the wireless device is enabled.</div>
+</li>
+<li class="level1"><div class="li"> Ensure that your Windows wireless configuration manager is enabled and the configuration manager that comes with your card is disabled.</div>
+</li>
+<li class="level1"><div class="li"> Do not run any wireless configuration manager while trying to use the aircrack-ng suite.</div>
+</li>
+<li class="level1"><div class="li"> Do not run any wireless program such as monitor mode checkers while trying to use the aircracck-ng suite.</div>
+</li>
+<li class="level1"><div class="li"> Check the “Driver Provider” name for the driver being used for your wireless device via properties to ensure it says Wildpackets.  Also confirm the driver version is what you expect.</div>
+</li>
+<li class="level1"><div class="li"> Using a command prompt, change to the directory where airodump-ng.exe is located.  Confirm that peek.dll and peek.sys exist in this directory.</div>
+</li>
+<li class="level1"><div class="li"> Using the command prompt and while still in the directory containing airodump-ng, try starting airodump-ng.  It should not ask you about downloading Wildpackets or peek files.  If it does, you do not have everything installed correctly. Redo the installation instructions.</div>
+</li>
+</ul>
+
+</div>
+
+<h4 id="review_all_your_steps">Review all your steps</h4>
+<div class="level4">
+
+<p>
+If airodump-ng is not functioning, it cannot detect your card or you get the blue screen of death, review the instructions for installing the <a href="/doku.php?id=install_aircrack#installing_pre-compiled_binaries_under_windows" class="wikilink1" title="install_aircrack" data-wiki-id="install_aircrack">software</a> and <a href="/doku.php?id=install_drivers#windows" class="wikilink1" title="install_drivers" data-wiki-id="install_drivers">drivers</a>.  If you cannot identify the problem, redo everything from scratch.  Also check the this <a href="/doku.php?id=aircrack-ng_suite-under-windows_for_dummies" class="wikilink1" title="aircrack-ng_suite-under-windows_for_dummies" data-wiki-id="aircrack-ng_suite-under-windows_for_dummies">tutorial</a> for ideas.
+</p>
+
+</div>
+
+<h4 id="airodump-ng_bluescreen">Airodump-ng Bluescreen</h4>
+<div class="level4">
+
+<p>
+Airodump-ng or any “user space” program cannot produce a bluescreen, it is the driver which is the root cause. In most cases, these bluescreen failures cannot be resolved since these drivers are closed source.
+</p>
+
+</div>
+
+<h2 class="sectionedit23" id="interaction">Interaction</h2>
+<div class="level2">
+
+<p>
+Since revision r1648, airodump-ng can receive and interpret key strokes while running. The following list describes the currently assigned keys and supposed actions.
+</p>
+<ul>
+<li class="level1"><div class="li"> [a]: Select active areas by cycling through these display options: AP+STA; AP+STA+ACK; AP only; STA only</div>
+</li>
+<li class="level1"><div class="li"> [d]: Reset sorting to defaults (Power)</div>
+</li>
+<li class="level1"><div class="li"> [i]: Invert sorting algorithm</div>
+</li>
+<li class="level1"><div class="li"> [m]: Mark the selected AP or cycle through different colors if the selected AP is already marked</div>
+</li>
+<li class="level1"><div class="li"> [r]: (De-)Activate realtime sorting - applies sorting algorithm everytime the display will be redrawn</div>
+</li>
+<li class="level1"><div class="li"> [s]: Change column to sort by, which currently includes: First seen; BSSID; PWR level; Beacons; Data packets; Packet rate; Channel; Max. data rate; Encryption; Strongest Ciphersuite; Strongest Authentication; ESSID</div>
+</li>
+<li class="level1"><div class="li"> [SPACE]: Pause display redrawing/ Resume redrawing</div>
+</li>
+<li class="level1"><div class="li"> [TAB]: Enable/Disable scrolling through AP list</div>
+</li>
+<li class="level1"><div class="li"> [UP]: Select the AP prior to the currently marked AP in the displayed list if available</div>
+</li>
+<li class="level1"><div class="li"> [DOWN]: Select the AP after the currently marked AP if available</div>
+</li>
+</ul>
+
+<p>
+If an AP is selected or marked, all the connected stations will also be selected or marked with the same color as the corresponding Access Point.
+</p>
+
+</div>
+                    <!-- wikipage stop -->
+                                    </div>
+
+                <div class="docInfo"><bdi>airodump-ng.txt</bdi> · Last modified: <time datetime="2022-05-01T21:03:41+0200">2022/05/01 21:03</time> by <bdi>mister_x</bdi></div>
+
+                
+                <hr class="a11y" />
+            </div></main><!-- /content -->
+
+            <!-- PAGE ACTIONS -->
+            <nav id="dokuwiki__pagetools" aria-labelledby="dokuwiki__pagetools__heading">
+                <h3 class="a11y" id="dokuwiki__pagetools__heading">Page Tools</h3>
+                <div class="tools">
+                    <ul>
+                        <li class="source"><a href="/doku.php?id=airodump-ng&amp;do=edit" title="Show pagesource [v]" rel="nofollow" accesskey="v"><span>Show pagesource</span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M13 9h5.5L13 3.5V9M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2m.12 13.5l3.74 3.74 1.42-1.41-2.33-2.33 2.33-2.33-1.42-1.41-3.74 3.74m11.16 0l-3.74-3.74-1.42 1.41 2.33 2.33-2.33 2.33 1.42 1.41 3.74-3.74z"/></svg></a></li><li class="backlink"><a href="/doku.php?id=airodump-ng&amp;do=backlink" title="Backlinks" rel="nofollow"><span>Backlinks</span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M10.59 13.41c.41.39.41 1.03 0 1.42-.39.39-1.03.39-1.42 0a5.003 5.003 0 0 1 0-7.07l3.54-3.54a5.003 5.003 0 0 1 7.07 0 5.003 5.003 0 0 1 0 7.07l-1.49 1.49c.01-.82-.12-1.64-.4-2.42l.47-.48a2.982 2.982 0 0 0 0-4.24 2.982 2.982 0 0 0-4.24 0l-3.53 3.53a2.982 2.982 0 0 0 0 4.24m2.82-4.24c.39-.39 1.03-.39 1.42 0a5.003 5.003 0 0 1 0 7.07l-3.54 3.54a5.003 5.003 0 0 1-7.07 0 5.003 5.003 0 0 1 0-7.07l1.49-1.49c-.01.82.12 1.64.4 2.43l-.47.47a2.982 2.982 0 0 0 0 4.24 2.982 2.982 0 0 0 4.24 0l3.53-3.53a2.982 2.982 0 0 0 0-4.24.973.973 0 0 1 0-1.42z"/></svg></a></li><li class="top"><a href="#dokuwiki__top" title="Back to top [t]" rel="nofollow" accesskey="t"><span>Back to top</span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"/></svg></a></li>                    </ul>
+                </div>
+            </nav>
+        </div><!-- /wrapper -->
+
+        
+<!-- ********** FOOTER ********** -->
+<footer id="dokuwiki__footer"><div class="pad">
+    <div class="license">Except where otherwise noted, content on this wiki is licensed under the following license: <bdi><a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en" rel="license" class="urlextern">CC Attribution-Noncommercial-Share Alike 4.0 International</a></bdi></div>
+    <div class="buttons">
+        <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en" rel="license"><img src="/lib/images/license/button/cc-by-nc-sa.png" alt="CC Attribution-Noncommercial-Share Alike 4.0 International" /></a>        <a href="https://www.dokuwiki.org/donate" title="Donate" ><img
+            src="/lib/tpl/dokuwiki/images/button-donate.gif" width="80" height="15" alt="Donate" /></a>
+        <a href="https://php.net" title="Powered by PHP" ><img
+            src="/lib/tpl/dokuwiki/images/button-php.gif" width="80" height="15" alt="Powered by PHP" /></a>
+        <a href="//validator.w3.org/check/referer" title="Valid HTML5" ><img
+            src="/lib/tpl/dokuwiki/images/button-html5.png" width="80" height="15" alt="Valid HTML5" /></a>
+        <a href="//jigsaw.w3.org/css-validator/check/referer?profile=css3" title="Valid CSS" ><img
+            src="/lib/tpl/dokuwiki/images/button-css.png" width="80" height="15" alt="Valid CSS" /></a>
+        <a href="https://dokuwiki.org/" title="Driven by DokuWiki" ><img
+            src="/lib/tpl/dokuwiki/images/button-dw.png" width="80" height="15"
+            alt="Driven by DokuWiki" /></a>
+    </div>
+
+    </div></footer><!-- /footer -->
+    </div></div><!-- /site -->
+
+    <div class="no"><img src="/lib/exe/taskrunner.php?id=airodump-ng&amp;1791928288" width="2" height="1" alt="" /></div>
+    <div id="screen__mode" class="no"></div></body>
+</html>

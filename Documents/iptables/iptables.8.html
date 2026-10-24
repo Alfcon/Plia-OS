@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iptables(8) — iptables — Debian bookworm — Debian Manpages</title>
+<style type="text/css">
+@font-face {
+  font-family: 'Inconsolata';
+  src: local('Inconsolata'), url(/Inconsolata.woff2) format('woff2'), url(/Inconsolata.woff) format('woff');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Roboto'), local('Roboto Regular'), local('Roboto-Regular'), url(/Roboto-Regular.woff2) format('woff2'), url(/Roboto-Regular.woff) format('woff');
+  font-display: swap;
+}
+
+body {
+	color: #000;
+	background-color: white;
+	background-image: linear-gradient(to bottom, #d7d9e2, #fff 70px);
+	background-position: 0 0;
+	background-repeat: repeat-x;
+	font-family: sans-serif;
+	font-size: 100%;
+	line-height: 1.2;
+	letter-spacing: 0.15px;
+	margin: 0;
+	padding: 0;
+}
+
+#header {
+	padding: 0 10px 0 52px;
+}
+
+#logo {
+	position: absolute;
+	top: 0;
+	left: 0;
+	border-left: 1px solid transparent;
+	border-right: 1px solid transparent;
+	border-bottom: 1px solid transparent;
+	width: 50px;
+	height: 5.07em;
+	min-height: 65px;
+}
+
+#logo a {
+	display: block;
+	height: 100%;
+}
+
+#logo img {
+	margin-top: 5px;
+	position: absolute;
+	bottom: 0.3em;
+	overflow: auto;
+	border: 0;
+}
+
+p.section {
+	margin: 0;
+	padding: 0 5px 0 5px;
+	font-size: 13px;
+	line-height: 16px;
+	color: white;
+	letter-spacing: 0.08em;
+	position: absolute;
+	top: 0px;
+	left: 52px;
+	background-color: #c70036;
+}
+
+p.section a {
+	color: white;
+	text-decoration: none;
+}
+
+.hidecss {
+	display: none;
+}
+
+#searchbox {
+	text-align:left;
+	line-height: 1;
+	margin: 0 10px 0 0.5em;
+	padding: 1px 0 1px 0;
+	position: absolute;
+	top: 0;
+	right: 0;
+	font-size: .75em;
+}
+
+#navbar {
+	border-bottom: 1px solid #c70036;
+}
+
+#navbar ul {
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+}
+
+#navbar li {
+	list-style: none;
+	float: left;
+}
+
+#navbar a {
+	display: block;
+	padding: 1.75em .5em .25em .5em;
+	color: #0035c7;
+	text-decoration: none;
+	border-left: 1px solid transparent;
+	border-right: 1px solid transparent;
+}
+
+#navbar a:hover
+, #navbar a:visited:hover {
+	background-color: #f5f6f7;
+	border-left: 1px solid  #d2d3d7;
+	border-right: 1px solid #d2d3d7;
+	text-decoration: underline;
+}
+
+a:link {
+	color: #0035c7;
+}
+
+a:visited {
+	color: #54638c;
+}
+
+#breadcrumbs {
+	line-height: 2;
+	min-height: 20px;
+	margin: 0;
+	padding: 0;
+	font-size: 0.75em;
+	background-color: #f5f6f7;
+	border-bottom: 1px solid #d2d3d7;
+}
+
+#breadcrumbs:before {
+	margin-left: 0.5em;
+	margin-right: 0.5em;
+}
+
+#content {
+    margin: 0 10px 0 52px;
+    display: flex;
+    flex-direction: row;
+    word-wrap: break-word;
+}
+
+.paneljump {
+    background-color: #d70751;
+    padding: 0.5em;
+    border-radius: 3px;
+    margin-right: .5em;
+    display: none;
+}
+
+.paneljump a,
+.paneljump a:visited,
+.paneljump a:hover,
+.paneljump a:focus {
+    color: white;
+}
+
+@media all and (max-width: 800px) {
+    #content {
+	flex-direction: column;
+	margin: 0.5em;
+    }
+    .paneljump {
+	display: block;
+    }
+}
+
+.panels {
+    display: block;
+    order: 2;
+}
+
+.maincontent {
+    width: 100%;
+    max-width: 80ch;
+    order: 1;
+}
+
+.mandoc {
+    font-family: monospace;
+    font-size: 1.04rem;
+}
+
+.mandoc pre {
+    white-space: pre-wrap;
+}
+
+#footer {
+	border: 1px solid #dfdfe0;
+	border-left: 0;
+	border-right: 0;
+	background-color: #f5f6f7;
+	padding: 1em;
+	margin: 1em 10px 0 52px;
+	font-size: 0.75em;
+	line-height: 1.5em;
+}
+
+hr {
+	border-top: 1px solid #d2d3d7;
+	border-bottom: 1px solid white;
+	border-left: 0;
+	border-right: 0;
+	margin: 1.4375em 0 1.5em 0;
+	height: 0;
+	background-color: #bbb;
+}
+
+#content p {
+    padding-left: 1em;
+}
+
+ 
+
+a, a:hover, a:focus, a:visited {
+    color: #0530D7;
+    text-decoration: none;
+}
+
+ 
+.panel {
+  padding: 15px;
+  margin-bottom: 20px;
+  background-color: #ffffff;
+  border: 1px solid #dddddd;
+  border-radius: 4px;
+  -webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+          box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+
+.panel-heading, .panel details {
+  margin: -15px -15px 0px;
+  background-color: #d70751;
+  border-bottom: 1px solid #dddddd;
+  border-top-right-radius: 3px;
+  border-top-left-radius: 3px;
+}
+
+.panel-heading, .panel summary {
+  padding: 5px 5px;
+  font-size: 17.5px;
+  font-weight: 500;
+  color: #ffffff;
+  outline-style: none;
+}
+
+.panel summary {
+    padding-left: 7px;
+}
+
+summary, details {
+    display: block;
+}
+
+.panel details ul {
+  margin: 0;
+}
+
+.panel-footer {
+  padding: 5px 5px;
+  margin: 15px -15px -15px;
+  background-color: #f5f5f5;
+  border-top: 1px solid #dddddd;
+  border-bottom-right-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+.panel-info {
+  border-color: #bce8f1;
+}
+
+.panel-info .panel-heading {
+  color: #3a87ad;
+  background-color: #d9edf7;
+  border-color: #bce8f1;
+}
+
+
+.list-group {
+  padding-left: 0;
+  margin-bottom: 20px;
+  background-color: #ffffff;
+}
+
+.list-group-item {
+  position: relative;
+  display: block;
+  padding: 5px 5px 5px 5px;
+  margin-bottom: -1px;
+  border: 1px solid #dddddd;
+}
+
+.list-group-item > .list-item-key {
+  min-width: 27%;
+  display: inline-block;
+}
+.list-group-item > .list-item-key.versions-repository {
+  min-width: 40%;
+}
+.list-group-item > .list-item-key.versioned-links-version {
+  min-width: 40%
+}
+
+
+.versioned-links-icon {
+  margin-right: 2px;
+}
+.versioned-links-icon a {
+  color: black;
+}
+.versioned-links-icon a:hover {
+  color: blue;
+}
+.versioned-links-icon-inactive {
+  opacity: 0.5;
+}
+
+.list-group-item:first-child {
+  border-top-right-radius: 4px;
+  border-top-left-radius: 4px;
+}
+
+.list-group-item:last-child {
+  margin-bottom: 0;
+  border-bottom-right-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.list-group-item-heading {
+  margin-top: 0;
+  margin-bottom: 5px;
+}
+
+.list-group-item-text {
+  margin-bottom: 0;
+  line-height: 1.3;
+}
+
+.list-group-item:hover {
+  background-color: #f5f5f5;
+}
+
+.list-group-item.active a {
+  z-index: 2;
+}
+
+.list-group-item.active {
+  background-color: #efefef;
+}
+
+.list-group-flush {
+  margin: 15px -15px -15px;
+}
+.panel .list-group-flush {
+  margin-top: -1px;
+}
+
+.list-group-flush .list-group-item {
+  border-width: 1px 0;
+}
+
+.list-group-flush .list-group-item:first-child {
+  border-top-right-radius: 0;
+  border-top-left-radius: 0;
+}
+
+.list-group-flush .list-group-item:last-child {
+  border-bottom: 0;
+}
+
+ 
+
+.panel {
+float: right;
+clear: right;
+min-width: 200px;
+}
+
+.toc {
+     
+    width: 200px;
+}
+
+.toc li {
+    font-size: 98%;
+    letter-spacing: 0.02em;
+    display: flex;
+}
+
+.otherversions {
+     
+    width: 200px;
+}
+
+.otherversions li,
+.otherlangs li {
+    display: flex;
+}
+
+.otherversions a,
+.otherlangs a {
+    flex-shrink: 0;
+}
+
+.pkgversion,
+.pkgname,
+.toc a {
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.pkgversion,
+.pkgname {
+    margin-left: auto;
+    padding-left: 1em;
+}
+
+ 
+
+.mandoc {
+     
+    overflow: hidden;
+    margin-top: .5em;
+    margin-right: 45px;
+}
+table.head, table.foot {
+    width: 100%;
+}
+.head-vol {
+    text-align: center;
+}
+.head-rtitle {
+    text-align: right;
+}
+
+ 
+.spacer, .Pp {
+    min-height: 1em;
+}
+
+pre {
+    margin-left: 2em;
+}
+
+.anchor {
+    margin-left: .25em;
+    visibility: hidden;
+}
+
+h1:hover .anchor,
+h2:hover .anchor,
+h3:hover .anchor,
+h4:hover .anchor,
+h5:hover .anchor,
+h6:hover .anchor {
+    visibility: visible;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    letter-spacing: .07em;
+    margin-top: 1.5em;
+    margin-bottom: .35em;
+}
+
+h1 {
+    font-size: 150%;
+}
+
+h2 {
+    font-size: 125%;
+}
+
+@media print {
+    #header, #footer, .panel, .anchor, .paneljump {
+	display: none;
+    }
+    #content {
+	margin: 0;
+    }
+    .mandoc {
+	margin: 0;
+    }
+}
+
+ 
+ 
+
+.Bd { }
+.Bd-indent {	margin-left: 3.8em; }
+
+.Bl-bullet {	list-style-type: disc;
+		padding-left: 1em; }
+.Bl-bullet > li { }
+.Bl-dash {	list-style-type: none;
+		padding-left: 0em; }
+.Bl-dash > li:before {
+		content: "\2014  "; }
+.Bl-item {	list-style-type: none;
+		padding-left: 0em; }
+.Bl-item > li { }
+.Bl-compact > li {
+		margin-top: 0em; }
+
+.Bl-enum {	padding-left: 2em; }
+.Bl-enum > li { }
+.Bl-compact > li {
+		margin-top: 0em; }
+
+.Bl-diag { }
+.Bl-diag > dt {
+		font-style: normal;
+		font-weight: bold; }
+.Bl-diag > dd {
+		margin-left: 0em; }
+.Bl-hang { }
+.Bl-hang > dt { }
+.Bl-hang > dd {
+		margin-left: 5.5em; }
+.Bl-inset { }
+.Bl-inset > dt { }
+.Bl-inset > dd {
+		margin-left: 0em; }
+.Bl-ohang { }
+.Bl-ohang > dt { }
+.Bl-ohang > dd {
+		margin-left: 0em; }
+.Bl-tag {	margin-left: 5.5em; }
+.Bl-tag > dt {
+		float: left;
+		margin-top: 0em;
+		margin-left: -5.5em;
+		padding-right: 1.2em;
+		vertical-align: top; }
+.Bl-tag > dd {
+		clear: both;
+		width: 100%;
+		margin-top: 0em;
+		margin-left: 0em;
+		vertical-align: top;
+		overflow: auto; }
+.Bl-compact > dt {
+		margin-top: 0em; }
+
+.Bl-column { }
+.Bl-column > tbody > tr { }
+.Bl-column > tbody > tr > td {
+		margin-top: 1em; }
+.Bl-compact > tbody > tr > td {
+		margin-top: 0em; }
+
+.Rs {		font-style: normal;
+		font-weight: normal; }
+.RsA { }
+.RsB {		font-style: italic;
+		font-weight: normal; }
+.RsC { }
+.RsD { }
+.RsI {		font-style: italic;
+		font-weight: normal; }
+.RsJ {		font-style: italic;
+		font-weight: normal; }
+.RsN { }
+.RsO { }
+.RsP { }
+.RsQ { }
+.RsR { }
+.RsT {		text-decoration: underline; }
+.RsU { }
+.RsV { }
+
+.eqn { }
+.tbl { }
+
+.HP {		margin-left: 3.8em;
+		text-indent: -3.8em; }
+
+ 
+
+table.Nm { }
+code.Nm {	font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Fl {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Cm {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Ar {		font-style: italic;
+		font-weight: normal; }
+.Op {		display: inline; }
+.Ic {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Ev {		font-style: normal;
+		font-weight: normal;
+		font-family: monospace; }
+.Pa {		font-style: italic;
+		font-weight: normal; }
+
+ 
+
+.Lb { }
+code.In {	font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+a.In { }
+.Fd {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Ft {		font-style: italic;
+		font-weight: normal; }
+.Fn {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Fa {		font-style: italic;
+		font-weight: normal; }
+.Vt {		font-style: italic;
+		font-weight: normal; }
+.Va {		font-style: italic;
+		font-weight: normal; }
+.Dv {		font-style: normal;
+		font-weight: normal;
+		font-family: monospace; }
+.Er {		font-style: normal;
+		font-weight: normal;
+		font-family: monospace; }
+
+ 
+
+.An { }
+.Lk { }
+.Mt { }
+.Cd {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Ad {		font-style: italic;
+		font-weight: normal; }
+.Ms {		font-style: normal;
+		font-weight: bold; }
+.St { }
+.Ux { }
+
+ 
+
+.Bf {		display: inline; }
+.No {		font-style: normal;
+		font-weight: normal; }
+.Em {		font-style: italic;
+		font-weight: normal; }
+.Sy {		font-style: normal;
+		font-weight: bold; }
+.Li {		font-style: normal;
+		font-weight: normal;
+		font-family: monospace; }
+body {
+  font-family: 'Roboto', sans-serif;
+}
+
+.mandoc, .mandoc pre, .mandoc code, p.section {
+  font-family: 'Inconsolata', monospace;
+}
+
+</style>
+<link rel="search" title="Debian manpages" type="application/opensearchdescription+xml" href="/opensearch.xml">
+<link rel="alternate" href="/bookworm/iptables/iptables.8.en.html" hreflang="en">
+<link rel="alternate" href="/bookworm/manpages-ja/iptables.8.ja.html" hreflang="ja">
+<link rel="alternate" href="/bookworm/manpages-zh/iptables.8.zh_CN.html" hreflang="zh-CN">
+<link rel="alternate" href="/bookworm/manpages-zh/iptables.8.zh_TW.html" hreflang="zh-TW">
+</head>
+<body>
+<div id="header">
+   <div id="upperheader">
+   <div id="logo">
+  <a href="https://www.debian.org/" title="Debian Home"><img src="/openlogo-50.svg" alt="Debian" width="50" height="61"></a>
+  </div>
+  <p class="section"><a href="/">MANPAGES</a></p>
+  <div id="searchbox">
+    <form action="https://dyn.manpages.debian.org/jump" method="get">
+      <input type="hidden" name="suite" value="bookworm">
+      <input type="hidden" name="binarypkg" value="iptables">
+      <input type="hidden" name="section" value="8">
+      <input type="hidden" name="language" value="en">
+      <input type="text" name="q" placeholder="manpage name" required>
+      <input type="submit" value="Jump">
+    </form>
+  </div>
+ </div>
+<div id="navbar">
+<p class="hidecss"><a href="#content">Skip Quicknav</a></p>
+<ul>
+   <li><a href="/">Index</a></li>
+   <li><a href="/about.html">About Manpages</a></li>
+   <li><a href="/faq.html">FAQ</a></li>
+   <li><a href="https://wiki.debian.org/manpages.debian.org">Service Information</a></li>
+</ul>
+</div>
+   <p id="breadcrumbs">&nbsp;
+     
+     &#x2F; <a href="/contents-bookworm.html">bookworm</a>
+     
+     
+     
+     &#x2F; <a href="/bookworm/iptables/index.html">iptables</a>
+     
+     
+     
+     &#x2F; iptables(8)
+     
+     </p>
+</div>
+<div id="content">
+
+
+<div class="panels" id="panels">
+<div class="panel" role="complementary">
+<div class="panel-heading" role="heading">
+links
+</div>
+<div class="panel-body">
+<ul class="list-group list-group-flush">
+<li class="list-group-item">
+<a href="/bookworm/iptables/iptables.8">language-indep link</a>
+</li>
+<li class="list-group-item">
+<a href="https://tracker.debian.org/pkg/iptables">package tracker</a>
+</li>
+<li class="list-group-item">
+<a href="/bookworm/iptables/iptables.8.en.gz">raw man page</a>
+</li>
+</ul>
+</div>
+</div>
+
+<div class="panel toc" role="complementary" style="padding-bottom: 0">
+<details>
+<summary>
+table of contents
+</summary>
+<div class="panel-body">
+<ul class="list-group list-group-flush">
+
+<li class="list-group-item">
+  <a class="toclink" href="#NAME" title="NAME">NAME</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#SYNOPSIS" title="SYNOPSIS">SYNOPSIS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#DESCRIPTION" title="DESCRIPTION">DESCRIPTION</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#TARGETS" title="TARGETS">TARGETS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#TABLES" title="TABLES">TABLES</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#OPTIONS" title="OPTIONS">OPTIONS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#LOCK_FILE" title="LOCK FILE">LOCK FILE</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#MATCH_AND_TARGET_EXTENSIONS" title="MATCH AND TARGET EXTENSIONS">MATCH AND TARGET EXTENSIONS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#DIAGNOSTICS" title="DIAGNOSTICS">DIAGNOSTICS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#BUGS" title="BUGS">BUGS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#COMPATIBILITY_WITH_IPCHAINS" title="COMPATIBILITY WITH IPCHAINS">COMPATIBILITY WITH IPCHAINS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#SEE_ALSO" title="SEE ALSO">SEE ALSO</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#AUTHORS" title="AUTHORS">AUTHORS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#VERSION" title="VERSION">VERSION</a>
+</li>
+
+</ul>
+</div>
+</details>
+</div>
+
+<div class="panel otherversions" role="complementary">
+<div class="panel-heading" role="heading">
+other versions
+</div>
+<div class="panel-body">
+<ul class="list-group list-group-flush">
+
+<li class="list-group-item active">
+<a href="/bookworm/iptables/iptables.8.en.html">bookworm</a> <span class="pkgversion" title="1.8.9-2">1.8.9-2</span>
+</li>
+
+<li class="list-group-item">
+<a href="/testing/iptables/iptables.8.en.html">testing</a> <span class="pkgversion" title="1.8.11-2">1.8.11-2</span>
+</li>
+
+<li class="list-group-item">
+<a href="/unstable/iptables/iptables.8.en.html">unstable</a> <span class="pkgversion" title="1.8.11-2">1.8.11-2</span>
+</li>
+
+</ul>
+</div>
+</div>
+
+
+<div class="panel otherlangs" role="complementary">
+<div class="panel-heading" role="heading">
+other languages
+</div>
+<div class="panel-body">
+<ul class="list-group list-group-flush">
+
+<li class="list-group-item active">
+<a href="/bookworm/iptables/iptables.8.en.html" title="English (en)">English</a>
+
+</li>
+
+<li class="list-group-item">
+<a href="/bookworm/manpages-ja/iptables.8.ja.html" title="Japanese (ja)">日本語</a>
+
+</li>
+
+<li class="list-group-item">
+<a href="/bookworm/manpages-zh/iptables.8.zh_CN.html" title="Chinese (zh_CN)">中文 (zh-CN)</a>
+
+</li>
+
+<li class="list-group-item">
+<a href="/bookworm/manpages-zh/iptables.8.zh_TW.html" title="Chinese (zh_TW)">繁體中文 (zh-TW)</a>
+
+</li>
+
+</ul>
+</div>
+</div>
+
+
+
+
+
+</div>
+
+<div class="maincontent">
+<p class="paneljump"><a href="#panels">Scroll to navigation</a></p>
+<div class="mandoc">
+<table class="head">
+  <tbody><tr>
+    <td class="head-ltitle">IPTABLES(8)</td>
+    <td class="head-vol">iptables 1.8.9</td>
+    <td class="head-rtitle">IPTABLES(8)</td>
+  </tr>
+</tbody></table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME">NAME<a class="anchor" href="#NAME">¶</a></h1>
+<p class="Pp">iptables/ip6tables — administration tool for IPv4/IPv6
+    packet filtering and NAT</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS">SYNOPSIS<a class="anchor" href="#SYNOPSIS">¶</a></h1>
+<p class="Pp"><b>iptables</b> [<b>-t</b> <i>table</i>]
+    {<b>-A</b>|<b>-C</b>|<b>-D</b>|<b>-V</b>} <i>chain</i>
+    <i>rule-specification</i></p>
+<p class="Pp"><b>ip6tables</b> [<b>-t</b> <i>table</i>]
+    {<b>-A</b>|<b>-C</b>|<b>-D</b>|<b>-V</b>} <i>chain
+  rule-specification</i></p>
+<p class="Pp"><b>iptables</b> [<b>-t</b> <i>table</i>] <b>-I</b> <i>chain</i>
+    [<i>rulenum</i>] <i>rule-specification</i></p>
+<p class="Pp"><b>iptables</b> [<b>-t</b> <i>table</i>] <b>-R</b> <i>chain
+    rulenum rule-specification</i></p>
+<p class="Pp"><b>iptables</b> [<b>-t</b> <i>table</i>] <b>-D</b> <i>chain
+    rulenum</i></p>
+<p class="Pp"><b>iptables</b> [<b>-t</b> <i>table</i>] <b>-S</b> [<i>chain</i>
+    [<i>rulenum</i>]]</p>
+<p class="Pp"><b>iptables</b> [<b>-t</b> <i>table</i>]
+    {<b>-F</b>|<b>-L</b>|<b>-Z</b>} [<i>chain</i> [<i>rulenum</i>]]
+    [<i>options...</i>]</p>
+<p class="Pp"><b>iptables</b> [<b>-t</b> <i>table</i>] <b>-N</b>
+  <i>chain</i></p>
+<p class="Pp"><b>iptables</b> [<b>-t</b> <i>table</i>] <b>-X</b>
+  [<i>chain</i>]</p>
+<p class="Pp"><b>iptables</b> [<b>-t</b> <i>table</i>] <b>-P</b> <i>chain
+    target</i></p>
+<p class="Pp"><b>iptables</b> [<b>-t</b> <i>table</i>] <b>-E</b>
+    <i>old-chain-name new-chain-name</i></p>
+<p class="Pp">rule-specification = [<i>matches...</i>] [<i>target</i>]</p>
+<p class="Pp">match = <b>-m</b> <i>matchname</i> [<i>per-match-options</i>]</p>
+<p class="Pp">target = <b>-j</b> <i>targetname</i>
+  [<i>per-target-options</i>]</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION">DESCRIPTION<a class="anchor" href="#DESCRIPTION">¶</a></h1>
+<p class="Pp"><b>Iptables</b> and <b>ip6tables</b> are used to set up, maintain,
+    and inspect the tables of IPv4 and IPv6 packet filter rules in the Linux
+    kernel. Several different tables may be defined. Each table contains a
+    number of built-in chains and may also contain user-defined chains.</p>
+<p class="Pp">Each chain is a list of rules which can match a set of packets.
+    Each rule specifies what to do with a packet that matches. This is called a
+    `target&#39;, which may be a jump to a user-defined chain in the same table.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="TARGETS">TARGETS<a class="anchor" href="#TARGETS">¶</a></h1>
+<p class="Pp">A firewall rule specifies criteria for a packet and a target. If
+    the packet does not match, the next rule in the chain is examined; if it
+    does match, then the next rule is specified by the value of the target,
+    which can be the name of a user-defined chain, one of the targets described
+    in <a href="/bookworm/iptables/iptables-extensions.8.en.html">iptables-extensions(8)</a>, or one of the special values
+    <b>ACCEPT</b>, <b>DROP</b> or <b>RETURN</b>.</p>
+<p class="Pp"><b>ACCEPT</b> means to let the packet through. <b>DROP</b> means
+    to drop the packet on the floor. <b>RETURN</b> means stop traversing this
+    chain and resume at the next rule in the previous (calling) chain. If the
+    end of a built-in chain is reached or a rule in a built-in chain with target
+    <b>RETURN</b> is matched, the target specified by the chain policy
+    determines the fate of the packet.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="TABLES">TABLES<a class="anchor" href="#TABLES">¶</a></h1>
+<p class="Pp">There are currently five independent tables (which tables are
+    present at any time depends on the kernel configuration options and which
+    modules are present).</p>
+<dl class="Bl-tag">
+  <dt id="t"><a class="permalink" href="#t"><b>-t</b>, <b>--table</b>
+    <i>table</i></a></dt>
+  <dd>This option specifies the packet matching table which the command should
+      operate on. If the kernel is configured with automatic module loading, an
+      attempt will be made to load the appropriate module for that table if it
+      is not already there.
+    <p class="Pp">The tables are as follows:</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="filter"><a class="permalink" href="#filter"><b>filter</b>:</a></dt>
+  <dd>This is the default table (if no -t option is passed). It contains the
+      built-in chains <b>INPUT</b> (for packets destined to local sockets),
+      <b>FORWARD</b> (for packets being routed through the box), and
+      <b>OUTPUT</b> (for locally-generated packets).</dd>
+  <dt id="nat"><a class="permalink" href="#nat"><b>nat</b>:</a></dt>
+  <dd>This table is consulted when a packet that creates a new connection is
+      encountered. It consists of four built-ins: <b>PREROUTING</b> (for
+      altering packets as soon as they come in), <b>INPUT</b> (for altering
+      packets destined for local sockets), <b>OUTPUT</b> (for altering
+      locally-generated packets before routing), and <b>POSTROUTING</b> (for
+      altering packets as they are about to go out). IPv6 NAT support is
+      available since kernel 3.7.</dd>
+  <dt id="mangle"><a class="permalink" href="#mangle"><b>mangle</b>:</a></dt>
+  <dd>This table is used for specialized packet alteration. Until kernel 2.4.17
+      it had two built-in chains: <b>PREROUTING</b> (for altering incoming
+      packets before routing) and <b>OUTPUT</b> (for altering locally-generated
+      packets before routing). Since kernel 2.4.18, three other built-in chains
+      are also supported: <b>INPUT</b> (for packets coming into the box itself),
+      <b>FORWARD</b> (for altering packets being routed through the box), and
+      <b>POSTROUTING</b> (for altering packets as they are about to go
+    out).</dd>
+  <dt id="raw"><a class="permalink" href="#raw"><b>raw</b>:</a></dt>
+  <dd>This table is used mainly for configuring exemptions from connection
+      tracking in combination with the NOTRACK target. It registers at the
+      netfilter hooks with higher priority and is thus called before
+      ip_conntrack, or any other IP tables. It provides the following built-in
+      chains: <b>PREROUTING</b> (for packets arriving via any network interface)
+      <b>OUTPUT</b> (for packets generated by local processes)</dd>
+  <dt id="security"><a class="permalink" href="#security"><b>security</b>:</a></dt>
+  <dd>This table is used for Mandatory Access Control (MAC) networking rules,
+      such as those enabled by the <b>SECMARK</b> and <b>CONNSECMARK</b>
+      targets. Mandatory Access Control is implemented by Linux Security Modules
+      such as SELinux. The security table is called after the filter table,
+      allowing any Discretionary Access Control (DAC) rules in the filter table
+      to take effect before MAC rules. This table provides the following
+      built-in chains: <b>INPUT</b> (for packets coming into the box itself),
+      <b>OUTPUT</b> (for altering locally-generated packets before routing), and
+      <b>FORWARD</b> (for altering packets being routed through the box).</dd>
+</dl>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS">OPTIONS<a class="anchor" href="#OPTIONS">¶</a></h1>
+<p class="Pp">The options that are recognized by <b>iptables</b> and
+    <b>ip6tables</b> can be divided into several different groups.</p>
+<section class="Ss">
+<h2 class="Ss" id="COMMANDS">COMMANDS<a class="anchor" href="#COMMANDS">¶</a></h2>
+<p class="Pp">These options specify the desired action to perform. Only one of
+    them can be specified on the command line unless otherwise stated below. For
+    long versions of the command and option names, you need to use only enough
+    letters to ensure that <b>iptables</b> can differentiate it from all other
+    options.</p>
+<dl class="Bl-tag">
+  <dt id="A"><a class="permalink" href="#A"><b>-A</b>, <b>--append</b> <i>chain
+    rule-specification</i></a></dt>
+  <dd>Append one or more rules to the end of the selected chain. When the source
+      and/or destination names resolve to more than one address, a rule will be
+      added for each possible address combination.</dd>
+  <dt id="C"><a class="permalink" href="#C"><b>-C</b>, <b>--check</b> <i>chain
+    rule-specification</i></a></dt>
+  <dd>Check whether a rule matching the specification does exist in the selected
+      chain. This command uses the same logic as <b>-D</b> to find a matching
+      entry, but does not alter the existing iptables configuration and uses its
+      exit code to indicate success or failure.</dd>
+  <dt id="D"><a class="permalink" href="#D"><b>-D</b>, <b>--delete</b> <i>chain
+    rule-specification</i></a></dt>
+  <dd></dd>
+  <dt id="D~2"><a class="permalink" href="#D~2"><b>-D</b>, <b>--delete</b>
+    <i>chain rulenum</i></a></dt>
+  <dd>Delete one or more rules from the selected chain. There are two versions
+      of this command: the rule can be specified as a number in the chain
+      (starting at 1 for the first rule) or a rule to match.</dd>
+  <dt id="I"><a class="permalink" href="#I"><b>-I</b>, <b>--insert</b>
+    <i>chain</i> [<i>rulenum</i>] <i>rule-specification</i></a></dt>
+  <dd>Insert one or more rules in the selected chain as the given rule number.
+      So, if the rule number is 1, the rule or rules are inserted at the head of
+      the chain. This is also the default if no rule number is specified.</dd>
+  <dt id="R"><a class="permalink" href="#R"><b>-R</b>, <b>--replace</b> <i>chain
+    rulenum rule-specification</i></a></dt>
+  <dd>Replace a rule in the selected chain. If the source and/or destination
+      names resolve to multiple addresses, the command will fail. Rules are
+      numbered starting at 1.</dd>
+  <dt id="L"><a class="permalink" href="#L"><b>-L</b>, <b>--list</b>
+    [<i>chain</i>]</a></dt>
+  <dd>List all rules in the selected chain. If no chain is selected, all chains
+      are listed. Like every other iptables command, it applies to the specified
+      table (filter is the default), so NAT rules get listed by
+    <pre><br/>
+ iptables -t nat -n -L</pre>
+    Please note that it is often used with the <b>-n</b> option, in order to
+      avoid long reverse DNS lookups. It is legal to specify the <b>-Z</b>
+      (zero) option as well, in which case the chain(s) will be atomically
+      listed and zeroed. The exact output is affected by the other arguments
+      given. The exact rules are suppressed until you use
+    <pre><br/>
+ iptables -L -v</pre>
+    or <a href="/bookworm/iptables/iptables-save.8.en.html">iptables-save(8)</a>.</dd>
+  <dt id="S"><a class="permalink" href="#S"><b>-S</b>, <b>--list-rules</b>
+    [<i>chain</i>]</a></dt>
+  <dd>Print all rules in the selected chain. If no chain is selected, all chains
+      are printed like iptables-save. Like every other iptables command, it
+      applies to the specified table (filter is the default).</dd>
+  <dt id="F"><a class="permalink" href="#F"><b>-F</b>, <b>--flush</b>
+    [<i>chain</i>]</a></dt>
+  <dd>Flush the selected chain (all the chains in the table if none is given).
+      This is equivalent to deleting all the rules one by one.</dd>
+  <dt id="Z"><a class="permalink" href="#Z"><b>-Z</b>, <b>--zero</b>
+    [<i>chain</i> [<i>rulenum</i>]]</a></dt>
+  <dd>Zero the packet and byte counters in all chains, or only the given chain,
+      or only the given rule in a chain. It is legal to specify the <b>-L</b>,
+      <b>--list</b> (list) option as well, to see the counters immediately
+      before they are cleared. (See above.)</dd>
+  <dt id="N"><a class="permalink" href="#N"><b>-N</b>, <b>--new-chain</b>
+    <i>chain</i></a></dt>
+  <dd>Create a new user-defined chain by the given name. There must be no target
+      of that name already.</dd>
+  <dt id="X"><a class="permalink" href="#X"><b>-X</b>, <b>--delete-chain</b>
+    [<i>chain</i>]</a></dt>
+  <dd>Delete the chain specified. There must be no references to the chain. If
+      there are, you must delete or replace the referring rules before the chain
+      can be deleted. The chain must be empty, i.e. not contain any rules. If no
+      argument is given, it will delete all empty chains in the table. Empty
+      builtin chains can only be deleted with <b>iptables-nft</b>.</dd>
+  <dt id="P"><a class="permalink" href="#P"><b>-P</b>, <b>--policy</b> <i>chain
+    target</i></a></dt>
+  <dd>Set the policy for the built-in (non-user-defined) chain to the given
+      target. The policy target must be either <b>ACCEPT</b> or
+    <b>DROP</b>.</dd>
+  <dt id="E"><a class="permalink" href="#E"><b>-E</b>, <b>--rename-chain</b>
+    <i>old-chain new-chain</i></a></dt>
+  <dd>Rename the user specified chain to the user supplied name. This is
+      cosmetic, and has no effect on the structure of the table.</dd>
+  <dt id="h"><a class="permalink" href="#h"><b>-h</b></a></dt>
+  <dd>Help. Give a (currently very brief) description of the command
+    syntax.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="PARAMETERS">PARAMETERS<a class="anchor" href="#PARAMETERS">¶</a></h2>
+<p class="Pp">The following parameters make up a rule specification (as used in
+    the add, delete, insert, replace and append commands).</p>
+<dl class="Bl-tag">
+  <dt><b>-4</b>, <b>--ipv4</b></dt>
+  <dd>This option has no effect in iptables and iptables-restore. If a rule
+      using the <b>-4</b> option is inserted with (and only with)
+      ip6tables-restore, it will be silently ignored. Any other uses will throw
+      an error. This option allows IPv4 and IPv6 rules in a single rule file for
+      use with both iptables-restore and ip6tables-restore.</dd>
+  <dt><b>-6</b>, <b>--ipv6</b></dt>
+  <dd>If a rule using the <b>-6</b> option is inserted with (and only with)
+      iptables-restore, it will be silently ignored. Any other uses will throw
+      an error. This option allows IPv4 and IPv6 rules in a single rule file for
+      use with both iptables-restore and ip6tables-restore. This option has no
+      effect in ip6tables and ip6tables-restore.</dd>
+  <dt>[<b>!</b>] <b>-p</b>, <b>--protocol</b> <i>protocol</i></dt>
+  <dd>The protocol of the rule or of the packet to check. The specified protocol
+      can be one of <b>tcp</b>, <b>udp</b>, <b>udplite</b>, <b>icmp</b>,
+      <b>icmpv6</b>,<b>esp</b>, <b>ah</b>, <b>sctp</b>, <b>mh</b> or the special
+      keyword &#34;<b>all</b>&#34;, or it can be a numeric value, representing
+      one of these protocols or a different one. A protocol name from
+      /etc/protocols is also allowed. A &#34;!&#34; argument before the
+      protocol inverts the test. The number zero is equivalent to <b>all</b>.
+      &#34;<b>all</b>&#34; will match with all protocols and is taken as
+      default when this option is omitted. Note that, in ip6tables, IPv6
+      extension headers except <b>esp</b> are not allowed. <b>esp</b> and
+      <b>ipv6-nonext</b> can be used with Kernel version 2.6.11 or later. The
+      number zero is equivalent to <b>all</b>, which means that you cannot test
+      the protocol field for the value 0 directly. To match on a HBH header,
+      even if it were the last, you cannot use <b>-p 0</b>, but always need
+      <b>-m hbh</b>.</dd>
+  <dt>[<b>!</b>] <b>-s</b>, <b>--source</b>
+    <i>address</i>[<b>/</b><i>mask</i>][<b>,</b><i>...</i>]</dt>
+  <dd>Source specification. <i>Address</i> can be either a network name, a
+      hostname, a network IP address (with <b>/</b><i>mask</i>), or a plain IP
+      address. Hostnames will be resolved once only, before the rule is
+      submitted to the kernel. Please note that specifying any name to be
+      resolved with a remote query such as DNS is a really bad idea. The
+      <i>mask</i> can be either an ipv4 network mask (for iptables) or a plain
+      number, specifying the number of 1&#39;s at the left side of the network mask.
+      Thus, an iptables mask of <i>24</i> is equivalent to <i>255.255.255.0</i>.
+      A &#34;!&#34; argument before the address specification inverts the
+      sense of the address. The flag <b>--src</b> is an alias for this option.
+      Multiple addresses can be specified, but this will <b>expand to
+      multiple</b> <b>rules</b> (when adding with -A), or will cause multiple
+      rules to be deleted (with -D).</dd>
+  <dt>[<b>!</b>] <b>-d</b>, <b>--destination</b>
+    <i>address</i>[<b>/</b><i>mask</i>][<b>,</b><i>...</i>]</dt>
+  <dd>Destination specification. See the description of the <b>-s</b> (source)
+      flag for a detailed description of the syntax. The flag <b>--dst</b> is an
+      alias for this option.</dd>
+  <dt id="m"><a class="permalink" href="#m"><b>-m</b>, <b>--match</b>
+    <i>match</i></a></dt>
+  <dd>Specifies a match to use, that is, an extension module that tests for a
+      specific property. The set of matches make up the condition under which a
+      target is invoked. Matches are evaluated first to last as specified on the
+      command line and work in short-circuit fashion, i.e. if one extension
+      yields false, evaluation will stop.</dd>
+  <dt id="j"><a class="permalink" href="#j"><b>-j</b>, <b>--jump</b>
+    <i>target</i></a></dt>
+  <dd>This specifies the target of the rule; i.e., what to do if the packet
+      matches it. The target can be a user-defined chain (other than the one
+      this rule is in), one of the special builtin targets which decide the fate
+      of the packet immediately, or an extension (see <b>EXTENSIONS</b> below).
+      If this option is omitted in a rule (and <b>-g</b> is not used), then
+      matching the rule will have no effect on the packet&#39;s fate, but the
+      counters on the rule will be incremented.</dd>
+  <dt id="g"><a class="permalink" href="#g"><b>-g</b>, <b>--goto</b>
+    <i>chain</i></a></dt>
+  <dd>This specifies that the processing should continue in a user specified
+      chain. Unlike the --jump option return will not continue processing in
+      this chain but instead in the chain that called us via --jump.</dd>
+  <dt>[<b>!</b>] <b>-i</b>, <b>--in-interface</b> <i>name</i></dt>
+  <dd>Name of an interface via which a packet was received (only for packets
+      entering the <b>INPUT</b>, <b>FORWARD</b> and <b>PREROUTING</b> chains).
+      When the &#34;!&#34; argument is used before the interface name, the
+      sense is inverted. If the interface name ends in a &#34;+&#34;, then any
+      interface which begins with this name will match. If this option is
+      omitted, any interface name will match.</dd>
+  <dt>[<b>!</b>] <b>-o</b>, <b>--out-interface</b> <i>name</i></dt>
+  <dd>Name of an interface via which a packet is going to be sent (for packets
+      entering the <b>FORWARD</b>, <b>OUTPUT</b> and <b>POSTROUTING</b> chains).
+      When the &#34;!&#34; argument is used before the interface name, the
+      sense is inverted. If the interface name ends in a &#34;+&#34;, then any
+      interface which begins with this name will match. If this option is
+      omitted, any interface name will match.</dd>
+  <dt>[<b>!</b>] <b>-f</b>, <b>--fragment</b></dt>
+  <dd>This means that the rule only refers to second and further IPv4 fragments
+      of fragmented packets. Since there is no way to tell the source or
+      destination ports of such a packet (or ICMP type), such a packet will not
+      match any rules which specify them. When the &#34;!&#34; argument
+      precedes the &#34;-f&#34; flag, the rule will only match head fragments,
+      or unfragmented packets. This option is IPv4 specific, it is not available
+      in ip6tables.</dd>
+  <dt id="c"><a class="permalink" href="#c"><b>-c</b>, <b>--set-counters</b>
+    <i>packets bytes</i></a></dt>
+  <dd>This enables the administrator to initialize the packet and byte counters
+      of a rule (during <b>INSERT</b>, <b>APPEND</b>, <b>REPLACE</b>
+      operations).</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="OTHER_OPTIONS">OTHER OPTIONS<a class="anchor" href="#OTHER_OPTIONS">¶</a></h2>
+<p class="Pp">The following additional options can be specified:</p>
+<dl class="Bl-tag">
+  <dt id="v"><a class="permalink" href="#v"><b>-v</b>, <b>--verbose</b></a></dt>
+  <dd>Verbose output. This option makes the list command show the interface
+      name, the rule options (if any), and the TOS masks. The packet and byte
+      counters are also listed, with the suffix &#39;K&#39;, &#39;M&#39; or &#39;G&#39; for 1000,
+      1,000,000 and 1,000,000,000 multipliers respectively (but see the
+      <b>-x</b> flag to change this). For appending, insertion, deletion and
+      replacement, this causes detailed information on the rule or rules to be
+      printed. <b>-v</b> may be specified multiple times to possibly emit more
+      detailed debug statements: Specified twice, <b>iptables-legacy</b> will
+      dump table info and entries in libiptc, <b>iptables-nft</b> dumps rules in
+      netlink (VM code) presentation. Specified three times, <b>iptables-nft</b>
+      will also dump any netlink messages sent to kernel.</dd>
+  <dt id="V"><a class="permalink" href="#V"><b>-V</b>, <b>--version</b></a></dt>
+  <dd>Show program version and the kernel API used.</dd>
+  <dt id="w"><a class="permalink" href="#w"><b>-w</b>, <b>--wait</b>
+    [<i>seconds</i>]</a></dt>
+  <dd>Wait for the xtables lock. To prevent multiple instances of the program
+      from running concurrently, an attempt will be made to obtain an exclusive
+      lock at launch. By default, the program will exit if the lock cannot be
+      obtained. This option will make the program wait (indefinitely or for
+      optional <i>seconds</i>) until the exclusive lock can be obtained.</dd>
+  <dt id="n"><a class="permalink" href="#n"><b>-n</b>, <b>--numeric</b></a></dt>
+  <dd>Numeric output. IP addresses and port numbers will be printed in numeric
+      format. By default, the program will try to display them as host names,
+      network names, or services (whenever applicable).</dd>
+  <dt id="x"><a class="permalink" href="#x"><b>-x</b>, <b>--exact</b></a></dt>
+  <dd>Expand numbers. Display the exact value of the packet and byte counters,
+      instead of only the rounded number in K&#39;s (multiples of 1000) M&#39;s
+      (multiples of 1000K) or G&#39;s (multiples of 1000M). This option is only
+      relevant for the <b>-L</b> command.</dd>
+  <dt id="line"><a class="permalink" href="#line"><b>--line-numbers</b></a></dt>
+  <dd>When listing rules, add line numbers to the beginning of each rule,
+      corresponding to that rule&#39;s position in the chain.</dd>
+  <dt id="modprobe="><a class="permalink" href="#modprobe="><b>--modprobe=</b><i>command</i></a></dt>
+  <dd>When adding or inserting rules into a chain, use <i>command</i> to load
+      any necessary modules (targets, match extensions, etc).
+    <p class="Pp"></p>
+  </dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="LOCK_FILE">LOCK FILE<a class="anchor" href="#LOCK_FILE">¶</a></h1>
+<p class="Pp">iptables uses the <i>/run/xtables.lock</i> file to take an
+    exclusive lock at launch.</p>
+<p class="Pp">The <b>XTABLES_LOCKFILE</b> environment variable can be used to
+    override the default setting.</p>
+<p class="Pp"></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="MATCH_AND_TARGET_EXTENSIONS">MATCH AND TARGET EXTENSIONS<a class="anchor" href="#MATCH_AND_TARGET_EXTENSIONS">¶</a></h1>
+<p class="Pp">iptables can use extended packet matching and target modules. A
+    list of these is available in the <a href="/bookworm/iptables/iptables-extensions.8.en.html">iptables-extensions(8)</a> manpage.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DIAGNOSTICS">DIAGNOSTICS<a class="anchor" href="#DIAGNOSTICS">¶</a></h1>
+<p class="Pp">Various error messages are printed to standard error. The exit
+    code is 0 for correct functioning. Errors which appear to be caused by
+    invalid or abused command line parameters cause an exit code of 2, and other
+    errors cause an exit code of 1.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="BUGS">BUGS<a class="anchor" href="#BUGS">¶</a></h1>
+<p class="Pp">Bugs? What&#39;s this? ;-) Well, you might want to have a look at
+    <a href="http://bugzilla.netfilter.org/">http://bugzilla.netfilter.org/</a> <b>iptables</b> will exit immediately with an
+    error code of 111 if it finds that it was called as a setuid-to-root
+    program. iptables cannot be used safely in this manner because it trusts the
+    shared libraries (matches, targets) loaded at run time, the search path can
+    be set using environment variables.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="COMPATIBILITY_WITH_IPCHAINS">COMPATIBILITY WITH IPCHAINS<a class="anchor" href="#COMPATIBILITY_WITH_IPCHAINS">¶</a></h1>
+<p class="Pp">This <b>iptables</b> is very similar to ipchains by Rusty Russell.
+    The main difference is that the chains <b>INPUT</b> and <b>OUTPUT</b> are
+    only traversed for packets coming into the local host and originating from
+    the local host respectively. Hence every packet only passes through one of
+    the three chains (except loopback traffic, which involves both INPUT and
+    OUTPUT chains); previously a forwarded packet would pass through all
+  three.</p>
+<p class="Pp">The other main difference is that <b>-i</b> refers to the input
+    interface; <b>-o</b> refers to the output interface, and both are available
+    for packets entering the <b>FORWARD</b> chain.</p>
+<p class="Pp">The various forms of NAT have been separated out; <b>iptables</b>
+    is a pure packet filter when using the default `filter&#39; table, with optional
+    extension modules. This should simplify much of the previous confusion over
+    the combination of IP masquerading and packet filtering seen previously. So
+    the following options are handled differently:</p>
+<pre><br/>
+ -j MASQ
+<br/>
+ -M -S
+<br/>
+ -M -L</pre>
+There are several other changes in iptables.
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO">SEE ALSO<a class="anchor" href="#SEE_ALSO">¶</a></h1>
+<p class="Pp"><a href="/bookworm/iptables/iptables-apply.8.en.html">iptables-apply(8)</a>, <a href="/bookworm/iptables/iptables-save.8.en.html">iptables-save(8)</a>,
+    <a href="/bookworm/iptables/iptables-restore.8.en.html">iptables-restore(8)</a>, <a href="/bookworm/iptables/iptables-extensions.8.en.html">iptables-extensions(8)</a>,</p>
+<p class="Pp">The packet-filtering-HOWTO details iptables usage for packet
+    filtering, the NAT-HOWTO details NAT, the netfilter-extensions-HOWTO details
+    the extensions that are not in the standard distribution, and the
+    netfilter-hacking-HOWTO details the netfilter internals.
+  <br/>
+  See <b><a href="http://www.netfilter.org/">http://www.netfilter.org/</a></b>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHORS">AUTHORS<a class="anchor" href="#AUTHORS">¶</a></h1>
+<p class="Pp">Rusty Russell originally wrote iptables, in early consultation
+    with Michael Neuling.</p>
+<p class="Pp">Marc Boucher made Rusty abandon ipnatctl by lobbying for a generic
+    packet selection framework in iptables, then wrote the mangle table, the
+    owner match, the mark stuff, and ran around doing cool stuff everywhere.</p>
+<p class="Pp">James Morris wrote the TOS target, and tos match.</p>
+<p class="Pp">Jozsef Kadlecsik wrote the REJECT target.</p>
+<p class="Pp">Harald Welte wrote the ULOG and NFQUEUE target, the new libiptc,
+    as well as the TTL, DSCP, ECN matches and targets.</p>
+<p class="Pp">The Netfilter Core Team is: Jozsef Kadlecsik, Pablo Neira Ayuso,
+    Eric Leblond, Florian Westphal and Arturo Borrero Gonzalez. Emeritus Core
+    Team members are: Marc Boucher, Martin Josefsson, Yasuyuki Kozakai, James
+    Morris, Harald Welte and Rusty Russell.</p>
+<p class="Pp">Man page originally written by Herve Eychenne
+    &lt;rv@wallfire.org&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="VERSION">VERSION<a class="anchor" href="#VERSION">¶</a></h1>
+<p class="Pp">This manual page applies to iptables/ip6tables 1.8.9.</p>
+</section>
+</div>
+<table class="foot">
+  <tbody><tr>
+    <td class="foot-date"></td>
+    <td class="foot-os">iptables 1.8.9</td>
+  </tr>
+</tbody></table>
+</div>
+</div>
+</div>
+<div id="footer">
+
+<p><table>
+<tr>
+<td>
+Source file:
+</td>
+<td>
+iptables.8.en.gz (from <a href="http://snapshot.debian.org/package/iptables/1.8.9-2/">iptables 1.8.9-2</a>)
+</td>
+</tr>
+
+<tr>
+<td>
+Source last updated:
+</td>
+<td>
+2023-01-16T13:44:37Z
+</td>
+</tr>
+
+<tr>
+<td>
+Converted to HTML:
+</td>
+<td>
+2025-06-28T02:50:19Z
+</td>
+</tr>
+</table></p>
+
+<hr>
+<div id="fineprint">
+<p>debiman HEAD, see <a
+href="https://github.com/Debian/debiman/">github.com/Debian/debiman</a>.
+Found a problem? See the <a href="/faq.html">FAQ</a>.</p>
+</div>
+</div>
+
+<script type="application/ld+json">
+"{\"@context\":\"http://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{\"@type\":\"ListItem\",\"position\":1,\"item\":{\"@type\":\"Thing\",\"@id\":\"/contents-bookworm.html\",\"name\":\"bookworm\"}},{\"@type\":\"ListItem\",\"position\":2,\"item\":{\"@type\":\"Thing\",\"@id\":\"/bookworm/iptables/index.html\",\"name\":\"iptables\"}},{\"@type\":\"ListItem\",\"position\":3,\"item\":{\"@type\":\"Thing\",\"@id\":\"\",\"name\":\"iptables(8)\"}}]}"
+</script>

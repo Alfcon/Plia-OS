@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>crunch(1) — crunch — Debian bookworm — Debian Manpages</title>
+<style type="text/css">
+@font-face {
+  font-family: 'Inconsolata';
+  src: local('Inconsolata'), url(/Inconsolata.woff2) format('woff2'), url(/Inconsolata.woff) format('woff');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Roboto'), local('Roboto Regular'), local('Roboto-Regular'), url(/Roboto-Regular.woff2) format('woff2'), url(/Roboto-Regular.woff) format('woff');
+  font-display: swap;
+}
+
+body {
+	color: #000;
+	background-color: white;
+	background-image: linear-gradient(to bottom, #d7d9e2, #fff 70px);
+	background-position: 0 0;
+	background-repeat: repeat-x;
+	font-family: sans-serif;
+	font-size: 100%;
+	line-height: 1.2;
+	letter-spacing: 0.15px;
+	margin: 0;
+	padding: 0;
+}
+
+#header {
+	padding: 0 10px 0 52px;
+}
+
+#logo {
+	position: absolute;
+	top: 0;
+	left: 0;
+	border-left: 1px solid transparent;
+	border-right: 1px solid transparent;
+	border-bottom: 1px solid transparent;
+	width: 50px;
+	height: 5.07em;
+	min-height: 65px;
+}
+
+#logo a {
+	display: block;
+	height: 100%;
+}
+
+#logo img {
+	margin-top: 5px;
+	position: absolute;
+	bottom: 0.3em;
+	overflow: auto;
+	border: 0;
+}
+
+p.section {
+	margin: 0;
+	padding: 0 5px 0 5px;
+	font-size: 13px;
+	line-height: 16px;
+	color: white;
+	letter-spacing: 0.08em;
+	position: absolute;
+	top: 0px;
+	left: 52px;
+	background-color: #c70036;
+}
+
+p.section a {
+	color: white;
+	text-decoration: none;
+}
+
+.hidecss {
+	display: none;
+}
+
+#searchbox {
+	text-align:left;
+	line-height: 1;
+	margin: 0 10px 0 0.5em;
+	padding: 1px 0 1px 0;
+	position: absolute;
+	top: 0;
+	right: 0;
+	font-size: .75em;
+}
+
+#navbar {
+	border-bottom: 1px solid #c70036;
+}
+
+#navbar ul {
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+}
+
+#navbar li {
+	list-style: none;
+	float: left;
+}
+
+#navbar a {
+	display: block;
+	padding: 1.75em .5em .25em .5em;
+	color: #0035c7;
+	text-decoration: none;
+	border-left: 1px solid transparent;
+	border-right: 1px solid transparent;
+}
+
+#navbar a:hover
+, #navbar a:visited:hover {
+	background-color: #f5f6f7;
+	border-left: 1px solid  #d2d3d7;
+	border-right: 1px solid #d2d3d7;
+	text-decoration: underline;
+}
+
+a:link {
+	color: #0035c7;
+}
+
+a:visited {
+	color: #54638c;
+}
+
+#breadcrumbs {
+	line-height: 2;
+	min-height: 20px;
+	margin: 0;
+	padding: 0;
+	font-size: 0.75em;
+	background-color: #f5f6f7;
+	border-bottom: 1px solid #d2d3d7;
+}
+
+#breadcrumbs:before {
+	margin-left: 0.5em;
+	margin-right: 0.5em;
+}
+
+#content {
+    margin: 0 10px 0 52px;
+    display: flex;
+    flex-direction: row;
+    word-wrap: break-word;
+}
+
+.paneljump {
+    background-color: #d70751;
+    padding: 0.5em;
+    border-radius: 3px;
+    margin-right: .5em;
+    display: none;
+}
+
+.paneljump a,
+.paneljump a:visited,
+.paneljump a:hover,
+.paneljump a:focus {
+    color: white;
+}
+
+@media all and (max-width: 800px) {
+    #content {
+	flex-direction: column;
+	margin: 0.5em;
+    }
+    .paneljump {
+	display: block;
+    }
+}
+
+.panels {
+    display: block;
+    order: 2;
+}
+
+.maincontent {
+    width: 100%;
+    max-width: 80ch;
+    order: 1;
+}
+
+.mandoc {
+    font-family: monospace;
+    font-size: 1.04rem;
+}
+
+.mandoc pre {
+    white-space: pre-wrap;
+}
+
+#footer {
+	border: 1px solid #dfdfe0;
+	border-left: 0;
+	border-right: 0;
+	background-color: #f5f6f7;
+	padding: 1em;
+	margin: 1em 10px 0 52px;
+	font-size: 0.75em;
+	line-height: 1.5em;
+}
+
+hr {
+	border-top: 1px solid #d2d3d7;
+	border-bottom: 1px solid white;
+	border-left: 0;
+	border-right: 0;
+	margin: 1.4375em 0 1.5em 0;
+	height: 0;
+	background-color: #bbb;
+}
+
+#content p {
+    padding-left: 1em;
+}
+
+ 
+
+a, a:hover, a:focus, a:visited {
+    color: #0530D7;
+    text-decoration: none;
+}
+
+ 
+.panel {
+  padding: 15px;
+  margin-bottom: 20px;
+  background-color: #ffffff;
+  border: 1px solid #dddddd;
+  border-radius: 4px;
+  -webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+          box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+
+.panel-heading, .panel details {
+  margin: -15px -15px 0px;
+  background-color: #d70751;
+  border-bottom: 1px solid #dddddd;
+  border-top-right-radius: 3px;
+  border-top-left-radius: 3px;
+}
+
+.panel-heading, .panel summary {
+  padding: 5px 5px;
+  font-size: 17.5px;
+  font-weight: 500;
+  color: #ffffff;
+  outline-style: none;
+}
+
+.panel summary {
+    padding-left: 7px;
+}
+
+summary, details {
+    display: block;
+}
+
+.panel details ul {
+  margin: 0;
+}
+
+.panel-footer {
+  padding: 5px 5px;
+  margin: 15px -15px -15px;
+  background-color: #f5f5f5;
+  border-top: 1px solid #dddddd;
+  border-bottom-right-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+.panel-info {
+  border-color: #bce8f1;
+}
+
+.panel-info .panel-heading {
+  color: #3a87ad;
+  background-color: #d9edf7;
+  border-color: #bce8f1;
+}
+
+
+.list-group {
+  padding-left: 0;
+  margin-bottom: 20px;
+  background-color: #ffffff;
+}
+
+.list-group-item {
+  position: relative;
+  display: block;
+  padding: 5px 5px 5px 5px;
+  margin-bottom: -1px;
+  border: 1px solid #dddddd;
+}
+
+.list-group-item > .list-item-key {
+  min-width: 27%;
+  display: inline-block;
+}
+.list-group-item > .list-item-key.versions-repository {
+  min-width: 40%;
+}
+.list-group-item > .list-item-key.versioned-links-version {
+  min-width: 40%
+}
+
+
+.versioned-links-icon {
+  margin-right: 2px;
+}
+.versioned-links-icon a {
+  color: black;
+}
+.versioned-links-icon a:hover {
+  color: blue;
+}
+.versioned-links-icon-inactive {
+  opacity: 0.5;
+}
+
+.list-group-item:first-child {
+  border-top-right-radius: 4px;
+  border-top-left-radius: 4px;
+}
+
+.list-group-item:last-child {
+  margin-bottom: 0;
+  border-bottom-right-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.list-group-item-heading {
+  margin-top: 0;
+  margin-bottom: 5px;
+}
+
+.list-group-item-text {
+  margin-bottom: 0;
+  line-height: 1.3;
+}
+
+.list-group-item:hover {
+  background-color: #f5f5f5;
+}
+
+.list-group-item.active a {
+  z-index: 2;
+}
+
+.list-group-item.active {
+  background-color: #efefef;
+}
+
+.list-group-flush {
+  margin: 15px -15px -15px;
+}
+.panel .list-group-flush {
+  margin-top: -1px;
+}
+
+.list-group-flush .list-group-item {
+  border-width: 1px 0;
+}
+
+.list-group-flush .list-group-item:first-child {
+  border-top-right-radius: 0;
+  border-top-left-radius: 0;
+}
+
+.list-group-flush .list-group-item:last-child {
+  border-bottom: 0;
+}
+
+ 
+
+.panel {
+float: right;
+clear: right;
+min-width: 200px;
+}
+
+.toc {
+     
+    width: 200px;
+}
+
+.toc li {
+    font-size: 98%;
+    letter-spacing: 0.02em;
+    display: flex;
+}
+
+.otherversions {
+     
+    width: 200px;
+}
+
+.otherversions li,
+.otherlangs li {
+    display: flex;
+}
+
+.otherversions a,
+.otherlangs a {
+    flex-shrink: 0;
+}
+
+.pkgversion,
+.pkgname,
+.toc a {
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.pkgversion,
+.pkgname {
+    margin-left: auto;
+    padding-left: 1em;
+}
+
+ 
+
+.mandoc {
+     
+    overflow: hidden;
+    margin-top: .5em;
+    margin-right: 45px;
+}
+table.head, table.foot {
+    width: 100%;
+}
+.head-vol {
+    text-align: center;
+}
+.head-rtitle {
+    text-align: right;
+}
+
+ 
+.spacer, .Pp {
+    min-height: 1em;
+}
+
+pre {
+    margin-left: 2em;
+}
+
+.anchor {
+    margin-left: .25em;
+    visibility: hidden;
+}
+
+h1:hover .anchor,
+h2:hover .anchor,
+h3:hover .anchor,
+h4:hover .anchor,
+h5:hover .anchor,
+h6:hover .anchor {
+    visibility: visible;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    letter-spacing: .07em;
+    margin-top: 1.5em;
+    margin-bottom: .35em;
+}
+
+h1 {
+    font-size: 150%;
+}
+
+h2 {
+    font-size: 125%;
+}
+
+@media print {
+    #header, #footer, .panel, .anchor, .paneljump {
+	display: none;
+    }
+    #content {
+	margin: 0;
+    }
+    .mandoc {
+	margin: 0;
+    }
+}
+
+ 
+ 
+
+.Bd { }
+.Bd-indent {	margin-left: 3.8em; }
+
+.Bl-bullet {	list-style-type: disc;
+		padding-left: 1em; }
+.Bl-bullet > li { }
+.Bl-dash {	list-style-type: none;
+		padding-left: 0em; }
+.Bl-dash > li:before {
+		content: "\2014  "; }
+.Bl-item {	list-style-type: none;
+		padding-left: 0em; }
+.Bl-item > li { }
+.Bl-compact > li {
+		margin-top: 0em; }
+
+.Bl-enum {	padding-left: 2em; }
+.Bl-enum > li { }
+.Bl-compact > li {
+		margin-top: 0em; }
+
+.Bl-diag { }
+.Bl-diag > dt {
+		font-style: normal;
+		font-weight: bold; }
+.Bl-diag > dd {
+		margin-left: 0em; }
+.Bl-hang { }
+.Bl-hang > dt { }
+.Bl-hang > dd {
+		margin-left: 5.5em; }
+.Bl-inset { }
+.Bl-inset > dt { }
+.Bl-inset > dd {
+		margin-left: 0em; }
+.Bl-ohang { }
+.Bl-ohang > dt { }
+.Bl-ohang > dd {
+		margin-left: 0em; }
+.Bl-tag {	margin-left: 5.5em; }
+.Bl-tag > dt {
+		float: left;
+		margin-top: 0em;
+		margin-left: -5.5em;
+		padding-right: 1.2em;
+		vertical-align: top; }
+.Bl-tag > dd {
+		clear: both;
+		width: 100%;
+		margin-top: 0em;
+		margin-left: 0em;
+		vertical-align: top;
+		overflow: auto; }
+.Bl-compact > dt {
+		margin-top: 0em; }
+
+.Bl-column { }
+.Bl-column > tbody > tr { }
+.Bl-column > tbody > tr > td {
+		margin-top: 1em; }
+.Bl-compact > tbody > tr > td {
+		margin-top: 0em; }
+
+.Rs {		font-style: normal;
+		font-weight: normal; }
+.RsA { }
+.RsB {		font-style: italic;
+		font-weight: normal; }
+.RsC { }
+.RsD { }
+.RsI {		font-style: italic;
+		font-weight: normal; }
+.RsJ {		font-style: italic;
+		font-weight: normal; }
+.RsN { }
+.RsO { }
+.RsP { }
+.RsQ { }
+.RsR { }
+.RsT {		text-decoration: underline; }
+.RsU { }
+.RsV { }
+
+.eqn { }
+.tbl { }
+
+.HP {		margin-left: 3.8em;
+		text-indent: -3.8em; }
+
+ 
+
+table.Nm { }
+code.Nm {	font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Fl {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Cm {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Ar {		font-style: italic;
+		font-weight: normal; }
+.Op {		display: inline; }
+.Ic {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Ev {		font-style: normal;
+		font-weight: normal;
+		font-family: monospace; }
+.Pa {		font-style: italic;
+		font-weight: normal; }
+
+ 
+
+.Lb { }
+code.In {	font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+a.In { }
+.Fd {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Ft {		font-style: italic;
+		font-weight: normal; }
+.Fn {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Fa {		font-style: italic;
+		font-weight: normal; }
+.Vt {		font-style: italic;
+		font-weight: normal; }
+.Va {		font-style: italic;
+		font-weight: normal; }
+.Dv {		font-style: normal;
+		font-weight: normal;
+		font-family: monospace; }
+.Er {		font-style: normal;
+		font-weight: normal;
+		font-family: monospace; }
+
+ 
+
+.An { }
+.Lk { }
+.Mt { }
+.Cd {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Ad {		font-style: italic;
+		font-weight: normal; }
+.Ms {		font-style: normal;
+		font-weight: bold; }
+.St { }
+.Ux { }
+
+ 
+
+.Bf {		display: inline; }
+.No {		font-style: normal;
+		font-weight: normal; }
+.Em {		font-style: italic;
+		font-weight: normal; }
+.Sy {		font-style: normal;
+		font-weight: bold; }
+.Li {		font-style: normal;
+		font-weight: normal;
+		font-family: monospace; }
+body {
+  font-family: 'Roboto', sans-serif;
+}
+
+.mandoc, .mandoc pre, .mandoc code, p.section {
+  font-family: 'Inconsolata', monospace;
+}
+
+</style>
+<link rel="search" title="Debian manpages" type="application/opensearchdescription+xml" href="/opensearch.xml">
+</head>
+<body>
+<div id="header">
+   <div id="upperheader">
+   <div id="logo">
+  <a href="https://www.debian.org/" title="Debian Home"><img src="/openlogo-50.svg" alt="Debian" width="50" height="61"></a>
+  </div>
+  <p class="section"><a href="/">MANPAGES</a></p>
+  <div id="searchbox">
+    <form action="https://dyn.manpages.debian.org/jump" method="get">
+      <input type="hidden" name="suite" value="bookworm">
+      <input type="hidden" name="binarypkg" value="crunch">
+      <input type="hidden" name="section" value="1">
+      <input type="hidden" name="language" value="en">
+      <input type="text" name="q" placeholder="manpage name" required>
+      <input type="submit" value="Jump">
+    </form>
+  </div>
+ </div>
+<div id="navbar">
+<p class="hidecss"><a href="#content">Skip Quicknav</a></p>
+<ul>
+   <li><a href="/">Index</a></li>
+   <li><a href="/about.html">About Manpages</a></li>
+   <li><a href="/faq.html">FAQ</a></li>
+   <li><a href="https://wiki.debian.org/manpages.debian.org">Service Information</a></li>
+</ul>
+</div>
+   <p id="breadcrumbs">&nbsp;
+     
+     &#x2F; <a href="/contents-bookworm.html">bookworm</a>
+     
+     
+     
+     &#x2F; <a href="/bookworm/crunch/index.html">crunch</a>
+     
+     
+     
+     &#x2F; crunch(1)
+     
+     </p>
+</div>
+<div id="content">
+
+
+<div class="panels" id="panels">
+<div class="panel" role="complementary">
+<div class="panel-heading" role="heading">
+links
+</div>
+<div class="panel-body">
+<ul class="list-group list-group-flush">
+<li class="list-group-item">
+<a href="/bookworm/crunch/crunch.1">language-indep link</a>
+</li>
+<li class="list-group-item">
+<a href="https://tracker.debian.org/pkg/crunch">package tracker</a>
+</li>
+<li class="list-group-item">
+<a href="/bookworm/crunch/crunch.1.en.gz">raw man page</a>
+</li>
+</ul>
+</div>
+</div>
+
+<div class="panel toc" role="complementary" style="padding-bottom: 0">
+<details>
+<summary>
+table of contents
+</summary>
+<div class="panel-body">
+<ul class="list-group list-group-flush">
+
+<li class="list-group-item">
+  <a class="toclink" href="#NAME" title="NAME">NAME</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#SYNOPSIS" title="SYNOPSIS">SYNOPSIS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#DESCRIPTION" title="DESCRIPTION">DESCRIPTION</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#OPTIONS" title="OPTIONS">OPTIONS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#EXAMPLES" title="EXAMPLES">EXAMPLES</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#REDIRECTION" title="REDIRECTION">REDIRECTION</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#NOTES" title="NOTES">NOTES</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#AUTHOR" title="AUTHOR">AUTHOR</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#FILES" title="FILES">FILES</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#BUGS" title="BUGS">BUGS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#COPYRIGHT" title="COPYRIGHT">COPYRIGHT</a>
+</li>
+
+</ul>
+</div>
+</details>
+</div>
+
+<div class="panel otherversions" role="complementary">
+<div class="panel-heading" role="heading">
+other versions
+</div>
+<div class="panel-body">
+<ul class="list-group list-group-flush">
+
+<li class="list-group-item active">
+<a href="/bookworm/crunch/crunch.1.en.html">bookworm</a> <span class="pkgversion" title="3.6-3">3.6-3</span>
+</li>
+
+<li class="list-group-item">
+<a href="/testing/crunch/crunch.1.en.html">testing</a> <span class="pkgversion" title="3.6-3">3.6-3</span>
+</li>
+
+<li class="list-group-item">
+<a href="/unstable/crunch/crunch.1.en.html">unstable</a> <span class="pkgversion" title="3.6-3">3.6-3</span>
+</li>
+
+</ul>
+</div>
+</div>
+
+
+
+
+
+
+</div>
+
+<div class="maincontent">
+<p class="paneljump"><a href="#panels">Scroll to navigation</a></p>
+<div class="mandoc">
+<table class="head">
+  <tbody><tr>
+    <td class="head-ltitle">CRUNCH(1)</td>
+    <td class="head-vol">General Commands Manual</td>
+    <td class="head-rtitle">CRUNCH(1)</td>
+  </tr>
+</tbody></table>
+<div class="manual-text">
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<p class="Pp"></p>
+<section class="Sh">
+<h1 class="Sh" id="NAME">NAME<a class="anchor" href="#NAME">¶</a></h1>
+<p class="Pp">crunch - generate wordlists from a character set</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS">SYNOPSIS<a class="anchor" href="#SYNOPSIS">¶</a></h1>
+<p class="Pp">crunch &lt;min-len&gt; &lt;max-len&gt; [&lt;charset string&gt;]
+    [options]</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION">DESCRIPTION<a class="anchor" href="#DESCRIPTION">¶</a></h1>
+<p class="Pp">Crunch can create a wordlist based on criteria you specify. The
+    output from crunch can be sent to the screen, file, or to another program.
+    The required parameters are:</p>
+<p class="Pp HP">min-len
+  <br/>
+  The minimum length string you want crunch to start at. This option is required
+    even for parameters that won&#39;t use the value.</p>
+<p class="Pp HP">max-len
+  <br/>
+  The maximum length string you want crunch to end at. This option is required
+    even for parameters that won&#39;t use the value.</p>
+<p class="Pp HP">charset string
+  <br/>
+  You may specify character sets for crunch to use on the command line or if you
+    leave it blank crunch will use the default character sets. The order MUST BE
+    lower case characters, upper case characters, numbers, and then symbols. If
+    you don&#39;t follow this order you will not get the results you want. You MUST
+    specify either values for the character type or a plus sign. NOTE: If you
+    want to include the space character in your character set you must escape it
+    using the \ character or enclose your character set in quotes i.e. &#34;abc
+    &#34;. See the examples 3, 11, 12, and 13 for examples.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS">OPTIONS<a class="anchor" href="#OPTIONS">¶</a></h1>
+<p class="Pp HP">-b number[type]
+  <br/>
+  Specifies the size of the output file, only works if -o START is used, i.e.:
+    60MB The output files will be in the format of starting letter-ending letter
+    for example: ./crunch 4 5 -b 20mib -o START will generate 4 files:
+    aaaa-gvfed.txt, gvfee-ombqy.txt, ombqz-wcydt.txt, wcydu-zzzzz.txt valid
+    values for type are kb, mb, gb, kib, mib, and gib. The first three types are
+    based on 1000 while the last three types are based on 1024. NOTE There is no
+    space between the number and type. For example 500mb is correct 500 mb is
+    NOT correct.</p>
+<p class="Pp HP">-c number
+  <br/>
+  Specifies the number of lines to write to output file, only works if -o START
+    is used, i.e.: 60 The output files will be in the format of starting
+    letter-ending letter for example: ./crunch 1 1 -f
+    /pentest/password/crunch/charset.lst mixalpha-numeric-all-space -o START -c
+    60 will result in 2 files: a-7.txt and 8-\ .txt The reason for the slash in
+    the second filename is the ending character is space and ls has to escape it
+    to print it. Yes you will need to put in the \ when specifying the filename
+    because the last character is a space.</p>
+<p class="Pp HP">-d numbersymbol
+  <br/>
+  Limits the number of duplicate characters. -d 2@ limits the lower case
+    alphabet to output like aab and aac. aaa would not be generated as that is 3
+    consecutive letters of a. The format is number then symbol where number is
+    the maximum number of consecutive characters and symbol is the symbol of the
+    the character set you want to limit i.e. @,%^ See examples 17-19.</p>
+<p class="Pp HP">-e string
+  <br/>
+  Specifies when crunch should stop early</p>
+<p class="Pp HP">-f /path/to/charset.lst charset-name
+  <br/>
+  Specifies a character set from the charset.lst</p>
+<p class="Pp HP">-i Inverts the output so instead of aaa,aab,aac,aad, etc you
+    get aaa,baa,caa,daa,aba,bba, etc</p>
+<p class="Pp HP">-l When you use the -t option this option tells crunch which
+    symbols should be treated as literals. This will allow you to use the
+    placeholders as letters in the pattern. The -l option should be the same
+    length as the -t option. See example 15.</p>
+<p class="Pp HP">-m Merged with -p. Please use -p instead.</p>
+<p class="Pp HP">-o wordlist.txt
+  <br/>
+  Specifies the file to write the output to, eg: wordlist.txt</p>
+<p class="Pp HP">-p charset OR -p word1 word2 ...
+  <br/>
+  Tells crunch to generate words that don&#39;t have repeating characters. By
+    default crunch will generate a wordlist size of #of_chars_in_charset ^
+    max_length. This option will instead generate #of_chars_in_charset!. The !
+    stands for factorial. For example say the charset is abc and max length is
+    4.. Crunch will by default generate 3^4 = 81 words. This option will instead
+    generate 3! = 3x2x1 = 6 words (abc, acb, bac, bca, cab, cba). THIS MUST BE
+    THE LAST OPTION! This option CANNOT be used with -s and it ignores min and
+    max length however you must still specify two numbers.</p>
+<p class="Pp HP">-q filename.txt
+  <br/>
+  Tells crunch to read filename.txt and permute what is read. This is like the
+    -p option except it gets the input from filename.txt.</p>
+<p class="Pp HP">-r Tells crunch to resume generate words from where it left
+    off. -r only works if you use -o. You must use the same command as the
+    original command used to generate the words. The only exception to this is
+    the -s option. If your original command used the -s option you MUST remove
+    it before you resume the session. Just add -r to the end of the original
+    command.</p>
+<p class="Pp HP">-s startblock
+  <br/>
+  Specifies a starting string, eg: 03god22fs</p>
+<p class="Pp HP">-t @,%^
+  <br/>
+  Specifies a pattern, eg: @@god@@@@ where the only the @&#39;s, ,&#39;s, %&#39;s, and ^&#39;s
+    will change.
+  <br/>
+  @ will insert lower case characters
+  <br/>
+  , will insert upper case characters
+  <br/>
+  % will insert numbers
+  <br/>
+  ^ will insert symbols</p>
+<p class="Pp HP">-u
+  <br/>
+  The -u option disables the printpercentage thread. This should be the last
+    option.</p>
+<p class="Pp HP">-z gzip, bzip2, lzma, and 7z
+  <br/>
+  Compresses the output from the -o option. Valid parameters are gzip, bzip2,
+    lzma, and 7z.
+  <br/>
+  gzip is the fastest but the compression is minimal. bzip2 is a little slower
+    than gzip but has better compression. 7z is slowest but has the best
+    compression.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES">EXAMPLES<a class="anchor" href="#EXAMPLES">¶</a></h1>
+<p class="Pp">Example 1
+  <br/>
+  crunch 1 8
+  <br/>
+  crunch will display a wordlist that starts at a and ends at zzzzzzzz</p>
+<p class="Pp">Example 2
+  <br/>
+  crunch 1 6 abcdefg
+  <br/>
+  crunch will display a wordlist using the character set abcdefg that starts at
+    a and ends at gggggg</p>
+<p class="Pp">Example 3
+  <br/>
+  crunch 1 6 abcdefg\
+  <br/>
+  there is a space at the end of the character string. In order for crunch to
+    use the space you will need to escape it using the \ character. In this
+    example you could also put quotes around the letters and not need the \,
+    i.e. &#34;abcdefg &#34;. Crunch will display a wordlist using the
+    character set abcdefg that starts at a and ends at (6 spaces)</p>
+<p class="Pp">Example 4
+  <br/>
+  crunch 1 8 -f charset.lst mixalpha-numeric-all-space -o wordlist.txt
+  <br/>
+  crunch will use the mixalpha-numeric-all-space character set from charset.lst
+    and will write the wordlist to a file named wordlist.txt. The file will
+    start with a and end with &#34; &#34;</p>
+<p class="Pp">Example 5
+  <br/>
+  crunch 8 8 -f charset.lst mixalpha-numeric-all-space -o wordlist.txt -t
+    @@dog@@@ -s cbdogaaa
+  <br/>
+  crunch should generate a 8 character wordlist using the
+    mixalpha-number-all-space character set from charset.lst and will write the
+    wordlist to a file named wordlist.txt. The file will start at cbdogaaa and
+    end at &#34; dog &#34;</p>
+<p class="Pp">Example 6
+  <br/>
+  crunch 2 3 -f charset.lst ualpha -s BB
+  <br/>
+  crunch with start generating a wordlist at BB and end with ZZZ. This is useful
+    if you have to stop generating a wordlist in the middle. Just do a tail
+    wordlist.txt and set the -s parameter to the next word in the sequence. Be
+    sure to rename the original wordlist BEFORE you begin as crunch will
+    overwrite the existing wordlist.</p>
+<p class="Pp">Example 7
+  <br/>
+  crunch 4 5 -p abc
+  <br/>
+  The numbers aren&#39;t processed but are needed.
+  <br/>
+  crunch will generate abc, acb, bac, bca, cab, cba.</p>
+<p class="Pp">Example 8
+  <br/>
+  crunch 4 5 -p dog cat bird
+  <br/>
+  The numbers aren&#39;t processed but are needed.
+  <br/>
+  crunch will generate birdcatdog, birddogcat, catbirddog, catdogbird,
+    dogbirdcat, dogcatbird.</p>
+<p class="Pp">Example 9
+  <br/>
+  crunch 1 5 -o START -c 6000 -z bzip2
+  <br/>
+  crunch will generate bzip2 compressed files with each file containing 6000
+    words. The filenames of the compressed files will be
+    first_word-last_word.txt.bz2</p>
+<p class="Pp"># time ./crunch 1 4 -o START -c 6000 -z gzip
+  <br/>
+  real 0m2.729s
+  <br/>
+  user 0m2.216s
+  <br/>
+  sys 0m0.360s</p>
+<p class="Pp"># time ./crunch 1 4 -o START -c 6000 -z bzip2
+  <br/>
+  real 0m3.414s
+  <br/>
+  user 0m2.620s
+  <br/>
+  sys 0m0.580s</p>
+<p class="Pp"># time ./crunch 1 4 -o START -c 6000 -z lzma
+  <br/>
+  real 0m43.060s
+  <br/>
+  user 0m9.965s
+  <br/>
+  sys 0m32.634s</p>
+<p class="Pp">size filename
+  <br/>
+  30K aaaa-aiwt.txt
+  <br/>
+  12K aaaa-aiwt.txt.gz
+  <br/>
+  3.8K aaaa-aiwt.txt.bz2
+  <br/>
+  1.1K aaaa-aiwt.txt.lzma</p>
+<p class="Pp">Example 10
+  <br/>
+  crunch 4 5 -b 20mib -o START
+  <br/>
+  will generate 4 files: aaaa-gvfed.txt, gvfee-ombqy.txt, ombqz-wcydt.txt,
+    wcydu-zzzzz.txt
+  <br/>
+  the first three files are 20MBs (real power of 2 MegaBytes) and the last file
+    is 11MB.</p>
+<p class="Pp">Example 11
+  <br/>
+  crunch 3 3 abc + 123 !@# -t @%^
+  <br/>
+  will generate a 3 character long word with a character as the first character,
+    and number as the second character, and a symbol for the third character.
+    The order in which you specify the characters you want is important. You
+    must specify the order as lower case character, upper case character,
+    number, and symbol. If you aren&#39;t going to use a particular character set
+    you use a plus sign as a placeholder. As you can see I am not using the
+    upper case character set so I am using the plus sign placeholder. The above
+    will start at a1! and end at c3#</p>
+<p class="Pp">Example 12
+  <br/>
+  crunch 3 3 abc + 123 !@# -t ^%@
+  <br/>
+  will generate 3 character words starting with !1a and ending with #3c</p>
+<p class="Pp">Example 13
+  <br/>
+  crunch 4 4 + + 123 + -t %%@^
+  <br/>
+  the plus sign (+) is a place holder so you can specify a character set for the
+    character type. crunch will use the default character set for the character
+    type when crunch encounters a + (plus sign) on the command line. You must
+    either specify values for each character type or use the plus sign. I.E. if
+    you have two characters types you MUST either specify values for each type
+    or use a plus sign. So in this example the character sets will be:
+  <br/>
+  abcdefghijklmnopqrstuvwxyz
+  <br/>
+  ABCDEFGHIJKLMNOPQRSTUVWXYZ
+  <br/>
+  123
+  <br/>
+  !@#$%^&amp;*()-_+=~`[]{}|\:;&#34;&#39;&lt;&gt;,.?/
+  <br/>
+  there is a space at the end of the above string
+  <br/>
+  the output will start at 11a! and end at &#34;33z &#34;. The quotes show the
+    space at the end of the string.</p>
+<p class="Pp">Example 14
+  <br/>
+  crunch 5 5 -t ddd@@ -o j -p dog cat bird
+  <br/>
+  any character other than one of the following: @,%^
+  <br/>
+  is the placeholder for the words to permute. The @,%^ symbols have the same
+    function as -t.
+  <br/>
+  If you want to use @,%^ in your output you can use the -l option to specify
+    which character you want crunch to treat as a literal.
+  <br/>
+  So the results are
+  <br/>
+  birdcatdogaa
+  <br/>
+  birdcatdogab
+  <br/>
+  birdcatdogac
+  <br/>
+  &lt;skipped&gt;
+  <br/>
+  dogcatbirdzy
+  <br/>
+  dogcatbirdzz</p>
+<p class="Pp">Example 15
+  <br/>
+  crunch 7 7 -t p@ss,%^ -l a@aaaaa
+  <br/>
+  crunch will now treat the @ symbol as a literal character and not replace the
+    character with a uppercase letter.
+  <br/>
+  this will generate
+  <br/>
+  p@ssA0!
+  <br/>
+  p@ssA0@
+  <br/>
+  p@ssA0#
+  <br/>
+  p@ssA0$
+  <br/>
+  &lt;skipped&gt;
+  <br/>
+  p@ssZ9</p>
+<p class="Pp">Example 16
+  <br/>
+  crunch 5 5 -s @4#S2 -t @%^,2 -e @8 Q2 -l @dddd -b 10KB -o START
+  <br/>
+  crunch will generate 5 character strings starting with @4#S2 and ending at @8
+    Q2. The output will be broken into 10KB sized files named for the files
+    starting and ending strings.</p>
+<p class="Pp">Example 17
+  <br/>
+  crunch 5 5 -d 2@ -t @@@%%
+  <br/>
+  crunch will generate 5 character strings staring with aab00 and ending at
+    zzy99. Notice that aaa and zzz are not present.</p>
+<p class="Pp">Example 18
+  <br/>
+  crunch 10 10 -t @@@^%%%%^^ -d 2@ -d 3% -b 20mb -o START
+  <br/>
+  crunch will generate 10 character strings starting with aab!0001!! and ending
+    at zzy 9998 The output will be written to 20mb files.</p>
+<p class="Pp">Example 19
+  <br/>
+  crunch 8 8 -d 2@
+  <br/>
+  crunch will generate 8 characters that limit the same number of lower case
+    characters to 2. Crunch will start at aabaabaa and end at zzyzzyzz.</p>
+<p class="Pp">Example 20
+  <br/>
+  crunch 4 4 -f unicode_test.lst japanese -t @@%% -l @xdd
+  <br/>
+  crunch will load some Japanese characters from the unicode_test character set
+    file. The output will start at @日00 and end at @語99.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REDIRECTION">REDIRECTION<a class="anchor" href="#REDIRECTION">¶</a></h1>
+<p class="Pp">You can use crunch&#39;s output and pipe it into other programs. The
+    two most popular programs to pipe crunch into are: aircrack-ng and
+    airolib-ng. The syntax is as follows:
+  <br/>
+  crunch 2 4 abcdefghijklmnopqrstuvwxyz | aircrack-ng /root/Mycapfile.cap -e
+    MyESSID -w-
+  <br/>
+  crunch 10 10 12345 --stdout | airolib-ng testdb -import passwd -</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="NOTES">NOTES<a class="anchor" href="#NOTES">¶</a></h1>
+<p class="Pp">1. Starting in version 2.6 crunch will display how much data is
+    about to be generated. In 2.7 it will also display how many lines will be
+    generated. Crunch will now wait 3 seconds BEFORE it begins generating data
+    to give you time to press Ctrl-C to abort crunch if you find the values are
+    too large for your application.</p>
+<p class="Pp">2. I have added hex-lower (0123456789abcdef) and hex-upper
+    (0123456789ABCDEF) to charset.lst.</p>
+<p class="Pp">3. Several people have requested that I add support for the space
+    character to crunch. crunch has always supported the space character on the
+    command line and in the charset.lst. To add a space on the command line you
+    must escape it using the / character. See example 3 for the syntax. You may
+    need to escape other characters like ! or # depending on your operating
+    system.</p>
+<p class="Pp">4. Starting in 2.7 if you are generating a file then every 10
+    seconds you will receive the % done.</p>
+<p class="Pp">5. Starting in 3.0 I had to change the -t * character to a , as
+    the * is a reserved character. You could still use it if you put a \ in
+    front of the *. Yes it breaks crunch&#39;s syntax and I do my best to avoid
+    doing that, but in this instance it is easier to make the change for long
+    term support.</p>
+<p class="Pp">6. Some output is missing. A file didn&#39;t get generated.
+  <br/>
+  The mostly explanation is you ran out of disk space. If you have verified you
+    have plenty of disk space then the problem is most likely the filename
+    begins with a period. In Linux filenames that begin with a period are
+    hidden. To view them do a ls -l .*</p>
+<p class="Pp">7. Crunch says The maximum and minimum length should be the same
+    size as the pattern you specified, however the length is set correctly.
+  <br/>
+  This usually means your pattern contains a character that needs to be escaped.
+    In bash you need to escape the followings: &amp;, *, space, \, (, ), |, &#39;,
+    &#34;, ;, &lt;, &gt;.
+  <br/>
+  The escape character in bash is a \. So a pattern that has a &amp; and a * in
+    it would look like this:
+  <br/>
+  crunch 4 4 -t \&amp;\*d@
+  <br/>
+  An alternative to escaping characters is to wrap your string with quotes. For
+    example:
+  <br/>
+  crunch 4 4 -t &#34;&amp;*d@&#34;
+  <br/>
+  If you want to use the &#34; in your pattern you will need to escape it like
+    this: crunch 4 4 -t &#34;&amp;*\&#34;@&#34;
+  <br/>
+  Please note that different terminals have different escape characters and
+    probably have different characters that will need escaping. Please check the
+    manpage of your terminal for the escape characters and characters that need
+    escaping.</p>
+<p class="Pp">8. When using the -z 7z option, 7z does not delete the original
+    file. You will have to delete those files by hand.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR">AUTHOR<a class="anchor" href="#AUTHOR">¶</a></h1>
+<p class="Pp">This manual page was written by bofh28@gmail.com</p>
+<p class="Pp">Crunch version 1.0 was written by mimayin@aciiid.ath.cx
+  <br/>
+  all later versions of crunch have been updated by bofh28@gmail.com</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FILES">FILES<a class="anchor" href="#FILES">¶</a></h1>
+<p class="Pp">None.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="BUGS">BUGS<a class="anchor" href="#BUGS">¶</a></h1>
+<p class="Pp">If you find any please email bofh28 &lt;bofh28@gmail.com&gt; or
+    post to <a href="http://www.backtrack-linux.org">http://www.backtrack-linux.org</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="COPYRIGHT">COPYRIGHT<a class="anchor" href="#COPYRIGHT">¶</a></h1>
+<p class="Pp">Copyright (c) 2009-2013 bofh28 &lt;bofh28@gmail.com&gt;</p>
+<p class="Pp">This file is a part of Crunch.</p>
+<p class="Pp">Crunch is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the Free
+    Software Foundation, version 2 only of the License.</p>
+<p class="Pp">Crunch is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+    more details.</p>
+<p class="Pp">You should have received a copy of the GNU General Public License
+    along with Crunch. If not, see &lt;<a href="http://www.gnu.org/licenses/">http://www.gnu.org/licenses/</a>&gt;.</p>
+</section>
+</div>
+<table class="foot">
+  <tbody><tr>
+    <td class="foot-date">May 2014</td>
+    <td class="foot-os">Version 3.6</td>
+  </tr>
+</tbody></table>
+</div>
+
+</div>
+</div>
+<div id="footer">
+
+<p><table>
+<tr>
+<td>
+Source file:
+</td>
+<td>
+crunch.1.en.gz (from <a href="http://snapshot.debian.org/package/crunch/3.6-3/">crunch 3.6-3</a>)
+</td>
+</tr>
+
+<tr>
+<td>
+Source last updated:
+</td>
+<td>
+2020-05-23T22:16:49Z
+</td>
+</tr>
+
+<tr>
+<td>
+Converted to HTML:
+</td>
+<td>
+2025-04-24T06:36:52Z
+</td>
+</tr>
+</table></p>
+
+<hr>
+<div id="fineprint">
+<p>debiman HEAD, see <a
+href="https://github.com/Debian/debiman/">github.com/Debian/debiman</a>.
+Found a problem? See the <a href="/faq.html">FAQ</a>.</p>
+</div>
+</div>
+
+<script type="application/ld+json">
+"{\"@context\":\"http://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{\"@type\":\"ListItem\",\"position\":1,\"item\":{\"@type\":\"Thing\",\"@id\":\"/contents-bookworm.html\",\"name\":\"bookworm\"}},{\"@type\":\"ListItem\",\"position\":2,\"item\":{\"@type\":\"Thing\",\"@id\":\"/bookworm/crunch/index.html\",\"name\":\"crunch\"}},{\"@type\":\"ListItem\",\"position\":3,\"item\":{\"@type\":\"Thing\",\"@id\":\"\",\"name\":\"crunch(1)\"}}]}"
+</script>

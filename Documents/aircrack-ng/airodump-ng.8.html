@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>airodump-ng(8) — aircrack-ng — Debian bookworm — Debian Manpages</title>
+<style type="text/css">
+@font-face {
+  font-family: 'Inconsolata';
+  src: local('Inconsolata'), url(/Inconsolata.woff2) format('woff2'), url(/Inconsolata.woff) format('woff');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Roboto'), local('Roboto Regular'), local('Roboto-Regular'), url(/Roboto-Regular.woff2) format('woff2'), url(/Roboto-Regular.woff) format('woff');
+  font-display: swap;
+}
+
+body {
+	color: #000;
+	background-color: white;
+	background-image: linear-gradient(to bottom, #d7d9e2, #fff 70px);
+	background-position: 0 0;
+	background-repeat: repeat-x;
+	font-family: sans-serif;
+	font-size: 100%;
+	line-height: 1.2;
+	letter-spacing: 0.15px;
+	margin: 0;
+	padding: 0;
+}
+
+#header {
+	padding: 0 10px 0 52px;
+}
+
+#logo {
+	position: absolute;
+	top: 0;
+	left: 0;
+	border-left: 1px solid transparent;
+	border-right: 1px solid transparent;
+	border-bottom: 1px solid transparent;
+	width: 50px;
+	height: 5.07em;
+	min-height: 65px;
+}
+
+#logo a {
+	display: block;
+	height: 100%;
+}
+
+#logo img {
+	margin-top: 5px;
+	position: absolute;
+	bottom: 0.3em;
+	overflow: auto;
+	border: 0;
+}
+
+p.section {
+	margin: 0;
+	padding: 0 5px 0 5px;
+	font-size: 13px;
+	line-height: 16px;
+	color: white;
+	letter-spacing: 0.08em;
+	position: absolute;
+	top: 0px;
+	left: 52px;
+	background-color: #c70036;
+}
+
+p.section a {
+	color: white;
+	text-decoration: none;
+}
+
+.hidecss {
+	display: none;
+}
+
+#searchbox {
+	text-align:left;
+	line-height: 1;
+	margin: 0 10px 0 0.5em;
+	padding: 1px 0 1px 0;
+	position: absolute;
+	top: 0;
+	right: 0;
+	font-size: .75em;
+}
+
+#navbar {
+	border-bottom: 1px solid #c70036;
+}
+
+#navbar ul {
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+}
+
+#navbar li {
+	list-style: none;
+	float: left;
+}
+
+#navbar a {
+	display: block;
+	padding: 1.75em .5em .25em .5em;
+	color: #0035c7;
+	text-decoration: none;
+	border-left: 1px solid transparent;
+	border-right: 1px solid transparent;
+}
+
+#navbar a:hover
+, #navbar a:visited:hover {
+	background-color: #f5f6f7;
+	border-left: 1px solid  #d2d3d7;
+	border-right: 1px solid #d2d3d7;
+	text-decoration: underline;
+}
+
+a:link {
+	color: #0035c7;
+}
+
+a:visited {
+	color: #54638c;
+}
+
+#breadcrumbs {
+	line-height: 2;
+	min-height: 20px;
+	margin: 0;
+	padding: 0;
+	font-size: 0.75em;
+	background-color: #f5f6f7;
+	border-bottom: 1px solid #d2d3d7;
+}
+
+#breadcrumbs:before {
+	margin-left: 0.5em;
+	margin-right: 0.5em;
+}
+
+#content {
+    margin: 0 10px 0 52px;
+    display: flex;
+    flex-direction: row;
+    word-wrap: break-word;
+}
+
+.paneljump {
+    background-color: #d70751;
+    padding: 0.5em;
+    border-radius: 3px;
+    margin-right: .5em;
+    display: none;
+}
+
+.paneljump a,
+.paneljump a:visited,
+.paneljump a:hover,
+.paneljump a:focus {
+    color: white;
+}
+
+@media all and (max-width: 800px) {
+    #content {
+	flex-direction: column;
+	margin: 0.5em;
+    }
+    .paneljump {
+	display: block;
+    }
+}
+
+.panels {
+    display: block;
+    order: 2;
+}
+
+.maincontent {
+    width: 100%;
+    max-width: 80ch;
+    order: 1;
+}
+
+.mandoc {
+    font-family: monospace;
+    font-size: 1.04rem;
+}
+
+.mandoc pre {
+    white-space: pre-wrap;
+}
+
+#footer {
+	border: 1px solid #dfdfe0;
+	border-left: 0;
+	border-right: 0;
+	background-color: #f5f6f7;
+	padding: 1em;
+	margin: 1em 10px 0 52px;
+	font-size: 0.75em;
+	line-height: 1.5em;
+}
+
+hr {
+	border-top: 1px solid #d2d3d7;
+	border-bottom: 1px solid white;
+	border-left: 0;
+	border-right: 0;
+	margin: 1.4375em 0 1.5em 0;
+	height: 0;
+	background-color: #bbb;
+}
+
+#content p {
+    padding-left: 1em;
+}
+
+ 
+
+a, a:hover, a:focus, a:visited {
+    color: #0530D7;
+    text-decoration: none;
+}
+
+ 
+.panel {
+  padding: 15px;
+  margin-bottom: 20px;
+  background-color: #ffffff;
+  border: 1px solid #dddddd;
+  border-radius: 4px;
+  -webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+          box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+
+.panel-heading, .panel details {
+  margin: -15px -15px 0px;
+  background-color: #d70751;
+  border-bottom: 1px solid #dddddd;
+  border-top-right-radius: 3px;
+  border-top-left-radius: 3px;
+}
+
+.panel-heading, .panel summary {
+  padding: 5px 5px;
+  font-size: 17.5px;
+  font-weight: 500;
+  color: #ffffff;
+  outline-style: none;
+}
+
+.panel summary {
+    padding-left: 7px;
+}
+
+summary, details {
+    display: block;
+}
+
+.panel details ul {
+  margin: 0;
+}
+
+.panel-footer {
+  padding: 5px 5px;
+  margin: 15px -15px -15px;
+  background-color: #f5f5f5;
+  border-top: 1px solid #dddddd;
+  border-bottom-right-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+.panel-info {
+  border-color: #bce8f1;
+}
+
+.panel-info .panel-heading {
+  color: #3a87ad;
+  background-color: #d9edf7;
+  border-color: #bce8f1;
+}
+
+
+.list-group {
+  padding-left: 0;
+  margin-bottom: 20px;
+  background-color: #ffffff;
+}
+
+.list-group-item {
+  position: relative;
+  display: block;
+  padding: 5px 5px 5px 5px;
+  margin-bottom: -1px;
+  border: 1px solid #dddddd;
+}
+
+.list-group-item > .list-item-key {
+  min-width: 27%;
+  display: inline-block;
+}
+.list-group-item > .list-item-key.versions-repository {
+  min-width: 40%;
+}
+.list-group-item > .list-item-key.versioned-links-version {
+  min-width: 40%
+}
+
+
+.versioned-links-icon {
+  margin-right: 2px;
+}
+.versioned-links-icon a {
+  color: black;
+}
+.versioned-links-icon a:hover {
+  color: blue;
+}
+.versioned-links-icon-inactive {
+  opacity: 0.5;
+}
+
+.list-group-item:first-child {
+  border-top-right-radius: 4px;
+  border-top-left-radius: 4px;
+}
+
+.list-group-item:last-child {
+  margin-bottom: 0;
+  border-bottom-right-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.list-group-item-heading {
+  margin-top: 0;
+  margin-bottom: 5px;
+}
+
+.list-group-item-text {
+  margin-bottom: 0;
+  line-height: 1.3;
+}
+
+.list-group-item:hover {
+  background-color: #f5f5f5;
+}
+
+.list-group-item.active a {
+  z-index: 2;
+}
+
+.list-group-item.active {
+  background-color: #efefef;
+}
+
+.list-group-flush {
+  margin: 15px -15px -15px;
+}
+.panel .list-group-flush {
+  margin-top: -1px;
+}
+
+.list-group-flush .list-group-item {
+  border-width: 1px 0;
+}
+
+.list-group-flush .list-group-item:first-child {
+  border-top-right-radius: 0;
+  border-top-left-radius: 0;
+}
+
+.list-group-flush .list-group-item:last-child {
+  border-bottom: 0;
+}
+
+ 
+
+.panel {
+float: right;
+clear: right;
+min-width: 200px;
+}
+
+.toc {
+     
+    width: 200px;
+}
+
+.toc li {
+    font-size: 98%;
+    letter-spacing: 0.02em;
+    display: flex;
+}
+
+.otherversions {
+     
+    width: 200px;
+}
+
+.otherversions li,
+.otherlangs li {
+    display: flex;
+}
+
+.otherversions a,
+.otherlangs a {
+    flex-shrink: 0;
+}
+
+.pkgversion,
+.pkgname,
+.toc a {
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.pkgversion,
+.pkgname {
+    margin-left: auto;
+    padding-left: 1em;
+}
+
+ 
+
+.mandoc {
+     
+    overflow: hidden;
+    margin-top: .5em;
+    margin-right: 45px;
+}
+table.head, table.foot {
+    width: 100%;
+}
+.head-vol {
+    text-align: center;
+}
+.head-rtitle {
+    text-align: right;
+}
+
+ 
+.spacer, .Pp {
+    min-height: 1em;
+}
+
+pre {
+    margin-left: 2em;
+}
+
+.anchor {
+    margin-left: .25em;
+    visibility: hidden;
+}
+
+h1:hover .anchor,
+h2:hover .anchor,
+h3:hover .anchor,
+h4:hover .anchor,
+h5:hover .anchor,
+h6:hover .anchor {
+    visibility: visible;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    letter-spacing: .07em;
+    margin-top: 1.5em;
+    margin-bottom: .35em;
+}
+
+h1 {
+    font-size: 150%;
+}
+
+h2 {
+    font-size: 125%;
+}
+
+@media print {
+    #header, #footer, .panel, .anchor, .paneljump {
+	display: none;
+    }
+    #content {
+	margin: 0;
+    }
+    .mandoc {
+	margin: 0;
+    }
+}
+
+ 
+ 
+
+.Bd { }
+.Bd-indent {	margin-left: 3.8em; }
+
+.Bl-bullet {	list-style-type: disc;
+		padding-left: 1em; }
+.Bl-bullet > li { }
+.Bl-dash {	list-style-type: none;
+		padding-left: 0em; }
+.Bl-dash > li:before {
+		content: "\2014  "; }
+.Bl-item {	list-style-type: none;
+		padding-left: 0em; }
+.Bl-item > li { }
+.Bl-compact > li {
+		margin-top: 0em; }
+
+.Bl-enum {	padding-left: 2em; }
+.Bl-enum > li { }
+.Bl-compact > li {
+		margin-top: 0em; }
+
+.Bl-diag { }
+.Bl-diag > dt {
+		font-style: normal;
+		font-weight: bold; }
+.Bl-diag > dd {
+		margin-left: 0em; }
+.Bl-hang { }
+.Bl-hang > dt { }
+.Bl-hang > dd {
+		margin-left: 5.5em; }
+.Bl-inset { }
+.Bl-inset > dt { }
+.Bl-inset > dd {
+		margin-left: 0em; }
+.Bl-ohang { }
+.Bl-ohang > dt { }
+.Bl-ohang > dd {
+		margin-left: 0em; }
+.Bl-tag {	margin-left: 5.5em; }
+.Bl-tag > dt {
+		float: left;
+		margin-top: 0em;
+		margin-left: -5.5em;
+		padding-right: 1.2em;
+		vertical-align: top; }
+.Bl-tag > dd {
+		clear: both;
+		width: 100%;
+		margin-top: 0em;
+		margin-left: 0em;
+		vertical-align: top;
+		overflow: auto; }
+.Bl-compact > dt {
+		margin-top: 0em; }
+
+.Bl-column { }
+.Bl-column > tbody > tr { }
+.Bl-column > tbody > tr > td {
+		margin-top: 1em; }
+.Bl-compact > tbody > tr > td {
+		margin-top: 0em; }
+
+.Rs {		font-style: normal;
+		font-weight: normal; }
+.RsA { }
+.RsB {		font-style: italic;
+		font-weight: normal; }
+.RsC { }
+.RsD { }
+.RsI {		font-style: italic;
+		font-weight: normal; }
+.RsJ {		font-style: italic;
+		font-weight: normal; }
+.RsN { }
+.RsO { }
+.RsP { }
+.RsQ { }
+.RsR { }
+.RsT {		text-decoration: underline; }
+.RsU { }
+.RsV { }
+
+.eqn { }
+.tbl { }
+
+.HP {		margin-left: 3.8em;
+		text-indent: -3.8em; }
+
+ 
+
+table.Nm { }
+code.Nm {	font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Fl {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Cm {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Ar {		font-style: italic;
+		font-weight: normal; }
+.Op {		display: inline; }
+.Ic {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Ev {		font-style: normal;
+		font-weight: normal;
+		font-family: monospace; }
+.Pa {		font-style: italic;
+		font-weight: normal; }
+
+ 
+
+.Lb { }
+code.In {	font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+a.In { }
+.Fd {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Ft {		font-style: italic;
+		font-weight: normal; }
+.Fn {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Fa {		font-style: italic;
+		font-weight: normal; }
+.Vt {		font-style: italic;
+		font-weight: normal; }
+.Va {		font-style: italic;
+		font-weight: normal; }
+.Dv {		font-style: normal;
+		font-weight: normal;
+		font-family: monospace; }
+.Er {		font-style: normal;
+		font-weight: normal;
+		font-family: monospace; }
+
+ 
+
+.An { }
+.Lk { }
+.Mt { }
+.Cd {		font-style: normal;
+		font-weight: bold;
+		font-family: inherit; }
+.Ad {		font-style: italic;
+		font-weight: normal; }
+.Ms {		font-style: normal;
+		font-weight: bold; }
+.St { }
+.Ux { }
+
+ 
+
+.Bf {		display: inline; }
+.No {		font-style: normal;
+		font-weight: normal; }
+.Em {		font-style: italic;
+		font-weight: normal; }
+.Sy {		font-style: normal;
+		font-weight: bold; }
+.Li {		font-style: normal;
+		font-weight: normal;
+		font-family: monospace; }
+body {
+  font-family: 'Roboto', sans-serif;
+}
+
+.mandoc, .mandoc pre, .mandoc code, p.section {
+  font-family: 'Inconsolata', monospace;
+}
+
+</style>
+<link rel="search" title="Debian manpages" type="application/opensearchdescription+xml" href="/opensearch.xml">
+</head>
+<body>
+<div id="header">
+   <div id="upperheader">
+   <div id="logo">
+  <a href="https://www.debian.org/" title="Debian Home"><img src="/openlogo-50.svg" alt="Debian" width="50" height="61"></a>
+  </div>
+  <p class="section"><a href="/">MANPAGES</a></p>
+  <div id="searchbox">
+    <form action="https://dyn.manpages.debian.org/jump" method="get">
+      <input type="hidden" name="suite" value="bookworm">
+      <input type="hidden" name="binarypkg" value="aircrack-ng">
+      <input type="hidden" name="section" value="8">
+      <input type="hidden" name="language" value="en">
+      <input type="text" name="q" placeholder="manpage name" required>
+      <input type="submit" value="Jump">
+    </form>
+  </div>
+ </div>
+<div id="navbar">
+<p class="hidecss"><a href="#content">Skip Quicknav</a></p>
+<ul>
+   <li><a href="/">Index</a></li>
+   <li><a href="/about.html">About Manpages</a></li>
+   <li><a href="/faq.html">FAQ</a></li>
+   <li><a href="https://wiki.debian.org/manpages.debian.org">Service Information</a></li>
+</ul>
+</div>
+   <p id="breadcrumbs">&nbsp;
+     
+     &#x2F; <a href="/contents-bookworm.html">bookworm</a>
+     
+     
+     
+     &#x2F; <a href="/bookworm/aircrack-ng/index.html">aircrack-ng</a>
+     
+     
+     
+     &#x2F; airodump-ng(8)
+     
+     </p>
+</div>
+<div id="content">
+
+
+<div class="panels" id="panels">
+<div class="panel" role="complementary">
+<div class="panel-heading" role="heading">
+links
+</div>
+<div class="panel-body">
+<ul class="list-group list-group-flush">
+<li class="list-group-item">
+<a href="/bookworm/aircrack-ng/airodump-ng.8">language-indep link</a>
+</li>
+<li class="list-group-item">
+<a href="https://tracker.debian.org/pkg/aircrack-ng">package tracker</a>
+</li>
+<li class="list-group-item">
+<a href="/bookworm/aircrack-ng/airodump-ng.8.en.gz">raw man page</a>
+</li>
+</ul>
+</div>
+</div>
+
+<div class="panel toc" role="complementary" style="padding-bottom: 0">
+<details>
+<summary>
+table of contents
+</summary>
+<div class="panel-body">
+<ul class="list-group list-group-flush">
+
+<li class="list-group-item">
+  <a class="toclink" href="#NAME" title="NAME">NAME</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#SYNOPSIS" title="SYNOPSIS">SYNOPSIS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#DESCRIPTION" title="DESCRIPTION">DESCRIPTION</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#OPTIONS" title="OPTIONS">OPTIONS</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#INTERACTION" title="INTERACTION">INTERACTION</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#EXAMPLES" title="EXAMPLES">EXAMPLES</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#AUTHOR" title="AUTHOR">AUTHOR</a>
+</li>
+
+<li class="list-group-item">
+  <a class="toclink" href="#SEE_ALSO" title="SEE ALSO">SEE ALSO</a>
+</li>
+
+</ul>
+</div>
+</details>
+</div>
+
+<div class="panel otherversions" role="complementary">
+<div class="panel-heading" role="heading">
+other versions
+</div>
+<div class="panel-body">
+<ul class="list-group list-group-flush">
+
+<li class="list-group-item active">
+<a href="/bookworm/aircrack-ng/airodump-ng.8.en.html">bookworm</a> <span class="pkgversion" title="1:1.7-5">1:1.7-5</span>
+</li>
+
+<li class="list-group-item">
+<a href="/testing/aircrack-ng/airodump-ng.8.en.html">testing</a> <span class="pkgversion" title="1:1.7&#43;git20230807.4bf83f1a-2">1:1.7&#43;git20230807.4bf83f1a-2</span>
+</li>
+
+<li class="list-group-item">
+<a href="/unstable/aircrack-ng/airodump-ng.8.en.html">unstable</a> <span class="pkgversion" title="1:1.7&#43;git20230807.4bf83f1a-2">1:1.7&#43;git20230807.4bf83f1a-2</span>
+</li>
+
+</ul>
+</div>
+</div>
+
+
+
+
+
+
+</div>
+
+<div class="maincontent">
+<p class="paneljump"><a href="#panels">Scroll to navigation</a></p>
+<div class="mandoc">
+<table class="head">
+  <tbody><tr>
+    <td class="head-ltitle">AIRODUMP-NG(8)</td>
+    <td class="head-vol">System Manager&#39;s Manual</td>
+    <td class="head-rtitle">AIRODUMP-NG(8)</td>
+  </tr>
+</tbody></table>
+<div class="manual-text">
+<p class="Pp"></p>
+<section class="Sh">
+<h1 class="Sh" id="NAME">NAME<a class="anchor" href="#NAME">¶</a></h1>
+<p class="Pp">airodump-ng - a wireless packet capture tool for aircrack-ng</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS">SYNOPSIS<a class="anchor" href="#SYNOPSIS">¶</a></h1>
+<p class="Pp"><b>airodump-ng</b> [options] &lt;interface name&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION">DESCRIPTION<a class="anchor" href="#DESCRIPTION">¶</a></h1>
+<p class="Pp"><b>airodump-ng</b> is used for packet capturing of raw 802.11
+    frames for the intent of using them with aircrack-ng. If you have a GPS
+    receiver connected to the computer, airodump-ng is capable of logging the
+    coordinates of the found access points. Additionally, airodump-ng writes out
+    a text file containing the details of all access points and clients
+  seen.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS">OPTIONS<a class="anchor" href="#OPTIONS">¶</a></h1>
+<dl class="Bl-tag">
+  <dt id="H,"><a class="permalink" href="#H,"><i>-H, --help</i></a></dt>
+  <dd>Shows the help screen.</dd>
+  <dt id="i,"><a class="permalink" href="#i,"><i>-i, --ivs</i></a></dt>
+  <dd>It only saves IVs (only useful for cracking). If this option is specified,
+      you have to give a dump prefix (--write option)</dd>
+  <dt id="g,"><a class="permalink" href="#g,"><i>-g, --gpsd</i></a></dt>
+  <dd>Indicate that airodump-ng should try to use GPSd to get coordinates.</dd>
+  <dt id="w"><a class="permalink" href="#w"><i>-w &lt;prefix&gt;, --write
+    &lt;prefix&gt;</i></a></dt>
+  <dd>Is the dump file prefix to use. If this option is not given, it will only
+      show data on the screen. Beside this file a CSV file with the same
+      filename as the capture will be created.</dd>
+  <dt id="e,"><a class="permalink" href="#e,"><i>-e, --beacons</i></a></dt>
+  <dd>It will record all beacons into the cap file. By default it only records
+      one beacon for each network.</dd>
+  <dt id="u"><a class="permalink" href="#u"><i>-u &lt;secs&gt;, --update
+    &lt;secs&gt;</i></a></dt>
+  <dd>Delay &lt;secs&gt; seconds delay between display updates (default: 1
+      second). Useful for slow CPU.</dd>
+  <dt id="showack"><a class="permalink" href="#showack"><i>--showack</i></a></dt>
+  <dd>Prints ACK/CTS/RTS statistics. Helps in debugging and general injection
+      optimization. It is indication if you inject, inject too fast, reach the
+      AP, the frames are valid encrypted frames. Allows one to detect
+      &#34;hidden&#34; stations, which are too far away to capture high
+      bitrate frames, as ACK frames are sent at 1Mbps.</dd>
+  <dt id="h"><a class="permalink" href="#h"><i>-h</i></a></dt>
+  <dd>Hides known stations for --showack.</dd>
+  <dt id="berlin"><a class="permalink" href="#berlin"><i>--berlin
+    &lt;secs&gt;</i></a></dt>
+  <dd>Time before removing the AP/client from the screen when no more frames are
+      received (Default: 120 seconds). See airodump-ng source for the history
+      behind this option ;).</dd>
+  <dt id="c"><a class="permalink" href="#c"><i>-c
+    &lt;channel&gt;[,&lt;channel&gt;[,...]], --channel
+    &lt;channel&gt;[,&lt;channel&gt;[,...]]</i></a></dt>
+  <dd>Indicate the channel(s) to listen to. By default airodump-ng hops on all
+      2.4GHz channels.</dd>
+  <dt id="C"><a class="permalink" href="#C"><i>-C
+    &lt;freq&gt;[,&lt;freq&gt;[,...]]</i></a></dt>
+  <dd>Indicates the frequencies to listen to. By default airodump-ng hops on all
+      2.4GHz channels.</dd>
+  <dt id="b"><a class="permalink" href="#b"><i>-b &lt;abg&gt;, --band
+    &lt;abg&gt;</i></a></dt>
+  <dd>Indicate the band on which airodump-ng should hop. It can be a combination
+      of &#39;a&#39;, &#39;b&#39; and &#39;g&#39; letters (&#39;b&#39; and &#39;g&#39; uses 2.4GHz and &#39;a&#39; uses 5GHz).
+      Incompatible with --channel option.</dd>
+  <dt><i>-s &lt;method&gt;, --cswitch &lt;method&gt;</i></dt>
+  <dd>Defines the way airodump-ng sets the channels when using more than one
+      card. Valid values: 0 (FIFO, default value), 1 (Round Robin) or 2 (Hop on
+      last).</dd>
+  <dt><i>-2, --ht20</i></dt>
+  <dd>Set the channel to be in HT20 (802.11n).</dd>
+  <dt><i>-3, --ht40+</i></dt>
+  <dd>Set the channel to be in HT40+ (802.11n). It requires the frequency 20MHz
+      above to be available (4 channels above) and thus some channels are not
+      usable in HT40+. Only channels up to 7 are available in HT40+ in the US
+      (and 9 in most of Europe).</dd>
+  <dt><i>-5, --ht40-</i></dt>
+  <dd>Set the channel to be in HT40- (802.11n). It requires the frequency 20MHz
+      below to be available (4 channels be)low and thus some channels are not
+      usable in HT40-. In 2.4GHz, HT40- channels start at channel 5.</dd>
+  <dt><i>-r &lt;file&gt;</i></dt>
+  <dd>Reads packet from a file.</dd>
+  <dt id="T,"><a class="permalink" href="#T,"><i>-T, --real-time</i></a></dt>
+  <dd>While reading frames from a file specified with &#39;-r &lt;file&gt;&#39;,
+      simulate the arrival rate of them, as if they were &#34;live&#34;.</dd>
+  <dt id="x"><a class="permalink" href="#x"><i>-x &lt;msecs&gt;</i></a></dt>
+  <dd>Active Scanning Simulation (send probe requests and parse the probe
+      responses).</dd>
+  <dt id="M,"><a class="permalink" href="#M,"><i>-M, --manufacturer</i></a></dt>
+  <dd>Display a manufacturer column with the information obtained from the IEEE
+      OUI list. See <a href="/bookworm/aircrack-ng/airodump-ng-oui-update.8.en.html">airodump-ng-oui-update(8)</a></dd>
+  <dt id="U,"><a class="permalink" href="#U,"><i>-U, --uptime</i></a></dt>
+  <dd>Display APs uptime obtained from its beacon timestamp.</dd>
+  <dt id="W,"><a class="permalink" href="#W,"><i>-W, --wps</i></a></dt>
+  <dd>Display a WPS column with WPS version, config method(s), AP Setup Locked
+      obtained from APs beacon or probe response (if any).</dd>
+  <dt id="output-format"><a class="permalink" href="#output-format"><i>--output-format
+    &lt;formats&gt;</i></a></dt>
+  <dd>Define the formats to use (separated by a comma). Possible values are:
+      pcap, ivs, csv, gps, kismet, netxml. The default values are: pcap, csv,
+      kismet, kismet-newcore. &#39;pcap&#39; is for recording a capture in pcap format,
+      &#39;ivs&#39; is for ivs format (it is a shortcut for --ivs). &#39;csv&#39; will create an
+      airodump-ng CSV file, &#39;kismet&#39; will create a kismet csv file and
+      &#39;kismet-newcore&#39; will create the kismet netxml file. &#39;gps&#39; is a shortcut
+      for --gps.
+    <br/>
+    Theses values can be combined with the exception of ivs and pcap.</dd>
+  <dt id="I"><a class="permalink" href="#I"><i>-I &lt;seconds&gt;,
+    --write-interval &lt;seconds&gt;</i></a></dt>
+  <dd>Output file(s) write interval for CSV, Kismet CSV and Kismet NetXML in
+      seconds (minimum: 1 second). By default: 5 seconds. Note that an interval
+      too small might slow down airodump-ng.</dd>
+  <dt id="K"><a class="permalink" href="#K"><i>-K &lt;enable&gt;, --background
+    &lt;enable&gt;</i></a></dt>
+  <dd>Override automatic background detection. Use &#34;0&#34; to force
+      foreground settings and &#34;1&#34; to force background settings. It
+      will not make airodump-ng run as a daemon, it will skip background
+      autodetection and force enable/disable of interactive mode and display
+      updates.</dd>
+  <dt id="ignore-negative-one"><a class="permalink" href="#ignore-negative-one"><i>--ignore-negative-one</i></a></dt>
+  <dd>Removes the message that says &#39;fixed channel &lt;interface&gt;: -1&#39;.</dd>
+</dl>
+<p class="Pp"><b>Filter options:</b></p>
+<dl class="Bl-tag">
+  <dt id="t"><a class="permalink" href="#t"><i>-t
+    &lt;OPN|WEP|WPA|WPA1|WPA2|WPA3|OWE&gt;, --encrypt
+    &lt;OPN|WEP|WPA|WPA1|WPA2|WPA3|OWE&gt;</i></a></dt>
+  <dd>It will only show networks matching the given encryption. Note that WPA is
+      a shortcut for WPA1, WPA2 and WPA3. May be specified more than once: &#39;-t
+      OPN -t WPA2&#39;</dd>
+  <dt><i>-d &lt;bssid&gt;, --bssid &lt;bssid&gt;</i></dt>
+  <dd>It will only show networks, matching the given bssid.</dd>
+  <dt><i>-m &lt;mask&gt;, --netmask &lt;mask&gt;</i></dt>
+  <dd>It will only show networks, matching the given bssid ^ netmask
+      combination. Need --bssid (or -d) to be specified.</dd>
+  <dt id="a"><a class="permalink" href="#a"><i>-a</i></a></dt>
+  <dd>It will only show associated clients.</dd>
+  <dt id="n"><a class="permalink" href="#n"><i>-n &lt;int&gt;, --min-packets
+    &lt;int&gt;</i></a></dt>
+  <dd>The minimum number of packets received by an AP before displaying it.</dd>
+  <dt id="N,"><a class="permalink" href="#N,"><i>-N, --essid</i></a></dt>
+  <dd>Filter APs by ESSID. Can be used several times to match a set of
+    ESSID.</dd>
+  <dt id="R,"><a class="permalink" href="#R,"><i>-R, --essid-regex</i></a></dt>
+  <dd>Filter APs by ESSID using a regular expression.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="INTERACTION">INTERACTION<a class="anchor" href="#INTERACTION">¶</a></h1>
+<p class="Pp"><b>airodump-ng</b> can receive and interpret key strokes while
+    running. The following list describes the currently assigned keys and
+    supposed actions:</p>
+<dl class="Bl-tag">
+  <dt id="a~2"><a class="permalink" href="#a~2"><i>a</i></a></dt>
+  <dd>Select active areas by cycling through these display options: AP+STA;
+      AP+STA+ACK; AP only; STA only</dd>
+  <dt id="d"><a class="permalink" href="#d"><i>d</i></a></dt>
+  <dd>Reset sorting to defaults (Power)</dd>
+  <dt id="i"><a class="permalink" href="#i"><i>i</i></a></dt>
+  <dd>Invert sorting algorithm</dd>
+  <dt id="m"><a class="permalink" href="#m"><i>m</i></a></dt>
+  <dd>Mark the selected AP or cycle through different colors if the selected AP
+      is already marked</dd>
+  <dt id="o"><a class="permalink" href="#o"><i>o</i></a></dt>
+  <dd>Enable colored display of APs and their stations.</dd>
+  <dt id="p"><a class="permalink" href="#p"><i>p</i></a></dt>
+  <dd>Disable colored display.</dd>
+  <dt id="q"><a class="permalink" href="#q"><i>q</i></a></dt>
+  <dd>Quit program.</dd>
+  <dt id="r"><a class="permalink" href="#r"><i>r</i></a></dt>
+  <dd>(De-)Activate realtime sorting - applies sorting algorithm every time the
+      display will be redrawn</dd>
+  <dt id="s"><a class="permalink" href="#s"><i>s</i></a></dt>
+  <dd>Change column to sort by, which currently includes: First seen; BSSID; PWR
+      level; Beacons; Data packets; Packet rate; Channel; Max. data rate;
+      Encryption; Strongest Ciphersuite; Strongest Authentication; ESSID</dd>
+  <dt id="SPACE"><a class="permalink" href="#SPACE"><i>SPACE</i></a></dt>
+  <dd>Pause display redrawing/ Resume redrawing</dd>
+  <dt id="TAB"><a class="permalink" href="#TAB"><i>TAB</i></a></dt>
+  <dd>Enable/Disable scrolling through AP list</dd>
+  <dt id="UP"><a class="permalink" href="#UP"><i>UP</i></a></dt>
+  <dd>Select the AP prior to the currently marked AP in the displayed list if
+      available</dd>
+  <dt id="DOWN"><a class="permalink" href="#DOWN"><i>DOWN</i></a></dt>
+  <dd>Select the AP after the currently marked AP if available</dd>
+</dl>
+<p class="Pp">If an AP is selected or marked, all the connected stations will
+    also be selected or marked with the same color as the corresponding Access
+    Point.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES">EXAMPLES<a class="anchor" href="#EXAMPLES">¶</a></h1>
+<p class="Pp"><b>airodump-ng</b> -c 9 wlan0mon</p>
+<p class="Pp">Here is an example screenshot:</p>
+<p class="Pp">-----------------------------------------------------------------------
+  <br/>
+  CH 9 ][ Elapsed: 1 min ][ 2007-04-26 17:41 ][ BAT: 2 hours 10 mins ][ WPA
+    handshake: 00:14:6C:7E:40:80
+  <br/>
+</p>
+<p class="Pp">BSSID PWR RXQ Beacons #Data, #/s CH MB ENC CIPHER AUTH ESSID
+  <br/>
+</p>
+<p class="Pp">00:09:5B:1C:AA:1D 11 16 10 0 0 11 54. OPN &lt;length: 7&gt;
+  <br/>
+  00:14:6C:7A:41:81 34 100 57 14 1 9 11 WEP WEP bigbear
+  <br/>
+  00:14:6C:7E:40:80 32 100 752 73 2 9 54 WPA TKIP PSK teddy
+  <br/>
+</p>
+<p class="Pp">BSSID STATION PWR Rate Lost Frames Notes Probes
+  <br/>
+</p>
+<p class="Pp">00:14:6C:7A:41:81 00:0F:B5:32:31:31 51 11-11 2 14 bigbear
+  <br/>
+  (not associated) 00:14:A4:3F:8D:13 19 11-11 0 4 mossy
+  <br/>
+  00:14:6C:7A:41:81 00:0C:41:52:D1:D1 -1 11-2 0 5 bigbear
+  <br/>
+  00:14:6C:7E:40:80 00:0F:B5:FD:FB:C2 35 36-24 0 99 teddy
+  <br/>
+  -----------------------------------------------------------------------
+  <br/>
+</p>
+<dl class="Bl-tag">
+  <dt id="BSSID"><a class="permalink" href="#BSSID"><i>BSSID</i></a></dt>
+  <dd>MAC address of the access point. In the Client section, a BSSID of
+      &#34;(not associated)&#34; means that the client is not associated with
+      any AP. In this unassociated state, it is searching for an AP to connect
+      with.</dd>
+  <dt id="PWR"><a class="permalink" href="#PWR"><i>PWR</i></a></dt>
+  <dd>Signal level reported by the Wi-Fi adapter. Its signification depends on
+      the driver, but as you get closer to the AP or the station, the signal
+      gets higher. It usually is the RSSI
+      (<a href="https://en.wikipedia.org/wiki/Received_signal_strength_indication).">https://en.wikipedia.org/wiki/Received_signal_strength_indication).</a> If
+      the BSSID PWR is -1, then the driver doesn&#39;t support signal level
+      reporting. If PWR is -1 for some access points, it means the access point
+      is out of range, however airodump-ng got at least a frame sent to it. If
+      the PWR is -1 for a limited number of stations then this is for a packet
+      which came from the AP to the client but the client transmissions are out
+      of range for your Wi-Fi adapter. Meaning you are hearing only 1/2 of the
+      communication. If all clients have PWR as -1 then it is likely that the
+      driver doesn&#39;t support signal level reporting. A strong signal is around
+      -40. An average one is around -55, and a weak one starts around -70. Wi-Fi
+      adapters lower limit (aka receive sensitivity) is often around
+    -80/-90.</dd>
+  <dt id="RXQ"><a class="permalink" href="#RXQ"><i>RXQ</i></a></dt>
+  <dd>Only shown when on a fixed channel. Receive Quality as measured by the
+      percentage of frames (management and data frames) successfully received
+      over the last 10 seconds. It&#39;s measured over all management and data
+      frames. That&#39;s the clue, this allows you to read more things out of this
+      value. Lets say you got 100 percent RXQ and all 10 (or whatever the rate)
+      beacons per second coming in. Now all of a sudden the RXQ drops below 90,
+      but you still capture all sent beacons. Thus you know that the AP is
+      sending frames to a client but you can&#39;t hear the client nor the AP
+      sending to the client (need to get closer). Another thing would be, that
+      you got a 11MB card to monitor and capture frames (say a prism2.5) and you
+      have a very good position to the AP. The AP is set to 54MBit and then
+      again the RXQ drops, so you know that there is at least one 54MBit client
+      connected to the AP.</dd>
+  <dt id="Beacons"><a class="permalink" href="#Beacons"><i>Beacons</i></a></dt>
+  <dd>Number of beacons sent by the AP. Each access point sends about ten
+      beacons per second at the lowest rate (1M), so they can usually be picked
+      up from very far.</dd>
+  <dt><i>#Data</i></dt>
+  <dd>Number of captured data packets (if WEP, unique IV count), including data
+      broadcast packets.</dd>
+  <dt><i>#/s</i></dt>
+  <dd>Number of data packets per second measure over the last 10 seconds.</dd>
+  <dt id="CH"><a class="permalink" href="#CH"><i>CH</i></a></dt>
+  <dd>Channel number (taken from beacon frames). Note: sometimes frames from
+      other channels are captured even if airodump-ng is not hopping, because of
+      radio interference.</dd>
+  <dt id="MB"><a class="permalink" href="#MB"><i>MB</i></a></dt>
+  <dd>Maximum speed supported by the AP. If MB = 11, it&#39;s 802.11b, if MB = 22
+      it&#39;s 802.11b+ and higher rates are 802.11g. The dot (after 54 above)
+      indicates short preamble is supported. &#39;e&#39; indicates that the network has
+      QoS (802.11e) enabled.</dd>
+  <dt id="ENC"><a class="permalink" href="#ENC"><i>ENC</i></a></dt>
+  <dd>Encryption algorithm in use. OPN = no encryption,&#34;WEP?&#34; = WEP or
+      higher (not enough data to choose between WEP and WPA/WPA2), WEP (without
+      the question mark) indicates static or dynamic WEP, and WPA or WPA2 if
+      TKIP or CCMP or MGT is present.</dd>
+  <dt id="CIPHER"><a class="permalink" href="#CIPHER"><i>CIPHER</i></a></dt>
+  <dd>The cipher detected. One of CCMP, WRAP, TKIP, WEP, WEP40, or WEP104. Not
+      mandatory, but TKIP is typically used with WPA and CCMP is typically used
+      with WPA2. WEP40 is displayed when the key index is greater than 0. The
+      standard states that the index can be 0-3 for 40bit and should be 0 for
+      104 bit.</dd>
+  <dt id="AUTH"><a class="permalink" href="#AUTH"><i>AUTH</i></a></dt>
+  <dd>The authentication protocol used. One of MGT (WPA/WPA2 using a separate
+      authentication server), SKA (shared key for WEP), PSK (pre-shared key for
+      WPA/WPA2), or OPN (open for WEP).</dd>
+  <dt id="WPS"><a class="permalink" href="#WPS"><i>WPS</i></a></dt>
+  <dd>This is only displayed when --wps (or -W) is specified. If the AP supports
+      WPS, the first field of the column indicates version supported. The second
+      field indicates WPS config methods (can be more than one method, separated
+      by comma): USB = USB method, ETHER = Ethernet, LAB = Label, DISP =
+      Display, EXTNFC = External NFC, INTNFC = Internal NFC, NFCINTF = NFC
+      Interface, PBC = Push Button, KPAD = Keypad. Locked is displayed when AP
+      setup is locked.</dd>
+  <dt id="ESSID"><a class="permalink" href="#ESSID"><i>ESSID</i></a></dt>
+  <dd>The so-called &#34;SSID&#34;, which can be empty if SSID hiding is
+      activated. In this case, airodump-ng will try to recover the SSID from
+      probe responses and association requests.</dd>
+  <dt id="STATION"><a class="permalink" href="#STATION"><i>STATION</i></a></dt>
+  <dd>MAC address of each associated station or stations searching for an AP to
+      connect with. Clients not currently associated with an AP have a BSSID of
+      &#34;(not associated)&#34;.</dd>
+  <dt id="Rate"><a class="permalink" href="#Rate"><i>Rate</i></a></dt>
+  <dd>This is only displayed when using a single channel. The first number is
+      the last data rate from the AP (BSSID) to the Client (STATION). The second
+      number is the last data rate from Client (STATION) to the AP (BSSID).</dd>
+  <dt id="Lost"><a class="permalink" href="#Lost"><i>Lost</i></a></dt>
+  <dd>It means lost frames coming from the client. To determine the number of
+      frames lost, there is a sequence field on every non-control frame, so you
+      can subtract the second last sequence number from the last sequence number
+      and you know how many frames you have lost.</dd>
+  <dt id="Notes"><a class="permalink" href="#Notes"><i>Notes</i></a></dt>
+  <dd>Additional information about the client, such as captured EAPOL or
+    PMKID.</dd>
+  <dt id="Frames"><a class="permalink" href="#Frames"><i>Frames</i></a></dt>
+  <dd>The number of data packets sent by the client.</dd>
+  <dt id="Probes"><a class="permalink" href="#Probes"><i>Probes</i></a></dt>
+  <dd>The ESSIDs probed by the client. These are the networks the client is
+      trying to connect to if it is not currently connected.</dd>
+</dl>
+<p class="Pp">The first part is the detected access points. The second part is a
+    list of detected wireless clients, stations. By relying on the signal power,
+    one can even physically pinpoint the location of a given station.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR">AUTHOR<a class="anchor" href="#AUTHOR">¶</a></h1>
+<p class="Pp">This manual page was written by Adam Cecile
+    &lt;gandalf@le-vert.net&gt; for the Debian system (but may be used by
+    others). Permission is granted to copy, distribute and/or modify this
+    document under the terms of the GNU General Public License, Version 2 or any
+    later version published by the Free Software Foundation On Debian systems,
+    the complete text of the GNU General Public License can be found in
+    /usr/share/common-licenses/GPL.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO">SEE ALSO<a class="anchor" href="#SEE_ALSO">¶</a></h1>
+<p class="Pp"><b><a href="/bookworm/aircrack-ng/airbase-ng.8.en.html">airbase-ng(8)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/aireplay-ng.8.en.html">aireplay-ng(8)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/airmon-ng.8.en.html">airmon-ng(8)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/airodump-ng-oui-update.8.en.html">airodump-ng-oui-update(8)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/airserv-ng.8.en.html">airserv-ng(8)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/airtun-ng.8.en.html">airtun-ng(8)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/besside-ng.8.en.html">besside-ng(8)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/easside-ng.8.en.html">easside-ng(8)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/tkiptun-ng.8.en.html">tkiptun-ng(8)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/wesside-ng.8.en.html">wesside-ng(8)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/aircrack-ng.1.en.html">aircrack-ng(1)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/airdecap-ng.1.en.html">airdecap-ng(1)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/airdecloak-ng.1.en.html">airdecloak-ng(1)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/airolib-ng.1.en.html">airolib-ng(1)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/besside-ng-crawler.1.en.html">besside-ng-crawler(1)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/buddy-ng.1.en.html">buddy-ng(1)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/ivstools.1.en.html">ivstools(1)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/kstats.1.en.html">kstats(1)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/makeivs-ng.1.en.html">makeivs-ng(1)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/packetforge-ng.1.en.html">packetforge-ng(1)</a></b>
+  <br/>
+  <b><a href="/bookworm/aircrack-ng/wpaclean.1.en.html">wpaclean(1)</a></b>
+  <br/>
+  <b>airventriloquist(8)</b></p>
+</section>
+</div>
+<table class="foot">
+  <tbody><tr>
+    <td class="foot-date">May 2022</td>
+    <td class="foot-os">Version 1.7.0</td>
+  </tr>
+</tbody></table>
+</div>
+
+</div>
+</div>
+<div id="footer">
+
+<p><table>
+<tr>
+<td>
+Source file:
+</td>
+<td>
+airodump-ng.8.en.gz (from <a href="http://snapshot.debian.org/package/aircrack-ng/1:1.7-5/">aircrack-ng 1:1.7-5</a>)
+</td>
+</tr>
+
+<tr>
+<td>
+Source last updated:
+</td>
+<td>
+2022-09-24T14:56:42Z
+</td>
+</tr>
+
+<tr>
+<td>
+Converted to HTML:
+</td>
+<td>
+2025-04-24T06:41:36Z
+</td>
+</tr>
+</table></p>
+
+<hr>
+<div id="fineprint">
+<p>debiman HEAD, see <a
+href="https://github.com/Debian/debiman/">github.com/Debian/debiman</a>.
+Found a problem? See the <a href="/faq.html">FAQ</a>.</p>
+</div>
+</div>
+
+<script type="application/ld+json">
+"{\"@context\":\"http://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{\"@type\":\"ListItem\",\"position\":1,\"item\":{\"@type\":\"Thing\",\"@id\":\"/contents-bookworm.html\",\"name\":\"bookworm\"}},{\"@type\":\"ListItem\",\"position\":2,\"item\":{\"@type\":\"Thing\",\"@id\":\"/bookworm/aircrack-ng/index.html\",\"name\":\"aircrack-ng\"}},{\"@type\":\"ListItem\",\"position\":3,\"item\":{\"@type\":\"Thing\",\"@id\":\"\",\"name\":\"airodump-ng(8)\"}}]}"
+</script>

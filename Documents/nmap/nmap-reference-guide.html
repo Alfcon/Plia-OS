@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Chapter 15. Nmap Reference Guide | Nmap Network Scanning</title><link rel="stylesheet" type="text/css" href="/shared/css/db5.css?v=2"/><meta name="generator" content="DocBook XSL Stylesheets V1.79.1"/><link rel="prev" href="data-files-replacing-data-files.html" title="Using Customized Data Files"/><link rel="next" href="man-briefoptions.html" title="Options Summary"/><link rel="canonical" href="https://nmap.org/book/man.html"/><link rel="alternate" hreflang="en" href="https://nmap.org/book/man.html"/><link rel="alternate" hreflang="de" href="https://nmap.org/man/de/index.html"/><link rel="alternate" hreflang="es" href="https://nmap.org/man/es/index.html"/><link rel="alternate" hreflang="fr" href="https://nmap.org/man/fr/index.html"/><link rel="alternate" hreflang="hr" href="https://nmap.org/man/hr/index.html"/><link rel="alternate" hreflang="hu" href="https://nmap.org/man/hu/index.html"/><link rel="alternate" hreflang="id" href="https://nmap.org/man/id/index.html"/><link rel="alternate" hreflang="it" href="https://nmap.org/man/it/index.html"/><link rel="alternate" hreflang="ja" href="https://nmap.org/man/ja/index.html"/><link rel="alternate" hreflang="pl" href="https://nmap.org/man/pl/index.html"/><link rel="alternate" hreflang="pt-BR" href="https://nmap.org/man/pt_BR/index.html"/><link rel="alternate" hreflang="pt-PT" href="https://nmap.org/man/pt_PT/index.html"/><link rel="alternate" hreflang="ro" href="https://nmap.org/man/ro/index.html"/><link rel="alternate" hreflang="ru" href="https://nmap.org/man/ru/index.html"/><link rel="alternate" hreflang="sk" href="https://nmap.org/man/sk/index.html"/><link rel="alternate" hreflang="zh" href="https://nmap.org/man/zh/index.html"/>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#2A0D45">
+<link rel="preload" as="image" href="/images/sitelogo.png" imagesizes="168px" imagesrcset="/images/sitelogo.png, /images/sitelogo-2x.png 2x">
+<link rel="preload" as="image" href="/shared/images/nst-icons.svg">
+<link rel="stylesheet" href="/shared/css/nst.css?v=2">
+<script async src="/shared/js/nst.js?v=2"></script>
+<link rel="stylesheet" href="/shared/css/nst-foot.css?v=2" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="/site.css">
+<!--Google Analytics Code-->
+<link rel="preload" href="https://www.google-analytics.com/analytics.js" as="script">
+<script>
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+ga('create', 'UA-11009417-1', 'auto');
+ga('send', 'pageview');
+</script>
+<!--END Google Analytics Code-->
+<META NAME="ROBOTS" CONTENT="NOARCHIVE">
+<link rel="shortcut icon" href="/shared/images/tiny-eyeicon.png" type="image/png">
+</head>
+<body><div id="nst-wrapper">
+
+<div id="menu">
+ <div class="blur">
+  <header id="nst-head">
+
+    <a id="menu-open" href="#menu" aria-label="Open menu">
+     <img width="44" height="44" alt="" aria-hidden="true"
+      src="/shared/images/nst-icons.svg#menu">
+    </a>
+    <a id="menu-close" href="#" aria-label="Close menu">
+     <img width="44" height="44" alt="" aria-hidden="true"
+      src="/shared/images/nst-icons.svg#close">
+    </a>
+
+   <a id="nst-logo" href="/" aria-label="Home page">
+    <img alt="Home page logo" srcset="/images/sitelogo.png, /images/sitelogo-2x.png 2x" src="/images/sitelogo.png" onerror="this.onerror=null;this.srcset=this.src" height=90 width=168></a>
+
+   <nav id="nst-gnav">
+    <a class="nlink" href="https://nmap.org/">Nmap.org</a>
+    <a class="nlink" href="https://npcap.com/">Npcap.com</a>
+    <a class="nlink" href="https://seclists.org/">Seclists.org</a>
+    <a class="nlink" href="https://sectools.org">Sectools.org</a>
+    <a class="nlink" href="https://insecure.org/">Insecure.org</a>
+   </nav>
+
+   <form class="nst-search" id="nst-head-search" action="/search/">
+    <input class="nst-search-q" name="q" type="search" placeholder="Site Search">
+    <button class="nst-search-button" title="Search">
+     <img style="width:100%;aspect-ratio:1/1;" alt="" aria-hidden="true"
+      src="/shared/images/nst-icons.svg#search">
+     </button>
+   </form>
+
+  </header>
+ </div>
+</div>
+
+<main id="nst-content">
+<nav id="nst-sitenav">
+<a class="nlink" href="/download.html">Download</a>
+<a class="nlink" href="/book/man.html">Reference Guide</a>
+<a class="nlink" href="/book/">Book</a>
+<a class="nlink" href="/docs.html">Docs</a>
+<a class="nlink" href="/zenmap/">Zenmap GUI</a>
+<a class="nlink" href="/movies/">In the Movies</a>
+</nav>
+<header><ul class="breadcrumb-nav"><li class="breadcrumb"><a href="toc.html">Nmap Network Scanning</a></li><li class="breadcrumb current">Chapter 15. Nmap Reference Guide</li></ul><nav class="docnav-header"><div class="dn-unit"><a class="dn-link dn-prev" href="data-files-replacing-data-files.html" accesskey="p">Prev</a></div><div class="dn-unit"><a class="dn-link dn-next" href="man-briefoptions.html" accesskey="n">Next</a></div></nav></header><section class="chapter" id="man"><div class="titlepage"><div><div><h1 class="title">Chapter 15. Nmap Reference Guide</h1></div></div></div><div class="toc"><div class="toc-title">Table of Contents</div><ul class="toc"><li><span class="sect1"><a href="man.html#man-description">Description</a></span></li><li><span class="sect1"><a href="man-briefoptions.html">Options Summary</a></span></li><li><span class="sect1"><a href="man-target-specification.html">Target Specification</a></span></li><li><span class="sect1"><a href="man-host-discovery.html">Host Discovery</a></span></li><li><span class="sect1"><a href="man-port-scanning-basics.html">Port Scanning Basics</a></span></li><li><span class="sect1"><a href="man-port-scanning-techniques.html">Port Scanning Techniques</a></span></li><li><span class="sect1"><a href="man-port-specification.html">Port Specification and Scan Order</a></span></li><li><span class="sect1"><a href="man-version-detection.html">Service and Version Detection</a></span></li><li><span class="sect1"><a href="man-os-detection.html">OS Detection</a></span></li><li><span class="sect1"><a href="man-nse.html">Nmap Scripting Engine (NSE)</a></span></li><li><span class="sect1"><a href="man-performance.html">Timing and Performance</a></span></li><li><span class="sect1"><a href="man-bypass-firewalls-ids.html">Firewall/IDS Evasion and Spoofing</a></span></li><li><span class="sect1"><a href="man-output.html">Output</a></span></li><li><span class="sect1"><a href="man-misc-options.html">Miscellaneous Options</a></span></li><li><span class="sect1"><a href="man-runtime-interaction.html">Runtime Interaction</a></span></li><li><span class="sect1"><a href="man-examples.html">Examples</a></span></li><li><span class="sect1"><a href="man-book.html">Nmap Book</a></span></li><li><span class="sect1"><a href="man-bugs.html">Bugs</a></span></li><li><span class="sect1"><a href="man-author.html">Authors</a></span></li><li><span class="sect1"><a href="man-legal.html">Legal Notices</a></span><ul><li><span class="sect2"><a href="man-legal.html#nmap-copyright">Nmap Copyright and Licensing</a></span></li><li><span class="sect2"><a href="man-legal.html#man-copyright">Creative Commons License for this Nmap Guide</a></span></li><li><span class="sect2"><a href="man-legal.html#source-contrib">Source Code Availability and Community Contributions</a></span></li><li><span class="sect2"><a href="man-legal.html#no-warranty">No Warranty</a></span></li><li><span class="sect2"><a href="man-legal.html#inappropriate-usage">Inappropriate Usage</a></span></li><li><span class="sect2"><a href="man-legal.html#third-party-soft">Third-Party Software and Funding Notices</a></span></li><li><span class="sect2"><a href="man-legal.html#us-export">United States Export Control</a></span></li></ul></li></ul></div><a id="idm26954962641904" class="indexterm"></a><a id="man-nmap1-indexterm" class="indexterm"></a><div class="refnamediv" id="man-name"><h2>Name</h2><p>nmap — Network exploration tool and security / port scanner</p></div><div class="refsynopsisdiv" id="man-synopsis"><h2>Synopsis</h2><div class="cmdsynopsis"><p id="idm26954962634208"><code class="command">nmap</code>  [
+        <em class="replaceable"><code>&lt;Scan Type&gt;</code></em>
+      ...] [
+        <em class="replaceable"><code>&lt;Options&gt;</code></em>
+      ] {
+        <em class="replaceable"><code>&lt;target specification&gt;</code></em>
+      }</p></div></div><section class="sect1" id="man-description"><div class="titlepage"><div><div><h2 class="title" style="clear: both">Description</h2></div></div></div><a id="idm26954962627856" class="indexterm"></a><div class="note"><table style="border: 0; "><tr><td style="text-align: center; vertical-align: top; width: 25px; " rowspan="2"><img alt="[Note]" src="images/note.png"/></td><th style="text-align: left; ">Note</th></tr><tr><td style="text-align: left; vertical-align: top; "><p>This document describes the very latest version of
+    Nmap available from <a class="ulink" href="https://nmap.org/download.html" target="_top"><code class="systemitem">https://nmap.org/download.html</code></a> or <a class="ulink" href="https://nmap.org/dist/?C=M&amp;O=D" target="_top"><code class="systemitem">https://nmap.org/dist/?C=M&amp;O=D</code></a>.  Please
+    ensure you are using the latest version before reporting that a
+    feature doesn't work as described.</p></td></tr></table></div><p>Nmap (<span class="quote">“<span class="quote">Network Mapper</span>”</span>) is an open source tool for network
+    exploration and security auditing.  It was designed to rapidly
+    scan large networks, although it works fine against single
+    hosts. Nmap uses raw IP packets in novel ways to determine what
+    hosts are available on the network, what services (application
+    name and version) those hosts are offering, what operating systems
+    (and OS versions) they are running, what type of packet
+    filters/firewalls are in use, and dozens of other
+    characteristics.  While Nmap is commonly used for security audits,
+    many systems and network administrators find it useful for routine
+    tasks such as network inventory, managing service upgrade
+    schedules, and monitoring host or service uptime.</p><p>The output from Nmap is a list of scanned targets, with
+    supplemental information on each depending on the options
+    used. Key among that information is the <span class="quote">“<span class="quote">interesting ports
+    table</span>”</span>.<a id="idm26954962621328" class="indexterm"></a>
+    That table lists the port number and protocol,
+    service name, and state.  The state is either
+    <code class="literal">open</code>, <code class="literal">filtered</code>,
+    <code class="literal">closed</code>, or <code class="literal">unfiltered</code>.
+    <code class="literal">Open</code><a id="idm26954962616416" class="indexterm"></a>
+    means that an application on the target machine is listening for
+    connections/packets on that port.
+    <code class="literal">Filtered</code><a id="idm26954962614352" class="indexterm"></a>
+    means that a firewall, filter, or other network
+    obstacle is blocking the port so that Nmap cannot tell whether it is
+    <code class="literal">open</code> or <code class="literal">closed</code>.
+    <code class="literal">Closed</code><a id="idm26954962610832" class="indexterm"></a>
+    ports have no application listening on them,
+    though they could open up at any time.
+    Ports are classified as
+    <code class="literal">unfiltered</code><a id="idm26954962608752" class="indexterm"></a>
+    when they are
+    responsive to Nmap's probes, but Nmap cannot determine whether they are
+    open or closed.
+    Nmap reports the state combinations
+    <code class="literal">open|filtered</code><a id="idm26954962606640" class="indexterm"></a>
+    and <code class="literal">closed|filtered</code><a id="idm26954962604672" class="indexterm"></a>
+    when it cannot determine which
+    of the two states describe a port.  The port table may also
+    include software version details when version detection has been
+    requested.  When an IP protocol scan is requested
+    (<code class="option">-sO</code>), Nmap provides information on supported IP
+    protocols rather than listening ports.</p><p>In addition to the interesting ports table, Nmap can provide
+    further information on targets, including reverse DNS names,
+    operating system guesses, device types, and MAC addresses.</p><p>A typical Nmap scan is shown in <a class="xref" href="man.html#man-ex-repscan" title="Example 15.1. A representative Nmap scan">Example 15.1</a>.  The only Nmap arguments used in
+    this example are <code class="option">-A</code>, to enable OS and version
+    detection, script scanning, and traceroute; <code class="option">-T4</code> for
+    faster execution; and then the hostname.</p><div class="example" id="man-ex-repscan"><div class="example-title">Example 15.1. A representative Nmap scan</div><div class="example-contents"><a id="idm26954962598784" class="indexterm"></a><pre class="screen"># <strong class="userinput"><code>nmap -A -T4 scanme.nmap.org</code></strong>
+
+Nmap scan report for scanme.nmap.org (74.207.244.221)
+Host is up (0.029s latency).
+rDNS record for 74.207.244.221: li86-221.members.linode.com
+Not shown: 995 closed ports
+PORT     STATE    SERVICE     VERSION
+22/tcp   open     ssh         OpenSSH 5.3p1 Debian 3ubuntu7 (protocol 2.0)
+| ssh-hostkey: 1024 8d:60:f1:7c:ca:b7:3d:0a:d6:67:54:9d:69:d9:b9:dd (DSA)
+|_2048 79:f8:09:ac:d4:e2:32:42:10:49:d3:bd:20:82:85:ec (RSA)
+80/tcp   open     http        Apache httpd 2.2.14 ((Ubuntu))
+|_http-title: Go ahead and ScanMe!
+646/tcp  filtered ldp
+1720/tcp filtered H.323/Q.931
+9929/tcp open     nping-echo  Nping echo
+Device type: general purpose
+Running: Linux 2.6.X
+OS CPE: cpe:/o:linux:linux_kernel:2.6.39
+OS details: Linux 2.6.39
+Network Distance: 11 hops
+Service Info: OS: Linux; CPE: cpe:/o:linux:kernel
+
+TRACEROUTE (using port 53/tcp)
+HOP RTT      ADDRESS
+[Cut first 10 hops for brevity]
+11  17.65 ms li86-221.members.linode.com (74.207.244.221)
+
+Nmap done: 1 IP address (1 host up) scanned in 14.40 seconds
+</pre></div></div><br class="example-break"/><p>The newest version of Nmap can be obtained from
+<a class="ulink" href="https://nmap.org" target="_top"><code class="systemitem">https://nmap.org</code></a>.  The newest version of this man page
+is available at <a class="ulink" href="https://nmap.org/book/man.html" target="_top"><code class="systemitem">https://nmap.org/book/man.html</code></a>.
+It is also included as a chapter of <a class="ulink" href="https://nmap.org/book/" target="_top"><em class="citetitle">Nmap Network Scanning: The Official Nmap Project Guide to Network Discovery and Security Scanning</em></a>.
+</p></section><a id="idm26954961137136" class="indexterm"></a></section><footer><hr/><nav class="docnav-footer"><div class="dn-unit"><a class="dn-link dn-prev" href="data-files-replacing-data-files.html">Prev</a><span class="dn-title">Using Customized Data Files</span></div><div class="dn-unit"><a class="dn-link dn-up" href="toc.html" accesskey="u">Up</a><span class="dn-title">Nmap Network Scanning</span></div><div class="dn-unit"><a class="dn-link dn-home" href="toc.html" accesskey="h">Home</a></div><div class="dn-unit"><a class="dn-link dn-next" href="man-briefoptions.html">Next</a><span class="dn-title">Options Summary</span></div></nav></footer>
+</main><!-- content -->
+
+<footer id="nst-foot">
+   <form class="nst-search" id="nst-foot-search" action="/search/">
+    <input class="nst-search-q" name="q" type="search" placeholder="Site Search">
+    <button class="nst-search-button" title="Search">
+     <img style="width:100%;aspect-ratio:1/1;" alt="" aria-hidden="true"
+      src="/shared/images/nst-icons.svg#search">
+     </button>
+   </form>
+<div class="flexlists">
+<div class="fl-unit">
+<h2><a class="nlink" href="https://nmap.org/">Nmap Security Scanner</a></h2>
+<ul>
+<li><a class="nlink" href="https://nmap.org/book/man.html">Ref Guide</a>
+<li><a class="nlink" href="https://nmap.org/book/install.html">Install Guide</a>
+<li><a class="nlink" href="https://nmap.org/docs.html">Docs</a>
+<li><a class="nlink" href="https://nmap.org/download.html">Download</a>
+<li><a class="nlink" href="https://nmap.org/oem/">Nmap OEM</a>
+</ul>
+</div>
+<div class="fl-unit">
+<h2><a class="nlink" href="https://npcap.com/">Npcap packet capture</a></h2>
+<ul>
+<li><a class="nlink" href="https://npcap.com/guide/">User's Guide</a>
+<li><a class="nlink" href="https://npcap.com/guide/npcap-devguide.html#npcap-api">API docs</a>
+<li><a class="nlink" href="https://npcap.com/#download">Download</a>
+<li><a class="nlink" href="https://npcap.com/oem/">Npcap OEM</a>
+</ul>
+</div>
+<div class="fl-unit">
+<h2><a class="nlink" href="https://seclists.org/">Security Lists</a></h2>
+<ul>
+<li><a class="nlink" href="https://seclists.org/nmap-announce/">Nmap Announce</a>
+<li><a class="nlink" href="https://seclists.org/nmap-dev/">Nmap Dev</a>
+<li><a class="nlink" href="https://seclists.org/fulldisclosure/">Full Disclosure</a>
+<li><a class="nlink" href="https://seclists.org/oss-sec/">Open Source Security</a>
+<li><a class="nlink" href="https://seclists.org/dataloss/">BreachExchange</a>
+</ul>
+</div>
+<div class="fl-unit">
+<h2><a class="nlink" href="https://sectools.org">Security Tools</a></h2>
+<ul>
+<li><a class="nlink" href="https://sectools.org/tag/vuln-scanners/">Vuln scanners</a>
+<li><a class="nlink" href="https://sectools.org/tag/pass-audit/">Password audit</a>
+<li><a class="nlink" href="https://sectools.org/tag/web-scanners/">Web scanners</a>
+<li><a class="nlink" href="https://sectools.org/tag/wireless/">Wireless</a>
+<li><a class="nlink" href="https://sectools.org/tag/sploits/">Exploitation</a>
+</ul>
+</div>
+<div class="fl-unit">
+<h2><a class="nlink" href="https://insecure.org/">About</a></h2>
+<ul>
+<li><a class="nlink" href="https://insecure.org/fyodor/">About/Contact</a>
+<li><a class="nlink" href="https://insecure.org/privacy.html">Privacy</a>
+<li><a class="nlink" href="https://insecure.org/advertising.html">Advertising</a>
+<li><a class="nlink" href="https://nmap.org/npsl/">Nmap Public Source License</a>
+</ul>
+</div>
+<div class="fl-unit social-links">
+<a class="nlink" href="https://twitter.com/nmap" title="Visit us on Twitter">
+ <img width="32" height="32" src="/shared/images/nst-icons.svg#twitter" alt="" aria-hidden="true">
+ </a>
+<a class="nlink" href="https://facebook.com/nmap" title="Visit us on Facebook">
+ <img width="32" height="32" src="/shared/images/nst-icons.svg#facebook" alt="" aria-hidden="true">
+ </a>
+<a class="nlink" href="https://github.com/nmap/" title="Visit us on Github">
+ <img width="32" height="32" src="/shared/images/nst-icons.svg#github" alt="" aria-hidden="true">
+ </a>
+<a class="nlink" href="https://reddit.com/r/nmap/" title="Discuss Nmap on Reddit">
+ <img width="32" height="32" src="/shared/images/nst-icons.svg#reddit" alt="" aria-hidden="true">
+ </a>
+</div>
+</div>
+</footer>
+
+</div><!-- wrapper -->
+</body>
+</html>
+

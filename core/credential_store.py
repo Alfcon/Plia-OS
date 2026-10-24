@@ -1,0 +1,166 @@
+from __future__ import annotations
+
+import base64
+import getpass
+import hashlib
+import json
+import logging
+import os
+import socket
+from pathlib import Path
+
+from core.config import get_config, update_config
+
+logger = logging.getLogger(__name__)
+
+_SERVICE = "plia-research"
+
+_CRED_FILE = Path(
+    os.environ.get(
+        "PLIA_CRED_FILE",
+        str(
+            Path(
+                os.environ.get("PLIA_CONFIG_FILE", str(Path.home() / ".plia" / "config.json"))
+            ).parent
+            / "credentials.enc"
+        ),
+    )
+)
+
+
+def _install_secret() -> bytes:
+    """Per-install random secret, persisted next to the credential file with
+    0600 perms. Mixed into the encryption key so credentials.enc is not
+    decryptable from public host/user info alone — an attacker who copies the
+    encrypted file (backup, disk image, cloud sync) also needs this key file.
+    Best-effort: returns b"" if the secret can't be created."""
+    key_file = _CRED_FILE.parent / "credentials.key"
+    try:
+        if key_file.exists():
+            return key_file.read_bytes()
+        secret = os.urandom(32)
+        key_file.parent.mkdir(parents=True, exist_ok=True)
+        key_file.write_bytes(secret)
+        key_file.chmod(0o600)
+        return secret
+    except Exception as exc:
+        logger.warning("Could not persist install secret (%s); key falls back to host/user only", exc)
+        return b""
+
+
+def _derive_key() -> bytes:
+    try:
+        user = getpass.getuser()
+    except Exception:
+        user = "plia"
+    raw = _install_secret() + (socket.gethostname() + user).encode()
+    digest = hashlib.sha256(raw).digest()
+    return base64.urlsafe_b64encode(digest)
+
+
+def _load_file() -> dict:
+    if not _CRED_FILE.exists():
+        return {}
+    try:
+        from cryptography.fernet import Fernet
+        return json.loads(Fernet(_derive_key()).decrypt(_CRED_FILE.read_bytes()))
+    except Exception as exc:
+        logger.warning("Failed to decrypt credential file: %s", exc)
+        return {}
+
+
+def _save_file(data: dict) -> None:
+    from cryptography.fernet import Fernet
+    _CRED_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _CRED_FILE.write_bytes(Fernet(_derive_key()).encrypt(json.dumps(data).encode()))
+    _CRED_FILE.chmod(0o600)
+
+
+def _classify_keyring_error(exc: Exception) -> str:
+    name = type(exc).__name__
+    msg = str(exc).lower()
+    if "nokeyring" in name.lower() or "nobackend" in name.lower():
+        return "no keyring backend installed"
+    if "permission" in name.lower() or "dbus" in name.lower() or "locked" in msg:
+        return "keyring locked or headless environment"
+    return f"keyring error: {name}"
+
+
+def set_credentials(site_slug: str, username: str, password: str) -> str:
+    cfg = get_config()
+
+    if cfg.credential_backend == "file":
+        data = _load_file()
+        data[site_slug] = {"username": username, "password": password}
+        _save_file(data)
+        return f"Stored credentials for '{site_slug}' in encrypted file."
+
+    try:
+        import keyring
+        blob = json.dumps({"username": username, "password": password})
+        keyring.set_password(_SERVICE, site_slug, blob)
+        return f"Stored credentials for '{site_slug}' in system keyring."
+    except Exception as exc:
+        reason = _classify_keyring_error(exc)
+        logger.warning("Keyring unavailable (%s), falling back to encrypted file", reason)
+        update_config(credential_backend="file")
+        data = _load_file()
+        data[site_slug] = {"username": username, "password": password}
+        _save_file(data)
+        return f"Keyring unavailable ({reason}). Stored credentials for '{site_slug}' in encrypted file."
+
+
+def get_credentials(site_slug: str) -> dict | None:
+    cfg = get_config()
+
+    if cfg.credential_backend == "file":
+        data = _load_file()
+        return data.get(site_slug)
+
+    try:
+        import keyring
+        blob = keyring.get_password(_SERVICE, site_slug)
+        if blob is None:
+            return None
+        return json.loads(blob)
+    except Exception as exc:
+        # Do NOT persist a backend switch here: a transient keyring error
+        # (locked session, headless boot) would permanently downgrade the
+        # backend and hide credentials still stored in the keyring. Fall back
+        # to the file for this read only.
+        logger.warning("Keyring read failed (%s), reading file backend for this call", _classify_keyring_error(exc))
+        data = _load_file()
+        return data.get(site_slug)
+
+
+def has_credentials(site_slug: str) -> bool:
+    return get_credentials(site_slug) is not None
+
+
+def remove_credentials(site_slug: str) -> bool:
+    cfg = get_config()
+
+    if cfg.credential_backend == "file":
+        data = _load_file()
+        if site_slug not in data:
+            return False
+        del data[site_slug]
+        _save_file(data)
+        return True
+
+    try:
+        import keyring
+        if keyring.get_password(_SERVICE, site_slug) is None:
+            return False
+        keyring.delete_password(_SERVICE, site_slug)
+        return True
+    except Exception as exc:
+        # As in get_credentials: don't persist a backend switch on a transient
+        # keyring error. Attempt the removal against the file backend only.
+        logger.warning("Keyring remove failed (%s), using file backend for this call", _classify_keyring_error(exc))
+        data = _load_file()
+        if site_slug not in data:
+            return False
+        del data[site_slug]
+        _save_file(data)
+        return True

@@ -1,0 +1,76 @@
+import os
+from core.config import reset_config, update_config, get_config
+
+
+def setup_function():
+    reset_config()
+
+
+def teardown_function():
+    reset_config()
+
+
+def test_fallback_provider_defaults_empty():
+    assert get_config().fallback_provider == ""
+
+
+def test_fallback_model_defaults_empty():
+    assert get_config().fallback_model == ""
+
+
+def test_web_search_default_is_ddg():
+    assert get_config().web_search_default == "ddg"
+
+
+def test_memory_dir_default():
+    assert get_config().memory_dir == os.path.expanduser("~/.plia")
+
+
+def test_update_fallback_provider():
+    update_config(fallback_provider="openai")
+    assert get_config().fallback_provider == "openai"
+
+
+def test_update_web_search_default():
+    update_config(web_search_default="google")
+    assert get_config().web_search_default == "google"
+
+
+def test_tts_engine_valid_values_accepted():
+    for engine in ("kokoro", "chatterbox", "dramabox"):
+        update_config(tts_engine=engine)
+        assert get_config().tts_engine == engine
+
+
+def test_tts_engine_invalid_value_raises():
+    import pytest
+    with pytest.raises(ValueError, match="tts_engine"):
+        update_config(tts_engine="garbage")
+
+
+def test_stt_model_size_valid_values_accepted():
+    for size in ("tiny", "base", "small", "medium", "large"):
+        update_config(stt_model_size=size)
+        assert get_config().stt_model_size == size
+
+
+def test_stt_model_size_invalid_value_raises():
+    import pytest
+    with pytest.raises(ValueError, match="stt_model_size"):
+        update_config(stt_model_size="huge")
+
+
+def test_studio_pipeline_mode_invalid_raises():
+    import pytest
+    with pytest.raises(ValueError, match="studio_pipeline_mode"):
+        update_config(studio_pipeline_mode="invalid")
+
+
+def test_gcal_credentials_file_default_empty():
+    from core.config import PliaConfig
+    assert PliaConfig().gcal_credentials_file == ""
+
+
+def test_gcal_calendar_id_default_primary():
+    from core.config import PliaConfig
+    assert PliaConfig().gcal_calendar_id == "primary"
