@@ -19,16 +19,17 @@ A local AI voice assistant with a web dashboard and a multi-agent backend.
 - [Ollama](https://ollama.com) running locally with a model loaded (default: `llama3.2`)
 - A microphone
 
-## Install via venv
 
-Clone the repository first:
+## Clone the repository first:
 
 ```bash
 git clone https://github.com/Alfcon/Plia-OS.git
 cd Plia-OS
 ```
 
-Then create an isolated environment (with venv):
+## Install via venv
+
+Create an isolated environment (with venv):
 
 ```bash
 python3.12 -m venv .plia-os
