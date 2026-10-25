@@ -50,8 +50,9 @@ It asks `Proceed ([y]/n)?` — press `y`. Once complete, activate the environmen
 ```bash
 conda activate plia-os
 ```
-
-Then, with the environment active:
+## Adding the required files
+You will need to run the requirements.txt, But edit it if you do not want all the Optional extras.  See below
+With the environment active:
 
 ```bash
 pip install -r requirements.txt
