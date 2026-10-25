@@ -21,7 +21,14 @@ A local AI voice assistant with a web dashboard and a multi-agent backend.
 
 ## Install via venv
 
-Create an isolated environment first (with venv):
+Clone the repository first:
+
+```bash
+git clone https://github.com/Alfcon/Plia-OS.git
+cd Plia-OS
+```
+
+Then create an isolated environment (with venv):
 
 ```bash
 python3.12 -m venv .plia-os
